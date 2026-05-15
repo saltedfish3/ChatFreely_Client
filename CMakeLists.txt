@@ -13,22 +13,22 @@ find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
 
 set(PROJECT_SOURCES
-        main.cpp
+        src/main.cpp
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(ChatClient
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
-        bodywidget.h bodywidget.cpp
-        closebutton.h closebutton.cpp
-        minimizebutton.h minimizebutton.cpp
-        images.qrc
-        GlobalVariable.h
-        loginwidget.h loginwidget.cpp
-        registerwidget.h registerwidget.cpp
-        titlebarwidget.h titlebarwidget.cpp
-        mainwidget.h mainwidget.cpp
+        src/widgets/bodywidget.h src/widgets/bodywidget.cpp
+        src/widgets/closebutton.h src/widgets/closebutton.cpp
+        src/widgets/minimizebutton.h src/widgets/minimizebutton.cpp
+        src/resources/images.qrc
+        src/utils/GlobalVariable.h
+        src/widgets/loginwidget.h src/widgets/loginwidget.cpp
+        src/widgets/registerwidget.h src/widgets/registerwidget.cpp
+        src/widgets/titlebarwidget.h src/widgets/titlebarwidget.cpp
+        src/widgets/mainwidget.h src/widgets/mainwidget.cpp
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET ChatClient APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
@@ -38,12 +38,30 @@ else()
     if(ANDROID)
         add_library(ChatClient SHARED
             ${PROJECT_SOURCES}
+            src/widgets/bodywidget.h src/widgets/bodywidget.cpp
+            src/widgets/closebutton.h src/widgets/closebutton.cpp
+            src/widgets/minimizebutton.h src/widgets/minimizebutton.cpp
+            src/resources/images.qrc
+            src/utils/GlobalVariable.h
+            src/widgets/loginwidget.h src/widgets/loginwidget.cpp
+            src/widgets/registerwidget.h src/widgets/registerwidget.cpp
+            src/widgets/titlebarwidget.h src/widgets/titlebarwidget.cpp
+            src/widgets/mainwidget.h src/widgets/mainwidget.cpp
         )
 # Define properties for Android with Qt 5 after find_package() calls as:
 #    set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
     else()
         add_executable(ChatClient
             ${PROJECT_SOURCES}
+            src/widgets/bodywidget.h src/widgets/bodywidget.cpp
+            src/widgets/closebutton.h src/widgets/closebutton.cpp
+            src/widgets/minimizebutton.h src/widgets/minimizebutton.cpp
+            src/resources/images.qrc
+            src/utils/GlobalVariable.h
+            src/widgets/loginwidget.h src/widgets/loginwidget.cpp
+            src/widgets/registerwidget.h src/widgets/registerwidget.cpp
+            src/widgets/titlebarwidget.h src/widgets/titlebarwidget.cpp
+            src/widgets/mainwidget.h src/widgets/mainwidget.cpp
         )
     endif()
 endif()
