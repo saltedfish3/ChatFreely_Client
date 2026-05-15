@@ -5,7 +5,7 @@
 #include <QLabel>
 #include "minimizebutton.h"
 #include "closebutton.h"
-#include "GlobalVariable.h"
+#include "../utils/GlobalVariable.h"
 
 
 class TitleBarWidget : public QWidget

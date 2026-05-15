@@ -5,7 +5,7 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QLineEdit>
-#include "GlobalVariable.h"
+#include "../utils/GlobalVariable.h"
 
 class RegisterWidget : public QWidget
 {

@@ -1,5 +1,5 @@
 // #include "widget.h"
-#include "bodywidget.h"
+#include "widgets/bodywidget.h"
 
 #include <QApplication>
 

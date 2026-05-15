@@ -14,7 +14,7 @@
 
 #include "closebutton.h"
 #include "minimizebutton.h"
-#include "GlobalVariable.h"
+#include "../utils/GlobalVariable.h"
 #include "loginwidget.h"
 #include "registerwidget.h"
 #include "titlebarwidget.h"
