@@ -29,6 +29,9 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         src/widgets/registerwidget.h src/widgets/registerwidget.cpp
         src/widgets/titlebarwidget.h src/widgets/titlebarwidget.cpp
         src/widgets/mainwidget.h src/widgets/mainwidget.cpp
+        src/widgets/chatwidget.h src/widgets/chatwidget.cpp
+        src/widgets/morewidget.h src/widgets/morewidget.cpp
+        src/widgets/contactswidget.h src/widgets/contactswidget.cpp
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET ChatClient APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR

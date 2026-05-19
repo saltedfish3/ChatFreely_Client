@@ -13,12 +13,14 @@ void LoginWidget::initWidget()
     //初始化 “欢迎回来” 标签
     this->label_welcomeBack = new QLabel("欢迎回来",this);
     this->label_welcomeBack->setObjectName("label_welcomeBack");
+    this->label_welcomeBack->setAlignment(Qt::AlignCenter);
     this->label_welcomeBack->resize(440,40);
     this->label_welcomeBack->move(180,68);
 
     //初始化 “登录您的” 标签
     this->label_welcomeBack2 = new QLabel("登录您的 "+ QString(AppEnglishName) +" 账号",this);
     this->label_welcomeBack2->setObjectName("label_welcomeBack2");
+    this->label_welcomeBack2->setAlignment(Qt::AlignCenter);
     this->label_welcomeBack2->resize(440,24);
     this->label_welcomeBack2->move(180,118);
 
@@ -64,6 +66,9 @@ void LoginWidget::initWidget()
     this->btn_loginNow->move(180,this->edit_loginPassd->pos().y() + this->edit_loginPassd->height() + 32);
     connect(this->btn_loginNow,&QPushButton::pressed,this,&LoginWidget::onButtonPressed);
     connect(this->btn_loginNow,&QPushButton::released,this,&LoginWidget::onButtonReleased);
+    connect(this->btn_loginNow,&QPushButton::clicked,this,[=](){
+        emit changeWidget(WidgetID::Main);
+    });
 
     //初始化 “还没有账号” 标签
     this->label_noAccount = new QLabel("还没有账号?",this);
@@ -81,6 +86,7 @@ void LoginWidget::initWidget()
     //初始化 “版本号” 标签
     this->label_version = new QLabel(QString(AppEnglishName) +" v" + QString(AppVersion),this);
     this->label_version->setObjectName("label_version");
+    this->label_version->setAlignment(Qt::AlignCenter);
     this->label_version->resize(440,20);
     this->label_version->move(180,this->height() - this->label_version->height() - 30);
 }
@@ -126,7 +132,6 @@ void LoginWidget::initLoginStyle()
                                             font-family: "Microsoft YaHei";
                                             font-size: 30px;
                                             font-weight: 700;
-                                            qproperty-alignment: 'AlignCenter';
                                             background:transparent;
                                         }
                                         #label_welcomeBack2
@@ -135,7 +140,6 @@ void LoginWidget::initLoginStyle()
                                             font-family: "Microsoft YaHei";
                                             font-size: 16px;
                                             font-weight: 500;
-                                            qproperty-alignment: 'AlignCenter';
                                             background:transparent;
                                         }
                                         #label_loginEmail,
@@ -162,7 +166,6 @@ void LoginWidget::initLoginStyle()
                                             font-size: 10px;
                                             font-weight: 400;
                                             background:transparent;
-                                            qproperty-alignment: 'AlignCenter';
                                         }
 
                                         #edit_loginEmail,

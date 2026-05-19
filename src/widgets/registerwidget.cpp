@@ -13,12 +13,14 @@ void RegisterWidget::initWidget()
     //初始化 “创建账号” 标签
     this->label_createAccount = new QLabel("创建账号",this);
     this->label_createAccount->setObjectName("label_createAccount");
+    this->label_createAccount->setAlignment(Qt::AlignCenter);
     this->label_createAccount->resize(440,40);
     this->label_createAccount->move(180,44);
 
     //初始化 “立即加入” 标签
     this->label_joinApp = new QLabel("立即加入 "+ QString(AppEnglishName) +" 社区",this);
     this->label_joinApp->setObjectName("label_joinApp");
+    this->label_joinApp->setAlignment(Qt::AlignCenter);
     this->label_joinApp->resize(440,24);
     this->label_joinApp->move(180,94);
 
@@ -111,7 +113,6 @@ void RegisterWidget::initRegisterSytle()
                                                 font-family: "Microsoft YaHei";
                                                 font-size: 30px;
                                                 font-weight: 700;
-                                                qproperty-alignment: 'AlignCenter';
                                                 background:transparent;
                                             }
                                             #label_joinApp
@@ -120,7 +121,6 @@ void RegisterWidget::initRegisterSytle()
                                                 font-family: "Microsoft YaHei";
                                                 font-size: 16px;
                                                 font-weight: 500;
-                                                qproperty-alignment: 'AlignCenter';
                                                 background:transparent;
                                             }
                                             #label_regUsername,

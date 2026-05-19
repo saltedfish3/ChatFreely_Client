@@ -1,5 +1,20 @@
 <RCC>
-    <qresource prefix="/"/>
+    <qresource prefix="/default">
+        <file>images/defaultAvatar.png</file>
+        <file>images/normal_chats.png</file>
+        <file>images/activate_contacts.png</file>
+        <file>images/normal_contacts.png</file>
+        <file>images/activate_chats.png</file>
+        <file>images/activate_setting.png</file>
+        <file>images/normal_setting.png</file>
+        <file>images/search.png</file>
+        <file>images/send.png</file>
+        <file>images/more.png</file>
+        <file>images/clearMsg.png</file>
+        <file>images/deleteUser.png</file>
+        <file>images/noNoise.png</file>
+        <file>images/userInfo.png</file>
+    </qresource>
     <qresource prefix="/icon">
         <file>images/favicon.ico</file>
     </qresource>

@@ -29,7 +29,7 @@ void TitleBarWidget::initWidget()
     this->label_logo = new QLabel(this);
     this->label_logo->setObjectName("label_logo");
     this->label_logo->resize(16,16);
-    this->label_logo->setPixmap(QPixmap(":/icon/images/favicon.ico").scaled(16,16));
+    this->label_logo->setPixmap(QIcon(":/icon/images/favicon.ico").pixmap(16,16));
     this->label_logo->move(12,(this->height() - this->label_logo->height())/2);
 
     //App名字标签

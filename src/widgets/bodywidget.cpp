@@ -120,7 +120,7 @@ void BodyWidget::initRegisterWidget()
 //初始化 主界面
 void BodyWidget::initMainWidget()
 {
-    this->widget_main = new MainWidget(this->stackedWidget_page->width(),this->stackedWidget_page->height(),this->stackedWidget_page);
+    this->widget_main = new MainWidget(this->stackedWidget_page->width(),this->stackedWidget_page->height());
     this->widget_main->setObjectName("widget_main");
 
     this->stackedWidget_page->addWidget(this->widget_main);
