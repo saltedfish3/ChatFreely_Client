@@ -56,11 +56,8 @@ void SettingWidget::initWidget()
     this->label_settingLittleTitle->resize(this->widget_holy->width(),20);
     this->label_settingLittleTitle->move(0,this->label_settingTitle->pos().y() + this->label_settingTitle->height() + 8);
 
-    initThisStyle();
     initPersonalDataWidget();
-    initPersonalDataStyle();
     initSystemDataWidget();
-    initSystemDataStyle();
 
     this->line = new QFrame(this->widget_holy);
     this->line->setObjectName("line");
@@ -96,11 +93,13 @@ void SettingWidget::initWidget()
                         + this->label_version->height() + 20;
     this->widget_holy->setMinimumHeight(contentHeight);
     this->scrollArea->setWidgetResizable(true);
+
+    initThisStyle();
 }
 
 void SettingWidget::initThisStyle()
 {
-    this->setStyleSheet(R"(
+    this->setStyleSheet(QString(R"(
                 #scrollArea
                 {
                     background:transparent;
@@ -219,7 +218,163 @@ void SettingWidget::initThisStyle()
                     font-weight: 400;
                     background:transparent;
                 }
-                    )");
+                                    #widget_personalData
+                                    {
+                                        background-color: #ffffff;
+                                        border: 1px solid rgba(239, 234, 254, 255);
+                                        border-radius: 12px;
+                                    }
+                                    #label_personalData
+                                    {
+                                        font-size: 16px;
+                                        font-family:'Segoe UI Variable';
+                                        font-weight:bold;
+                                        color:#111827;
+                                        padding-left:%1px;
+                                    }
+                                    #btn_avatar
+                                    {
+                                        background-color: rgba(255, 255, 255, 255);
+                                        border: 2px solid rgba(243, 244, 246, 255);
+                                        border-radius:%3px;
+                                    }
+                                    #label_camera_icon
+                                    {
+                                        background-color: rgba(99, 102, 241, 255);
+                                        border: 2px solid rgba(255, 255, 255, 255);
+                                        border-radius: %2px;
+                                    }
+                                    #label_username,#label_userID,#label_email
+                                    {
+                                        font-size: 14px;
+                                        font-weight:bold;
+                                        color:#4b5563;
+                                    }
+                                    #edit_username,#edit_userID,#edit_email
+                                    {
+                                        background-color: rgba(249, 250, 251, 255);;
+                                        border: 1px solid rgba(229, 231, 235, 255);
+                                        border-radius: 8px;
+                                        padding: 8px 12px;
+                                        font-size: 14px;
+                                        color: rgba(55, 65, 81, 255);
+                                    }
+                                    #edit_username:focus,#edit_userID:focus,#edit_email:focus
+                                    {
+                                        border: 1px solid rgba(99, 102, 241, 255);
+                                        background-color: rgba(255, 255, 255, 255);;
+                                    }
+                                    #edit_username:disabled,#edit_userID:disabled,#edit_email:disabled
+                                    {
+                                        border: 1px solid rgba(229, 231, 235, 255);
+                                        background-color: rgba(243, 244, 246, 255);
+                                        color: rgba(156, 163, 175, 255);
+                                    }
+
+
+                                    #widget_systemData
+                                    {
+                                        background-color: #ffffff;
+                                        border: 1px solid rgba(239, 234, 254, 255);
+                                        border-radius: 12px;
+                                    }
+                                    #label_system_setting
+                                    {
+                                        font-size: 16px;
+                                        font-family:'Segoe UI Variable';
+                                        font-weight:bold;
+                                        color:#111827;
+                                        padding-left:%4px;
+                                    }
+                                    #label_bigTitle_fileSave,#label_bigTitle_chatRecord
+                                    {
+                                        color: rgba(156, 163, 175, 255);
+                                        font-size: 16px;
+                                        font-weight:500;
+                                        padding-left:20px;
+                                    }
+                                    #label_fileSavePos,#label_chatRecordSavePos,#label_saveSpaceManage
+                                    {
+                                        color: rgba(75, 85, 99, 255);
+                                        font-size: 13px;
+                                        padding-left:20px;
+                                    }
+                                    #label_occupyNow
+                                    {
+                                        color: rgba(75, 85, 99, 255);
+                                        font-size: 12px;
+                                        padding-left:20px;
+                                    }
+                                    #label_occupyNumber
+                                    {
+                                        color: rgba(75, 85, 99, 255);
+                                        font-size: 12px;
+                                        padding-left:75px;
+                                    }
+                                    #edit_fileSavePos,#edit_chatRecordSavePos
+                                    {
+                                        background-color: rgba(249, 250, 251, 255);;
+                                        border: 1px solid rgba(229, 231, 235, 255);
+                                        border-radius: 8px;
+                                        padding: 8px 12px;
+                                        font-size: 13px;
+                                        font-weight:bold;
+                                        color: rgba(55, 65, 81, 255);
+                                    }
+                                    #edit_fileSavePos:focus,#edit_chatRecordSavePos:focus
+                                    {
+                                        border: 1px solid rgba(99, 102, 241, 255);
+                                        background-color: rgba(255, 255, 255, 255);;
+                                    }
+                                    #edit_fileSavePos:disabled,#edit_chatRecordSavePos:disabled
+                                    {
+                                        border: 1px solid rgba(229, 231, 235, 255);
+                                        background-color: rgba(243, 244, 246, 255);
+                                        color: rgba(156, 163, 175, 255);
+                                    }
+                                    #btn_changechatRecordSavePos,#btn_changeFileSavePos
+                                    {
+                                        background-color: rgba(255, 255, 255, 255);
+                                        border: 1px solid rgba(209, 213, 219, 255);
+                                        border-radius: 6px;
+                                        color: rgba(75, 85, 99, 255);
+                                        font-size: 13px;
+                                        font-weight:bold;
+                                    }
+                                    #btn_changechatRecordSavePos:hover,#btn_changeFileSavePos:hover
+                                    {
+                                        background-color: rgba(249, 250, 251, 255);
+                                        border-color: rgba(99, 102, 241, 255);
+                                        color: rgba(99, 102, 241, 255);
+                                    }
+                                    #btn_changechatRecordSavePos:pressed,#btn_changeFileSavePos:pressed
+                                    {
+                                        background-color: rgba(243, 244, 246, 255);
+                                    }
+                                    #btn_clearOccupy
+                                    {
+                                        background-color: rgba(254, 242, 242, 255);
+                                        border: 1px solid rgba(252, 165, 165, 255);
+                                        border-radius: 6px;
+                                        color: rgba(220, 38, 38, 255);
+                                        font-size: 13px;
+                                    }
+                                    #btn_clearOccupy:hover
+                                    {
+                                        background-color: rgba(220, 38, 38, 255);
+                                        border-color: rgba(220, 38, 38, 255);
+                                        color: rgba(255, 255, 255, 255);
+                                    }
+                                    #btn_clearOccupy:pressed
+                                    {
+                                        background-color: rgba(185, 28, 28, 255);
+                                        border-color: rgba(185, 28, 28, 255);
+                                        color: rgba(255, 255, 255, 255);
+                                    }
+                        )").arg(this->label_personalData_icon->width() + this->label_personalData_icon->pos().x()+8)
+                            .arg(this->label_camera_icon->height()/2)
+                            .arg(this->btn_avatar->width()/2)
+                        .arg(this->label_system_setting_icon->width() + this->label_system_setting_icon->pos().x()+8));
 }
 
 void SettingWidget::initPersonalDataWidget()
@@ -294,65 +449,6 @@ void SettingWidget::initPersonalDataWidget()
     this->edit_email->resize(512,40);
     this->edit_email->move(this->label_email->pos().x(),
                            this->label_email->pos().y()+this->label_email->height()+8);
-}
-void SettingWidget::initPersonalDataStyle()
-{
-    this->widget_personalData->setStyleSheet(QString(R"(
-                                    #widget_personalData
-                                    {
-                                        background-color: #ffffff;
-                                        border: 1px solid rgba(239, 234, 254, 255);
-                                        border-radius: 12px;
-                                    }
-                                    #label_personalData
-                                    {
-                                        font-size: 16px;
-                                        font-family:'Segoe UI Variable';
-                                        font-weight:bold;
-                                        color:#111827;
-                                        padding-left:%1px;
-                                    }
-                                    #btn_avatar
-                                    {
-                                        background-color: rgba(255, 255, 255, 255);
-                                        border: 2px solid rgba(243, 244, 246, 255);
-                                        border-radius:%3px;
-                                    }
-                                    #label_camera_icon
-                                    {
-                                        background-color: rgba(99, 102, 241, 255);
-                                        border: 2px solid rgba(255, 255, 255, 255);
-                                        border-radius: %2px;
-                                    }
-                                    #label_username,#label_userID,#label_email
-                                    {
-                                        font-size: 14px;
-                                        font-weight:bold;
-                                        color:#4b5563;
-                                    }
-                                    QLineEdit
-                                    {
-                                        background-color: rgba(249, 250, 251, 255);;
-                                        border: 1px solid rgba(229, 231, 235, 255);
-                                        border-radius: 8px;
-                                        padding: 8px 12px;
-                                        font-size: 14px;
-                                        color: rgba(55, 65, 81, 255);
-                                    }
-                                    QLineEdit:focus
-                                    {
-                                        border: 1px solid rgba(99, 102, 241, 255);
-                                        background-color: rgba(255, 255, 255, 255);;
-                                    }
-                                    QLineEdit:disabled
-                                    {
-                                        border: 1px solid rgba(229, 231, 235, 255);
-                                        background-color: rgba(243, 244, 246, 255);
-                                        color: rgba(156, 163, 175, 255);
-                                    }
-                                            )").arg(this->label_personalData_icon->width() + this->label_personalData_icon->pos().x()+8)
-                                             .arg(this->label_camera_icon->height()/2)
-                                             .arg(this->btn_avatar->width()/2));
 }
 
 void SettingWidget::initSystemDataWidget()
@@ -448,107 +544,3 @@ void SettingWidget::initSystemDataWidget()
                                 this->label_saveSpaceManage->pos().y() + 4);
 }
 
-void SettingWidget::initSystemDataStyle()
-{
-    this->widget_systemData->setStyleSheet(QString(R"(
-                                    #widget_systemData
-                                    {
-                                        background-color: #ffffff;
-                                        border: 1px solid rgba(239, 234, 254, 255);
-                                        border-radius: 12px;
-                                    }
-                                    #label_system_setting
-                                    {
-                                        font-size: 16px;
-                                        font-family:'Segoe UI Variable';
-                                        font-weight:bold;
-                                        color:#111827;
-                                        padding-left:%1px;
-                                    }
-                                    #label_bigTitle_fileSave,#label_bigTitle_chatRecord
-                                    {
-                                        color: rgba(156, 163, 175, 255);
-                                        font-size: 16px;
-                                        font-weight:500;
-                                        padding-left:20px;
-                                    }
-                                    #label_fileSavePos,#label_chatRecordSavePos,#label_saveSpaceManage
-                                    {
-                                        color: rgba(75, 85, 99, 255);
-                                        font-size: 13px;
-                                        padding-left:20px;
-                                    }
-                                    #label_occupyNow
-                                    {
-                                        color: rgba(75, 85, 99, 255);
-                                        font-size: 12px;
-                                        padding-left:20px;
-                                    }
-                                    #label_occupyNumber
-                                    {
-                                        color: rgba(75, 85, 99, 255);
-                                        font-size: 12px;
-                                        padding-left:75px;
-                                    }
-                                    QLineEdit
-                                    {
-                                        background-color: rgba(249, 250, 251, 255);;
-                                        border: 1px solid rgba(229, 231, 235, 255);
-                                        border-radius: 8px;
-                                        padding: 8px 12px;
-                                        font-size: 13px;
-                                        font-weight:bold;
-                                        color: rgba(55, 65, 81, 255);
-                                    }
-                                    QLineEdit:focus
-                                    {
-                                        border: 1px solid rgba(99, 102, 241, 255);
-                                        background-color: rgba(255, 255, 255, 255);;
-                                    }
-                                    QLineEdit:disabled
-                                    {
-                                        border: 1px solid rgba(229, 231, 235, 255);
-                                        background-color: rgba(243, 244, 246, 255);
-                                        color: rgba(156, 163, 175, 255);
-                                    }
-                                    #btn_changechatRecordSavePos,#btn_changeFileSavePos
-                                    {
-                                        background-color: rgba(255, 255, 255, 255);
-                                        border: 1px solid rgba(209, 213, 219, 255);
-                                        border-radius: 6px;
-                                        color: rgba(75, 85, 99, 255);
-                                        font-size: 13px;
-                                        font-weight:bold;
-                                    }
-                                    #btn_changechatRecordSavePos:hover,#btn_changeFileSavePos:hover
-                                    {
-                                        background-color: rgba(249, 250, 251, 255);
-                                        border-color: rgba(99, 102, 241, 255);
-                                        color: rgba(99, 102, 241, 255);
-                                    }
-                                    #btn_changechatRecordSavePos:pressed,#btn_changeFileSavePos:pressed
-                                    {
-                                        background-color: rgba(243, 244, 246, 255);
-                                    }
-                                    #btn_clearOccupy
-                                    {
-                                        background-color: rgba(254, 242, 242, 255);
-                                        border: 1px solid rgba(252, 165, 165, 255);
-                                        border-radius: 6px;
-                                        color: rgba(220, 38, 38, 255);
-                                        font-size: 13px;
-                                    }
-                                    #btn_clearOccupy:hover
-                                    {
-                                        background-color: rgba(220, 38, 38, 255);
-                                        border-color: rgba(220, 38, 38, 255);
-                                        color: rgba(255, 255, 255, 255);
-                                    }
-                                    #btn_clearOccupy:pressed
-                                    {
-                                        background-color: rgba(185, 28, 28, 255);
-                                        border-color: rgba(185, 28, 28, 255);
-                                        color: rgba(255, 255, 255, 255);
-                                    }
-                                        )").arg(this->label_system_setting_icon->width() + this->label_system_setting_icon->pos().x()+8));
-}

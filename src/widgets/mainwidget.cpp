@@ -221,11 +221,24 @@ void MainWidget::initStackedChat()
 
 void MainWidget::initPage()
 {
+    //初始化预热页面
+    QPixmap warmup(this->stackedWidget_Chat->size());
+    warmup.fill(Qt::transparent);
+
     this->widget_chat = new ChatWidget(this->stackedWidget_Chat->width(),this->stackedWidget_Chat->height());
+    this->widget_chat->ensurePolished();
+    this->widget_chat->render(&warmup);
+
     this->stackedWidget_Chat->addWidget(this->widget_chat);
     this->widget_contacts = new ContactsWidget(this->stackedWidget_Chat->width(),this->stackedWidget_Chat->height());
+    this->widget_contacts->ensurePolished();
+    this->widget_contacts->render(&warmup);
+
     this->stackedWidget_Chat->addWidget(this->widget_contacts);
     this->widget_setting = new SettingWidget(this->stackedWidget_Chat->width(),this->stackedWidget_Chat->height());
+    //提前绘制好样式和控件
+    this->widget_setting->ensurePolished();
+    this->widget_setting->render(&warmup);
     this->stackedWidget_Chat->addWidget(this->widget_setting);
 
     QPushButton* btn = nullptr;

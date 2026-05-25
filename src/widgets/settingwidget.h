@@ -21,11 +21,7 @@ public:
 
 signals:
 
-protected:
-    //void showEvent(QShowEvent* event) override;
-
 private:
-    //bool isInit;
 
     void setRadius(QIcon pic, QPushButton* btn, int hei_wid);
 
@@ -33,10 +29,7 @@ private:
     void initThisStyle();
 
     void initPersonalDataWidget();
-    void initPersonalDataStyle();
-
     void initSystemDataWidget();
-    void initSystemDataStyle();
 
     QScrollArea* scrollArea;
     QWidget* widget_holy;
