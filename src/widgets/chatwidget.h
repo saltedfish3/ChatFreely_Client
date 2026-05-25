@@ -50,8 +50,6 @@ private:
     QListView* listView_messages;
     QWidget* widget_input;
 
-
-
     QStackedWidget* stackedWidget_Conversation;
 };
 

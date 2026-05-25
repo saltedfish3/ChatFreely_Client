@@ -85,7 +85,7 @@ void MainWidget::initSideBar()
     this->label_avatar = new QLabel(this->widget_sideBar);
     this->label_avatar->setObjectName("label_avatar");
     this->label_avatar->resize(40,40);
-    this->label_avatar->setPixmap(QIcon(":/default/images/defaultAvatar.png").pixmap(this->label_avatar->width(),this->label_avatar->height()));
+    setRadius(QIcon(":/default/images/defaultAvatar.png"),this->label_avatar,this->label_avatar->width());
     this->label_avatar->move((this->widget_sideBar->width() - this->label_avatar->width()) / 2,16);
 
     this->sideBarGroup = new QButtonGroup(this->widget_sideBar);
@@ -223,11 +223,55 @@ void MainWidget::initPage()
 {
     this->widget_chat = new ChatWidget(this->stackedWidget_Chat->width(),this->stackedWidget_Chat->height());
     this->stackedWidget_Chat->addWidget(this->widget_chat);
-    // this->widget_contacts = new ContactsWidget()
+    this->widget_contacts = new ContactsWidget(this->stackedWidget_Chat->width(),this->stackedWidget_Chat->height());
+    this->stackedWidget_Chat->addWidget(this->widget_contacts);
+    this->widget_setting = new SettingWidget(this->stackedWidget_Chat->width(),this->stackedWidget_Chat->height());
+    this->stackedWidget_Chat->addWidget(this->widget_setting);
+
+    QPushButton* btn = nullptr;
+    btn = this->sideBarButton.value("btn_chats");
+    if(btn)
+        connect(btn,&QPushButton::clicked,this,[=](){
+            this->stackedWidget_Chat->setCurrentWidget(this->widget_chat);
+        });
+
+    btn = this->sideBarButton.value("btn_contacts");
+    if(btn)
+        connect(btn,&QPushButton::clicked,this,[=](){
+            this->stackedWidget_Chat->setCurrentWidget(this->widget_contacts);
+        });
+
+    btn = this->sideBarButton.value("btn_setting");
+    if(btn)
+        connect(btn,&QPushButton::clicked,this,[=](){
+            this->stackedWidget_Chat->setCurrentWidget(this->widget_setting);
+        });
 
     this->stackedWidget_Chat->setCurrentWidget(this->widget_chat);
 }
 
+void MainWidget::setRadius(QIcon pic, QLabel *label, int hei_wid)
+{
+    QPixmap pixmap = pic.pixmap(hei_wid);
+    //适配高DPI
+    pixmap.setDevicePixelRatio(pixmap.devicePixelRatioF());
+
+    QPixmap roundedPix(pixmap.size());
+    roundedPix.fill(Qt::transparent);
+    roundedPix.setDevicePixelRatio(pixmap.devicePixelRatio());
+
+    QPainter painter(&roundedPix);
+    painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+
+    QPainterPath path;
+    path.addEllipse(0,0,hei_wid,hei_wid);
+
+    painter.setClipPath(path);
+    painter.drawPixmap(0,0,pixmap);
+    painter.end();
+
+    label->setPixmap(roundedPix);
+}
 
 
 

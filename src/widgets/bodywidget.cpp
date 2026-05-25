@@ -10,6 +10,7 @@ BodyWidget::BodyWidget(int width, int height, int radius, QWidget* parent)
         height = 400;
     if (radius <= 0)
         this->radius = 0;
+    addRoundedMask();
     this->resize(width,height);
 
     //设置无边框和透明背景
@@ -68,6 +69,19 @@ bool BodyWidget::eventFilter(QObject* obj, QEvent* ev)
         }
     }
     return QObject::eventFilter(obj, ev);
+}
+
+void BodyWidget::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    addRoundedMask();
+}
+
+void BodyWidget::addRoundedMask()
+{
+    QPainterPath path;
+    path.addRoundedRect(this->rect(),this->radius - 1,this->radius - 1);
+    this->setMask(QRegion(path.toFillPolygon().toPolygon()));
 }
 
 //初始化 标题栏

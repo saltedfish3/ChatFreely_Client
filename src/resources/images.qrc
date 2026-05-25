@@ -14,6 +14,13 @@
         <file>images/deleteUser.png</file>
         <file>images/noNoise.png</file>
         <file>images/userInfo.png</file>
+        <file>images/addFriend.png</file>
+        <file>images/activate_rightArrow.png</file>
+        <file>images/normal_rightArrow.png</file>
+        <file>images/sendMsg.png</file>
+        <file>images/personalData.png</file>
+        <file>images/camera.png</file>
+        <file>images/systemSetting.png</file>
     </qresource>
     <qresource prefix="/icon">
         <file>images/favicon.ico</file>

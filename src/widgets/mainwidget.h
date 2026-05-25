@@ -10,6 +10,7 @@
 #include <QButtonGroup>
 #include "chatwidget.h"
 #include "contactswidget.h"
+#include "settingwidget.h"
 
 class MainWidget : public QWidget
 {
@@ -30,10 +31,13 @@ private:
 
     void initPage();
 
+    void setRadius(QIcon pic, QLabel *label, int hei_wid);
+
     //--------------------------------
     QWidget* widget_sideBar;
     ChatWidget* widget_chat;
-
+    ContactsWidget* widget_contacts;
+    SettingWidget* widget_setting;
 
     QLabel* label_avatar;
     QLabel* label_chats;
@@ -48,8 +52,6 @@ private:
 
     //--------------------------------
     QStackedWidget* stackedWidget_Chat;
-
-
 
 };
 

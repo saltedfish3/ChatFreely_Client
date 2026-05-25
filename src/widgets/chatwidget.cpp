@@ -1,9 +1,10 @@
 #include "chatwidget.h"
 
-ChatWidget::ChatWidget(int width, int height, QWidget *parent)
+ChatWidget::ChatWidget(int width, int height,QWidget *parent)
     : QWidget{parent}
 {
     this->resize(width,height);
+    this->setObjectName("this");
 
     initSearchWidget();
     initSearchStyle();
@@ -34,19 +35,19 @@ void ChatWidget::initSearchStyle()
     this->setStyleSheet(R"(
                                     #widget_search
                                     {
-                                        background: rgba(250, 251, 255, 255);
+                                        background: #ffffff;
                                         border-radius: 0;
-                                        border-right: 1px solid rgba(0, 0, 0, 26);
-                                        border-bottom: 1px solid rgba(0, 0, 0, 26);
+                                        border-right: 1px solid #e0e0e0;
+                                        border-bottom: 1px solid #e0e0e0;
                                     }
                                     #edit_search
                                     {
-                                        background-color: rgba(243, 244, 246, 255);
-                                        border: 1px solid rgba(209, 213, 219, 255);;
+                                        background-color: #efecf8;
+                                        border: 1px solid #f3f4f6;
                                         border-radius: 8px;
                                         padding-left: 0px;
                                         padding-right: 15px;
-                                        color: rgba(31, 41, 55, 255);
+                                        color: #1b1b23;
                                         font-size: 12px;
                                         font-weight:bold;
                                         font-family: "Microsoft YaHei";
@@ -72,9 +73,9 @@ void ChatWidget::initListStyle()
     this->listWidget_userList->setStyleSheet(R"(
                                             #listWidget_userList
                                             {
-                                                background: rgba(250, 251, 255, 255);
+                                                background: #ffffff;
                                                 border-radius: 0;
-                                                border-right: 1px solid rgba(0, 0, 0, 26);
+                                                border-right: 1px solid #e0e0e0;
                                             }
                                             )");
 }
@@ -194,13 +195,13 @@ void ChatWidget::initConversationStyle(QWidget* conversation)
     conversation->setStyleSheet(R"(
                             #conversation
                             {
-                                background-color: rgba(255, 255, 255, 255);
+                                background-color: #ffffff;
                                 border-left: none;
                             }
                             #header
                             {
                                 background-color: rgba(252, 255, 255, 255);
-                                border-bottom: 1px solid rgba(229, 231, 235, 255);
+                                border-bottom: 1px solid #e0e0e0;
                             }
                             #name
                             {
@@ -233,12 +234,12 @@ void ChatWidget::initConversationStyle(QWidget* conversation)
                             }
                             #messages
                             {
-                                background-color: rgba(255, 248, 255, 255);
-                                border-bottom: 1px solid rgba(229, 231, 235, 255);
+                                background-color: #f9f9f9;
+                                border-bottom: 1px solid #e0e0e0;
                             }
                             #editRegion
                             {
-                                background-color: rgba(255, 255, 255, 255);
+                                background-color: #ffffff;
                                 border: 1px solid rgba(99, 102, 241, 255);
                                 border-radius: 8px;
                             }

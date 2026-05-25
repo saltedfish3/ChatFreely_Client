@@ -35,6 +35,9 @@ private slots:
 private:
     void paintEvent(QPaintEvent* event) override;
     bool eventFilter(QObject* obj,QEvent* ev) override;
+    void resizeEvent(QResizeEvent* event) override;
+
+    void addRoundedMask();
 
     void initTitleBar();
     void initStackWidget();
