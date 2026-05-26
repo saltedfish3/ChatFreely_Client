@@ -24,7 +24,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         src/widgets/closebutton.h src/widgets/closebutton.cpp
         src/widgets/minimizebutton.h src/widgets/minimizebutton.cpp
         src/resources/images.qrc
-        src/utils/GlobalVariable.h
+        src/utils/GlobalVariable.h src/utils/GlobalVariable.cpp
         src/widgets/loginwidget.h src/widgets/loginwidget.cpp
         src/widgets/registerwidget.h src/widgets/registerwidget.cpp
         src/widgets/titlebarwidget.h src/widgets/titlebarwidget.cpp

@@ -5,11 +5,49 @@
 #define AppChineseName "畅聊"
 #define AppEnglishName "ChatFreely"
 
-enum WidgetID
+#include <QString>
+#include <QStandardPaths>
+#include <QDir>
+#include <QSettings>
+#include <QFileInfo>
+#include <QDirIterator>
+
+class GlobalVariable
 {
-    Login = 0,
-    Register,
-    Main
+public:
+    enum MainPage
+    {
+        Login = 0,
+        Register,
+        Main
+    };
+
+    static GlobalVariable& initGlobalSettings();
+    static QString getPosOfDownloadFile();
+    static void setPosOfDownloadFile(const QString& dir);
+
+    static QString getPosOfChatRecord();
+    static void setPosOfChatRecord(const QString& dir);
+
+    static QString getChatRecordSize();
+    static void clearAllChatRecord();
+
+    static void saveAllChange();
+    static void clearAllChange();
+
+private:
+    GlobalVariable();
+
+    static GlobalVariable myself;
+
+    static QString pos_ini;
+    static QString pos_downloadFile;
+    static QString pos_chatRecord;
+
+    static QString temp_posDownloadFile;
+    static QString temp_posChatRecord;
 };
+
+
 
 #endif // GLOBALVARIABLE_H

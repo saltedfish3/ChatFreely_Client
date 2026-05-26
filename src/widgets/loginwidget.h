@@ -14,7 +14,7 @@ public:
     explicit LoginWidget(int width, int height, QWidget *parent = nullptr);
 
 signals:
-    void changeWidget(WidgetID id);
+    void changeWidget(GlobalVariable::MainPage id);
 
 private slots:
 

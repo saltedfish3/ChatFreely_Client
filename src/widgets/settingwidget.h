@@ -11,6 +11,10 @@
 #include <QPainterPath>
 #include <QScrollArea>
 #include <QTimer>
+#include <thread>
+#include <atomic>
+#include <QMessageBox>
+#include <chrono>
 #include "../utils/GlobalVariable.h"
 
 class SettingWidget : public QWidget
@@ -18,7 +22,7 @@ class SettingWidget : public QWidget
     Q_OBJECT
 public:
     explicit SettingWidget(int width, int height, QWidget *parent = nullptr);
-
+    ~SettingWidget();
 signals:
 
 private:
@@ -30,6 +34,9 @@ private:
 
     void initPersonalDataWidget();
     void initSystemDataWidget();
+
+    std::atomic<bool> is_stop;
+    std::thread occupy_worker;
 
     QScrollArea* scrollArea;
     QWidget* widget_holy;

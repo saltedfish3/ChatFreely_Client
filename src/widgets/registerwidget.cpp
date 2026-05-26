@@ -237,5 +237,5 @@ void RegisterWidget::onButtonReleased()
 //发送 跳转到登录界面 信号
 void RegisterWidget::sendSignalChangeToLogin()
 {
-    emit changeWidget(WidgetID::Login);
+    emit changeWidget(GlobalVariable::MainPage::Login);
 }

@@ -141,13 +141,13 @@ void BodyWidget::initMainWidget()
 }
 
 //改变容器页码
-void BodyWidget::changeWidget(WidgetID id)
+void BodyWidget::changeWidget(GlobalVariable::MainPage id)
 {
-    if(id == WidgetID::Login)
+    if(id == GlobalVariable::MainPage::Login)
         this->stackedWidget_page->setCurrentWidget(this->widget_login);
-    else if(id == WidgetID::Register)
+    else if(id == GlobalVariable::MainPage::Register)
         this->stackedWidget_page->setCurrentWidget(this->widget_register);
-    else if(id == WidgetID::Main)
+    else if(id == GlobalVariable::MainPage::Main)
         this->stackedWidget_page->setCurrentWidget(this->widget_main);
 }
 

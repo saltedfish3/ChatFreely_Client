@@ -67,7 +67,7 @@ void LoginWidget::initWidget()
     connect(this->btn_loginNow,&QPushButton::pressed,this,&LoginWidget::onButtonPressed);
     connect(this->btn_loginNow,&QPushButton::released,this,&LoginWidget::onButtonReleased);
     connect(this->btn_loginNow,&QPushButton::clicked,this,[=](){
-        emit changeWidget(WidgetID::Main);
+        emit changeWidget(GlobalVariable::MainPage::Main);
     });
 
     //初始化 “还没有账号” 标签
@@ -114,7 +114,7 @@ void LoginWidget::onButtonReleased()
 //发送切换到 注册窗口 信号
 void LoginWidget::sendSignalsChangeToRegister()
 {
-    emit changeWidget(WidgetID::Register);
+    emit changeWidget(GlobalVariable::MainPage::Register);
 }
 
 //初始化 登录界面 样式表

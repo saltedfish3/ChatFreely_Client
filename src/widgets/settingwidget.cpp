@@ -7,6 +7,13 @@ SettingWidget::SettingWidget(int width, int height, QWidget *parent)
     initWidget();
 }
 
+SettingWidget::~SettingWidget()
+{
+    this->is_stop = true;
+    if(this->occupy_worker.joinable())
+        this->occupy_worker.join();
+}
+
 void SettingWidget::setRadius(QIcon pic, QPushButton *btn, int hei_wid)
 {
     QPixmap pixmap = pic.pixmap(hei_wid);
@@ -77,11 +84,22 @@ void SettingWidget::initWidget()
     this->btn_saveAllChange->move(this->widget_systemData->pos().x()+this->widget_systemData->width() - this->btn_saveAllChange->width(),
                                   this->btn_UnLoginMyself->pos().y());
 
+    connect(this->btn_saveAllChange,&QPushButton::clicked,this,[this](){
+        GlobalVariable::saveAllChange();
+        this->label_occupyNumber->setText(GlobalVariable::getChatRecordSize());
+    });
+
     this->btn_cancel = new QPushButton("取消",this->widget_holy);
     this->btn_cancel->setObjectName("btn_cancel");
     this->btn_cancel->resize(80,36);
     this->btn_cancel->move(this->btn_saveAllChange->pos().x() - this->btn_cancel->width() - 12,
                            this->btn_UnLoginMyself->pos().y());
+
+    connect(this->btn_cancel,&QPushButton::clicked,this,[this](){
+        GlobalVariable::clearAllChange();
+        this->edit_fileSavePos->setText(GlobalVariable::getPosOfDownloadFile());
+        this->edit_chatRecordSavePos->setText(GlobalVariable::getPosOfChatRecord());
+    });
 
     this->label_version = new QLabel(QString(AppEnglishName) +" v" + QString(AppVersion),this->widget_holy);
     this->label_version->setObjectName("label_version");
@@ -357,7 +375,7 @@ void SettingWidget::initThisStyle()
                                         border: 1px solid rgba(252, 165, 165, 255);
                                         border-radius: 6px;
                                         color: rgba(220, 38, 38, 255);
-                                        font-size: 13px;
+                                        font-size: 11px;
                                     }
                                     #btn_clearOccupy:hover
                                     {
@@ -484,7 +502,7 @@ void SettingWidget::initSystemDataWidget()
     this->edit_fileSavePos = new QLineEdit(this->widget_systemData);
     this->edit_fileSavePos->setObjectName("edit_fileSavePos");
     this->edit_fileSavePos->setReadOnly(true);
-    this->edit_fileSavePos->setText("afawfafa12313");
+    this->edit_fileSavePos->setText(GlobalVariable::getPosOfDownloadFile());
 
     this->edit_fileSavePos->move(20,this->label_fileSavePos->pos().y()+this->label_fileSavePos->height()+8);
 
@@ -495,6 +513,15 @@ void SettingWidget::initSystemDataWidget()
     this->edit_fileSavePos->resize(this->widget_systemData->width()-40-btn_changeFileSavePos->width() - 10,this->btn_changeFileSavePos->height());
     this->btn_changeFileSavePos->move(this->edit_fileSavePos->pos().x()+this->edit_fileSavePos->width()+10,
                                       this->edit_fileSavePos->pos().y());
+
+    connect(this->btn_changeFileSavePos,&QPushButton::clicked,this,[this](){
+        QString dir = QFileDialog::getExistingDirectory(this,"请选择下载文件保存目录",GlobalVariable::getPosOfDownloadFile());
+        if(dir.isEmpty())
+            return;
+        GlobalVariable::setPosOfDownloadFile(dir);
+        this->edit_fileSavePos->setText(dir);
+        //文件转移
+    });
 
     this->label_bigTitle_chatRecord = new QLabel("聊天记录",this->widget_systemData);
     this->label_bigTitle_chatRecord->setObjectName("label_bigTitle_chatRecord");
@@ -509,7 +536,7 @@ void SettingWidget::initSystemDataWidget()
     this->edit_chatRecordSavePos = new QLineEdit(this->widget_systemData);
     this->edit_chatRecordSavePos->setObjectName("edit_chatRecordSavePos");
     this->edit_chatRecordSavePos->setReadOnly(true);
-    this->edit_chatRecordSavePos->setText("awa1231442");
+    this->edit_chatRecordSavePos->setText(GlobalVariable::getPosOfChatRecord());
 
     this->edit_chatRecordSavePos->move(20,this->label_chatRecordSavePos->pos().y()+this->label_chatRecordSavePos->height()+4);
 
@@ -522,6 +549,15 @@ void SettingWidget::initSystemDataWidget()
     this->btn_changechatRecordSavePos->move(this->edit_chatRecordSavePos->pos().x()+this->edit_chatRecordSavePos->width()+10,
                                       this->edit_chatRecordSavePos->pos().y());
 
+    connect(this->btn_changechatRecordSavePos,&QPushButton::clicked,this,[this](){
+        QString dir = QFileDialog::getExistingDirectory(this,"请选择聊天文件保存目录",GlobalVariable::getPosOfChatRecord());
+        if(dir.isEmpty())
+            return;
+        GlobalVariable::setPosOfChatRecord(dir);
+        this->edit_chatRecordSavePos->setText(dir);
+        //文件转移
+    });
+
     this->label_saveSpaceManage = new QLabel("存储空间管理",this->widget_systemData);
     this->label_saveSpaceManage->setObjectName("label_saveSpaceManage");
     this->label_saveSpaceManage->resize(this->widget_systemData->width(),20);
@@ -532,15 +568,40 @@ void SettingWidget::initSystemDataWidget()
     this->label_occupyNow->resize(this->widget_systemData->width(),18);
     this->label_occupyNow->move(0,this->label_saveSpaceManage->pos().y()+this->label_saveSpaceManage->height()+4);
 
-    this->label_occupyNumber = new QLabel("23453MB",this->label_occupyNow);
+    this->label_occupyNumber = new QLabel(this->label_occupyNow);
     this->label_occupyNumber->setObjectName("label_occupyNumber");
     this->label_occupyNumber->resize(this->label_occupyNow->width(),this->label_occupyNow->height());
     this->label_occupyNumber->move(0,0);
+    this->label_occupyNumber->setText(GlobalVariable::getChatRecordSize());
 
-    this->btn_clearOccupy = new QPushButton("清空缓存",this->widget_systemData);
+    this->is_stop = false;
+    this->occupy_worker = std::thread([this](){
+        while(!this->is_stop)
+        {
+            this->label_occupyNumber->setText(GlobalVariable::getChatRecordSize());
+            std::this_thread::sleep_for(std::chrono::seconds(10));
+        }
+    });
+
+    QTimer* timer = new QTimer(this->widget_holy);
+    connect(timer,&QTimer::timeout,this,[this](){
+        this->label_occupyNumber->setText(GlobalVariable::getChatRecordSize());
+    });
+    timer->start(10000);
+
+    this->btn_clearOccupy = new QPushButton("清空聊天记录",this->widget_systemData);
     this->btn_clearOccupy->setObjectName("btn_clearOccupy");
     this->btn_clearOccupy->resize(80,this->label_occupyNow->pos().y()+this->label_occupyNow->height()-this->label_saveSpaceManage->pos().y() - 8);
     this->btn_clearOccupy->move(this->btn_changechatRecordSavePos->pos().x()+this->btn_changechatRecordSavePos->width()-this->btn_clearOccupy->width(),
                                 this->label_saveSpaceManage->pos().y() + 4);
+
+    connect(this->btn_clearOccupy,&QPushButton::clicked,this,[this](){
+        QMessageBox::StandardButton reply = QMessageBox::question(this,"确认清空？","确定要清空所有聊天记录吗？",QMessageBox::Yes|QMessageBox::Cancel);
+        if(reply == QMessageBox::Yes)
+        {
+            GlobalVariable::clearAllChatRecord();
+            this->label_occupyNumber->setText(GlobalVariable::getChatRecordSize());
+        }
+    });
 }
 

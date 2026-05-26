@@ -30,7 +30,7 @@ signals:
 
 
 private slots:
-    void changeWidget(WidgetID id);
+    void changeWidget(GlobalVariable::MainPage id);
 
 private:
     void paintEvent(QPaintEvent* event) override;
