@@ -70,6 +70,11 @@ void LoginWidget::initWidget()
         emit changeWidget(GlobalVariable::MainPage::Main);
     });
 
+    this->animation_btn_loginNow = new QPropertyAnimation(this->btn_loginNow,"geometry",this);
+    this->animation_btn_loginNow->setStartValue(this->btn_loginNow->geometry());
+    this->animation_btn_loginNow->setEndValue(this->btn_loginNow->geometry().adjusted(4,0,-4,-1));
+    this->animation_btn_loginNow->setDuration(50);
+
     //初始化 “还没有账号” 标签
     this->label_noAccount = new QLabel("还没有账号?",this);
     this->label_noAccount->setObjectName("label_noAccount");
@@ -97,8 +102,11 @@ void LoginWidget::onButtonPressed()
     QPushButton* send = qobject_cast<QPushButton*>(sender());
     if(!send)
         return;
-    send->resize(send->width() - 8,send->height() - 2);
-    send->move(send->pos().x() + 4,send->pos().y() + 1);
+    // send->resize(send->width() - 8,send->height() - 2);
+    this->animation_btn_loginNow->setDirection(QPropertyAnimation::Direction::Forward);
+    // send->move(send->pos().x() + 2,send->pos().y() + 1);
+    this->animation_btn_loginNow->start();
+
 }
 
 //按钮 松开动画
@@ -107,8 +115,11 @@ void LoginWidget::onButtonReleased()
     QPushButton* send = qobject_cast<QPushButton*>(sender());
     if(!send)
         return;
-    send->resize(send->width() + 8,send->height() + 2);
-    send->move(send->pos().x() - 4,send->pos().y() - 1);
+    this->animation_btn_loginNow->setDirection(QPropertyAnimation::Direction::Backward);
+    // send->move(send->pos().x() - 2,send->pos().y() - 1);
+    this->animation_btn_loginNow->start();
+    //send->resize(send->width() + 8,send->height() + 2);
+
 }
 
 //发送切换到 注册窗口 信号

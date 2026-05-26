@@ -5,6 +5,8 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QLineEdit>
+#include <QPropertyAnimation>
+
 #include "../utils/GlobalVariable.h"
 
 class LoginWidget : public QWidget
@@ -40,6 +42,8 @@ private:
     QPushButton* btn_loginNow;
     QPushButton* btn_forgetPassd;
     QPushButton* btn_goRegisterNow;
+
+    QPropertyAnimation* animation_btn_loginNow;
 };
 
 #endif // LOGINWIDGET_H

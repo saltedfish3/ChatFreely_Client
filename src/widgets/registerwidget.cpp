@@ -90,6 +90,11 @@ void RegisterWidget::initWidget()
     connect(this->btn_registerNow,&QPushButton::pressed,this,&RegisterWidget::onButtonPressed);
     connect(this->btn_registerNow,&QPushButton::released,this,&RegisterWidget::onButtonReleased);
 
+    this->animation_btn_registerNow = new QPropertyAnimation(this->btn_registerNow,"geometry",this);
+    this->animation_btn_registerNow->setStartValue(this->btn_registerNow->geometry());
+    this->animation_btn_registerNow->setEndValue(this->btn_registerNow->geometry().adjusted(4,0,-4,-1));
+    this->animation_btn_registerNow->setDuration(50);
+
     //初始化 “已经有账号” 标签
     this->label_haveAccount = new QLabel("已经有账号?",this);
     this->label_haveAccount->setObjectName("label_haveAccount");
@@ -220,8 +225,10 @@ void RegisterWidget::onButtonPressed()
     QPushButton* send = qobject_cast<QPushButton*>(sender());
     if(!send)
         return;
-    send->resize(send->width() - 8,send->height() - 2);
-    send->move(send->pos().x() + 4,send->pos().y() + 1);
+    // send->resize(send->width() - 8,send->height() - 2);
+    // send->move(send->pos().x() + 4,send->pos().y() + 1);
+    this->animation_btn_registerNow->setDirection(QPropertyAnimation::Direction::Forward);
+    this->animation_btn_registerNow->start();
 }
 
 //按钮 松开动画
@@ -230,8 +237,10 @@ void RegisterWidget::onButtonReleased()
     QPushButton* send = qobject_cast<QPushButton*>(sender());
     if(!send)
         return;
-    send->resize(send->width() + 8,send->height() + 2);
-    send->move(send->pos().x() - 4,send->pos().y() - 1);
+    // send->resize(send->width() + 8,send->height() + 2);
+    // send->move(send->pos().x() - 4,send->pos().y() - 1);
+    this->animation_btn_registerNow->setDirection(QPropertyAnimation::Direction::Backward);
+    this->animation_btn_registerNow->start();
 }
 
 //发送 跳转到登录界面 信号
