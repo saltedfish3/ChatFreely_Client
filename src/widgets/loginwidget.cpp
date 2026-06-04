@@ -37,6 +37,17 @@ void LoginWidget::initWidget()
     this->edit_loginEmail->setMaxLength(254);
     this->edit_loginEmail->resize(440,52);
     this->edit_loginEmail->move(180,192);
+    this->edit_loginEmail->setProperty("hasError", false);
+    connect(this->edit_loginEmail, &QLineEdit::textChanged, this, [=](){
+        clearError(this->edit_loginEmail, this->label_emailError);
+    });
+
+    //初始化 "电子邮箱" 错误标签
+    this->label_emailError = new QLabel("", this);
+    this->label_emailError->setObjectName("label_emailError");
+    this->label_emailError->resize(440, 20);
+    this->label_emailError->move(180, this->edit_loginEmail->pos().y() + this->edit_loginEmail->height() + 4);
+    this->label_emailError->hide();
 
     //初始化 "密码" 标签
     this->label_loginPassd = new QLabel("密码",this);
@@ -52,6 +63,17 @@ void LoginWidget::initWidget()
     this->edit_loginPassd->setMaxLength(128);
     this->edit_loginPassd->resize(440,52);
     this->edit_loginPassd->move(180,296);
+    this->edit_loginPassd->setProperty("hasError", false);
+    connect(this->edit_loginPassd, &QLineEdit::textChanged, this, [=](){
+        clearError(this->edit_loginPassd, this->label_passdError);
+    });
+
+    //初始化 "密码" 错误标签
+    this->label_passdError = new QLabel("", this);
+    this->label_passdError->setObjectName("label_passdError");
+    this->label_passdError->resize(440, 20);
+    this->label_passdError->move(180, this->edit_loginPassd->pos().y() + this->edit_loginPassd->height() + 4);
+    this->label_passdError->hide();
 
     //初始化 “忘记密码” 按钮
     this->btn_forgetPassd = new QPushButton("忘记密码?",this);
@@ -67,13 +89,74 @@ void LoginWidget::initWidget()
     connect(this->btn_loginNow,&QPushButton::pressed,this,&LoginWidget::onButtonPressed);
     connect(this->btn_loginNow,&QPushButton::released,this,&LoginWidget::onButtonReleased);
     connect(this->btn_loginNow,&QPushButton::clicked,this,[=](){
-        emit changeWidget(GlobalVariable::MainPage::Main);
+        QString email = this->edit_loginEmail->text().trimmed();
+        QString password = this->edit_loginPassd->text().trimmed();
+        QRegularExpression regExp_email("^[0-9a-zA-Z._%+\\-]+@[0-9a-zA-Z.\\-]+\\.[a-zA-Z]{2,}$");
+        QString info = QString();
+        if(email.isEmpty())
+        {
+            info = "邮箱不能为空";
+        }
+        else if(!regExp_email.match(email).hasMatch())
+        {
+            info = "邮箱格式不正确";
+        }
+        if(!info.isEmpty())
+        {
+            showError(this->edit_loginEmail, this->label_emailError, info);
+            return;
+        }
+
+        QRegularExpression regExp_password("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*])[a-zA-Z\\d!@#$%^&*]{8,30}$");
+        if(password.isEmpty())
+        {
+            info = "密码不能为空";
+        }
+        else if(!regExp_password.match(password).hasMatch())
+        {
+            info = "密码需包含大小写字母、数字和特殊符号(!@#$%^&*)，8-30位";
+        }
+        if(!info.isEmpty())
+        {
+            showError(this->edit_loginPassd, this->label_passdError, info);
+            return;
+        }
+        this->setDisabled(true);
+        this->btn_loginNow->setDisabled(true);
+        this->btn_loginNow->setText("立即登录中...");
+        this->animation_loading->start();
+        this->label_loading->show();
+        ChatClient::getChatClient().sendLogin(email, password);
     });
 
     this->animation_btn_loginNow = new QPropertyAnimation(this->btn_loginNow,"geometry",this);
     this->animation_btn_loginNow->setStartValue(this->btn_loginNow->geometry());
     this->animation_btn_loginNow->setEndValue(this->btn_loginNow->geometry().adjusted(4,0,-4,-1));
     this->animation_btn_loginNow->setDuration(50);
+
+    //初始化 “加载” 图标
+    this->label_loading = new LoadingLabel(this->btn_loginNow);
+    this->label_loading->resize(24,24);
+    this->label_loading->setPixmap(QIcon(":/default/images/loading.png").pixmap(24));
+    this->label_loading->move((this->btn_loginNow->width() - this->label_loading->width())/2 - 55,
+                              (this->btn_loginNow->height() - this->label_loading->height())/2);
+    this->label_loading->hide();
+
+    this->animation_loading = new QPropertyAnimation(this->label_loading,"angle",this);
+    this->animation_loading->setStartValue(0);
+    this->animation_loading->setEndValue(360);
+    this->animation_loading->setDuration(2000);
+    this->animation_loading->setLoopCount(-1);
+    this->animation_loading->start();
+
+    //初始化 "跳转" 时钟
+    this->timer_jump = new QTimer(this);
+    this->timer_jump->setInterval(2000);
+    this->timer_jump->setSingleShot(true);
+    connect(this->timer_jump,&QTimer::timeout,this,[=](){
+        emit changeWidget(GlobalVariable::MainPage::Main);
+        this->setDisabled(false);
+    });
 
     //初始化 “还没有账号” 标签
     this->label_noAccount = new QLabel("还没有账号?",this);
@@ -94,6 +177,22 @@ void LoginWidget::initWidget()
     this->label_version->setAlignment(Qt::AlignCenter);
     this->label_version->resize(440,20);
     this->label_version->move(180,this->height() - this->label_version->height() - 30);
+
+    //初始化 "顶部 错误提示" 标签
+    this->label_toast = new QLabel("", this);
+    this->label_toast->setObjectName("label_toast");
+    this->label_toast->setAlignment(Qt::AlignCenter);
+    this->label_toast->resize(this->width(), 44);
+    this->label_toast->move(0, 0);
+    this->label_toast->hide();
+
+    this->timer_toast = new QTimer(this);
+    this->timer_toast->setSingleShot(true);
+    connect(this->timer_toast, &QTimer::timeout, this, [=](){
+        this->label_toast->hide();
+    });
+
+    connect(&ChatClient::getChatClient(), &ChatClient::LoginState, this, &LoginWidget::getLoginState);
 }
 
 //按钮 按下动画
@@ -126,6 +225,64 @@ void LoginWidget::onButtonReleased()
 void LoginWidget::sendSignalsChangeToRegister()
 {
     emit changeWidget(GlobalVariable::MainPage::Register);
+}
+
+void LoginWidget::getLoginState(bool isSuccess, QString from, QString info)
+{
+    this->btn_loginNow->setDisabled(false);
+    this->btn_loginNow->setText("立即登录");
+    this->animation_loading->stop();
+    this->label_loading->hide();
+    if(isSuccess)
+    {
+        showToast(info + " 将在2秒后为您跳转...",isSuccess);
+        this->timer_jump->start();
+        return;
+    }
+    if(from.isEmpty())
+    {
+        showToast(info);
+    }
+    else if(from == "Email")
+    {
+        showError(this->edit_loginEmail,this->label_emailError,info);
+    }
+    else if(from == "Password")
+    {
+        showError(this->edit_loginPassd,this->label_passdError,info);
+    }
+    this->setDisabled(false);
+}
+
+//显示错误标签
+void LoginWidget::showError(QLineEdit* edit, QLabel* label, const QString& msg)
+{
+    label->setText(msg);
+    label->show();
+    edit->setProperty("hasError", true);
+    edit->style()->unpolish(edit);
+    edit->style()->polish(edit);
+}
+
+//清除错误标签
+void LoginWidget::clearError(QLineEdit* edit, QLabel* label)
+{
+    label->hide();
+    label->setText("");
+    edit->setProperty("hasError", false);
+    edit->style()->unpolish(edit);
+    edit->style()->polish(edit);
+}
+
+void LoginWidget::showToast(const QString &msg, bool isSuccess)
+{
+    this->label_toast->setText(msg);
+    this->label_toast->setProperty("toastType",isSuccess);
+    this->label_toast->style()->unpolish(this->label_toast);
+    this->label_toast->style()->polish(this->label_toast);
+    this->label_toast->show();
+    this->label_toast->raise();
+    this->timer_toast->start(3000);
 }
 
 //初始化 登录界面 样式表
@@ -178,7 +335,25 @@ void LoginWidget::initLoginStyle()
                                             font-weight: 400;
                                             background:transparent;
                                         }
-
+                                        #label_emailError,
+                                        #label_passdError
+                                        {
+                                            color: rgba(239, 68, 68, 255);
+                                            font-size: 12px;
+                                            background: transparent;
+                                        }
+                                            #label_toast[toastType="false"]
+                                            {
+                                                background: rgba(254, 226, 226, 255);
+                                                color: rgba(185, 28, 28, 255);
+                                                border-bottom: 1px solid rgba(252, 165, 165, 255);
+                                            }
+                                            #label_toast[toastType="true"]
+                                            {
+                                                background: rgba(220, 252, 231, 255);
+                                                color: rgba(22, 101, 52, 255);
+                                                border-bottom: 1px solid rgba(134, 239, 172, 255);
+                                            }
                                         #edit_loginEmail,
                                         #edit_loginPassd
                                         {
@@ -192,6 +367,12 @@ void LoginWidget::initLoginStyle()
                                             font-weight:bold;
                                             selection-background-color: rgba(99, 102, 241, 100);
                                         }
+                                        #edit_loginEmail[hasError="true"],
+                                        #edit_loginPassd[hasError="true"]
+                                        {
+                                            border: 1px solid rgba(239, 68, 68, 255);
+                                            padding-left: 16px;
+                                        }
                                         #edit_loginEmail:hover,
                                         #edit_loginPassd:hover
                                         {
@@ -200,8 +381,8 @@ void LoginWidget::initLoginStyle()
                                         #edit_loginEmail:focus,
                                         #edit_loginPassd:focus
                                         {
-                                            border: 2px solid rgba(99, 102, 241, 255);
-                                            padding-left:15px;
+                                            border: 1px solid rgba(99, 102, 241, 255);
+                                            padding-left:16px;
                                         }
                                         #edit_loginEmail::placeholder,
                                         #edit_loginPassd::placeholder
@@ -239,6 +420,16 @@ void LoginWidget::initLoginStyle()
                                         #btn_loginNow:pressed
                                         {
                                             background: rgba(67, 56, 202, 255);
+                                        }
+                                        #btn_loginNow:disabled
+                                        {
+                                            background-color: rgba(99, 102, 241, 180);
+                                            border: none;
+                                            border-radius: 8px;
+                                            color: rgba(255, 255, 255, 220);
+                                            font-size: 16px;
+                                            font-weight: 600;
+                                            padding-left:20px;
                                         }
                                         #btn_goRegisterNow
                                         {

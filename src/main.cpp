@@ -3,6 +3,7 @@
 
 #include <QApplication>
 #include "utils/GlobalVariable.h"
+#include "network/chatclient.h"
 
 int main(int argc, char *argv[])
 {
@@ -11,6 +12,8 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("ProChat");
     QCoreApplication::setApplicationName("ProChat");
     GlobalVariable::initGlobalSettings();
+
+    ChatClient::getChatClient();
 
     BodyWidget w(800,600,8);
     w.show();

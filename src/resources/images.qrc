@@ -21,6 +21,7 @@
         <file>images/personalData.png</file>
         <file>images/camera.png</file>
         <file>images/systemSetting.png</file>
+        <file>images/loading.png</file>
     </qresource>
     <qresource prefix="/icon">
         <file>images/favicon.ico</file>

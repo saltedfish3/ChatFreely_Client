@@ -22,6 +22,9 @@ public:
         Main
     };
 
+    GlobalVariable(const GlobalVariable&) = delete;
+    GlobalVariable& operator=(const GlobalVariable&) = delete;
+
     static GlobalVariable& initGlobalSettings();
     static QString getPosOfDownloadFile();
     static void setPosOfDownloadFile(const QString& dir);
