@@ -16,6 +16,7 @@
 #include <QMessageBox>
 #include <chrono>
 #include "../utils/GlobalVariable.h"
+#include "../network/chatclient.h"
 
 class SettingWidget : public QWidget
 {
@@ -24,6 +25,9 @@ public:
     explicit SettingWidget(int width, int height, QWidget *parent = nullptr);
     ~SettingWidget();
 signals:
+
+private slots:
+    void getLoginUserData(QString username, qint64 sid);
 
 private:
 

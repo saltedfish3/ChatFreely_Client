@@ -5,6 +5,8 @@ SettingWidget::SettingWidget(int width, int height, QWidget *parent)
 {
     this->resize(width,height);
     initWidget();
+
+    connect(&ChatClient::getChatClient(),&ChatClient::UserData, this, &SettingWidget::getLoginUserData);
 }
 
 SettingWidget::~SettingWidget()
@@ -12,6 +14,12 @@ SettingWidget::~SettingWidget()
     this->is_stop = true;
     if(this->occupy_worker.joinable())
         this->occupy_worker.join();
+}
+
+void SettingWidget::getLoginUserData(QString username, qint64 sid)
+{
+    this->edit_username->setText(username);
+    this->edit_userID->setText(QString::number(sid));
 }
 
 void SettingWidget::setRadius(QIcon pic, QPushButton *btn, int hei_wid)

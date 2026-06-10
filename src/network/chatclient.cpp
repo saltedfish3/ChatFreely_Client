@@ -13,7 +13,9 @@ void ChatClient::sendLogin(QString email, QString password)
         emit LoginState(false, "", "无法连接服务器，请稍后再试");
         return;
     }
+    QString requestsID = QString::number(getRequestsId());
     QJsonObject obj;
+    obj["Requests_id"] = requestsID;
     obj["Type"] = "Login";
     obj["Email"] = email;
     obj["Password"] = password;
@@ -21,7 +23,14 @@ void ChatClient::sendLogin(QString email, QString password)
     QByteArray data = doc.toJson(QJsonDocument::Compact) + '\n';
     this->socket->write(data);
     this->socket->flush();
-    qDebug()<<"发送登录请求";
+
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(5000,[this,requestsID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            emit LoginState(false, "", "登录超时，请稍后再试");
+        }
+    });
 }
 
 void ChatClient::sendRegister(QString username, QString email, QString password)
@@ -31,7 +40,9 @@ void ChatClient::sendRegister(QString username, QString email, QString password)
         emit RegisterState(false, "", "无法连接服务器，请稍后再试");
         return;
     }
+    QString requestsID = QString::number(getRequestsId());
     QJsonObject obj;
+    obj["Requests_id"] = requestsID;
     obj["Type"] = "Register";
     obj["Username"] = username;
     obj["Email"] = email;
@@ -40,22 +51,47 @@ void ChatClient::sendRegister(QString username, QString email, QString password)
     QByteArray data = doc.toJson(QJsonDocument::Compact) + '\n';
     this->socket->write(data);
     this->socket->flush();
-    qDebug()<<"发送注册请求";
+
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(5000,[this,requestsID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            emit LoginState(false, "", "注册超时，请稍后再试");
+        }
+    });
 }
 
 void ChatClient::sendHello()
 {
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        QTimer::singleShot(100,[this](){
+            sendHello();
+        });
+        return;
+    }
+    QString requestsID = QString::number(getRequestsId());
     QJsonObject obj;
+    obj["Requests_id"] = requestsID;
     obj["Type"] = "Hello";
 
     QJsonDocument doc(obj);
     QByteArray data =doc.toJson(QJsonDocument::Compact) + "\n";
     socket->write(data);
     socket->flush();
+
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(5000,[this,requestsID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            sendHello();
+        }
+    });
 }
 
 void ChatClient::handleHelloResp(QJsonObject obj)
 {
+    QString requestsID = obj.value("Requests_id").toString();
     if(obj.contains("HeartbeatNum"))
     {
         int interval = obj.value("HeartbeatNum").toInt();
@@ -63,17 +99,24 @@ void ChatClient::handleHelloResp(QJsonObject obj)
             return;
         this->clock_heartbeat->setInterval(interval*1000);
         this->clock_heartbeat->start();
+        this->waiting_requestsID.erase(requestsID.toStdString());
     }
 }
 
 void ChatClient::handleLoginResp(QJsonObject obj)
 {
+    QString requestsID = obj.value("Requests_id").toString();
     if(obj.contains("Result") && obj.contains("Info"))
     {
         bool result = obj.value("Result").toBool();
         if(result)
         {
             emit LoginState(result,"",obj.value("Info").toString());
+            if(obj.contains("Username") && obj.contains("SID"))
+            {
+                emit UserData(obj.value("Username").toString(), obj.value("SID").toInteger());
+                //若获取失败重新申请
+            }
         }
         else
         {
@@ -86,11 +129,13 @@ void ChatClient::handleLoginResp(QJsonObject obj)
                 emit LoginState(result,"",obj.value("Info").toString());
             }
         }
+        this->waiting_requestsID.erase(requestsID.toStdString());
     }
 }
 
 void ChatClient::handleRegisterResp(QJsonObject obj)
 {
+    QString requestsID = obj.value("Requests_id").toString();
     bool result = obj.value("Result").toBool();
     if(result)
     {
@@ -107,6 +152,13 @@ void ChatClient::handleRegisterResp(QJsonObject obj)
             emit RegisterState(result,"",obj.value("Info").toString());
         }
     }
+    this->waiting_requestsID.erase(requestsID.toStdString());
+}
+
+uint64_t ChatClient::getRequestsId()
+{
+    static std::atomic<uint64_t> requestsid{0};
+    return requestsid++;
 }
 
 ChatClient::ChatClient(QObject *parent)
@@ -120,14 +172,19 @@ ChatClient::ChatClient(QObject *parent)
 
     //连接成功处理
     connect(this->socket, &QTcpSocket::connected, this, [this](){
-        qDebug() << "connect Success";
         this->clock_retry->stop();
         sendHello();
     });
 
+    connect(this->socket, &QTcpSocket::disconnected, this, [this](){
+        this->clock_heartbeat->stop();
+        if(!this->clock_retry->isActive())
+            this->clock_retry->start();
+    });
+
     //连接失败或发生错误处理
     connect(this->socket, &QTcpSocket::errorOccurred, this, [this](QAbstractSocket::SocketError error){
-        qDebug()<<this->socket->errorString();
+        this->clock_heartbeat->stop();
         if(!this->clock_retry->isActive())
             this->clock_retry->start();
     });
@@ -140,6 +197,8 @@ ChatClient::ChatClient(QObject *parent)
             if(!qjd.isNull() && qjd.isObject())
             {
                 QJsonObject obj = qjd.object();
+                if(!obj.contains("Requests_id"))
+                    return;
                 if(obj.contains("Type"))
                 {
                     QString type = obj.value("Type").toString();
@@ -165,12 +224,10 @@ ChatClient::ChatClient(QObject *parent)
     });
 
     connect(this->clock_retry, &QTimer::timeout, this, [this](){
-        qDebug()<<"try connect";
         startConnect();
     });
 
     connect(this->clock_heartbeat, &QTimer::timeout, this, [this](){
-        qDebug()<<"Heartbeat Send";
         QJsonObject obj;
         obj["Type"] = "Heartbeat";
         QJsonDocument doc(obj);
@@ -200,5 +257,8 @@ ChatClient::~ChatClient()
 void ChatClient::startConnect()
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        this->socket->abort();
         this->socket->connectToHost(SADDR,SPORT);
+    }
 }

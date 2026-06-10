@@ -499,4 +499,8 @@ void RegisterWidget::getRegisterState(bool isSuccess, QString from, QString info
     {
         showError(this->edit_regUsername,this->label_usernameError,info);
     }
+    else
+    {
+        showToast(info);
+    }
 }

@@ -8,6 +8,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QDateTime>
+#include <atomic>
+#include <unordered_set>
 #include "../utils/GlobalVariable.h"
 
 #define SADDR "127.0.0.1"
@@ -27,6 +29,8 @@ public:
 signals:
     void LoginState(bool isSuccess ,QString from, QString info);
     void RegisterState(bool isSuccess ,QString from, QString info);
+    void UserData(QString username, qint64 sid);
+
 private:
     explicit ChatClient(QObject *parent = nullptr);
     ~ChatClient();
@@ -35,10 +39,13 @@ private:
     void handleHelloResp(QJsonObject obj);
     void handleLoginResp(QJsonObject obj);
     void handleRegisterResp(QJsonObject obj);
+    uint64_t getRequestsId();
 
     QTcpSocket* socket;
     QTimer* clock_retry;
     QTimer* clock_heartbeat;
+
+    std::unordered_set<std::string> waiting_requestsID;
 };
 
 #endif // CHATCLIENT_H

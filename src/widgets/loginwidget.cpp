@@ -127,6 +127,7 @@ void LoginWidget::initWidget()
         this->animation_loading->start();
         this->label_loading->show();
         ChatClient::getChatClient().sendLogin(email, password);
+        //超时计时器启动
     });
 
     this->animation_btn_loginNow = new QPropertyAnimation(this->btn_loginNow,"geometry",this);
@@ -250,6 +251,10 @@ void LoginWidget::getLoginState(bool isSuccess, QString from, QString info)
     else if(from == "Password")
     {
         showError(this->edit_loginPassd,this->label_passdError,info);
+    }
+    else
+    {
+        showToast(info);
     }
     this->setDisabled(false);
 }

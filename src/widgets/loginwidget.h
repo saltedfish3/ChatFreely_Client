@@ -31,7 +31,6 @@ private slots:
     void sendSignalsChangeToRegister();
 
     void getLoginState(bool isSuccess ,QString from, QString info);
-
 private:
     void initWidget();
     void initLoginStyle();
