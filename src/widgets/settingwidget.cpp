@@ -6,7 +6,17 @@ SettingWidget::SettingWidget(int width, int height, QWidget *parent)
     this->resize(width,height);
     initWidget();
 
-    connect(&ChatClient::getChatClient(),&ChatClient::UserData, this, &SettingWidget::getLoginUserData);
+    //用户信息更改更新
+    connect(&UserInfo::getUserInfo(),&UserInfo::updateInfo, this, [this](QString username, QString email, QString sid){
+        this->edit_username->setText(username);
+        this->edit_email->setText(email);
+        this->edit_userID->setText(sid);
+    });
+
+    //头像更新
+    connect(&UserInfo::getUserInfo(), &UserInfo::updateAvatar, this, [this](QPixmap avatar){
+        setRadius(QIcon(avatar), this->btn_avatar, 80);
+    });
 }
 
 SettingWidget::~SettingWidget()
@@ -14,12 +24,6 @@ SettingWidget::~SettingWidget()
     this->is_stop = true;
     if(this->occupy_worker.joinable())
         this->occupy_worker.join();
-}
-
-void SettingWidget::getLoginUserData(QString username, qint64 sid)
-{
-    this->edit_username->setText(username);
-    this->edit_userID->setText(QString::number(sid));
 }
 
 void SettingWidget::setRadius(QIcon pic, QPushButton *btn, int hei_wid)
@@ -285,6 +289,10 @@ void SettingWidget::initThisStyle()
                                         font-size: 14px;
                                         color: rgba(55, 65, 81, 255);
                                     }
+                                    #edit_username
+                                    {
+                                        margin-top: 1px;
+                                    }
                                     #edit_username:focus,#edit_userID:focus,#edit_email:focus
                                     {
                                         border: 1px solid rgba(99, 102, 241, 255);
@@ -346,6 +354,14 @@ void SettingWidget::initThisStyle()
                                         font-size: 13px;
                                         font-weight:bold;
                                         color: rgba(55, 65, 81, 255);
+                                    }
+                                    #edit_fileSavePos
+                                    {
+                                        margin-top: 1px;
+                                    }
+                                    #edit_chatRecordSavePos
+                                    {
+                                        margin-bottom: 1px;
                                     }
                                     #edit_fileSavePos:focus,#edit_chatRecordSavePos:focus
                                     {
@@ -429,6 +445,13 @@ void SettingWidget::initPersonalDataWidget()
     setRadius(QIcon(":/default/images/defaultAvatar.png"),this->btn_avatar,80);
     this->btn_avatar->move((this->widget_personalData->width() - this->btn_avatar->width())/2,
                            this->label_personalData->pos().y()+this->label_personalData->height()+20);
+    connect(this->btn_avatar, &QPushButton::clicked, this, [this](){
+        qDebug()<<"头像按钮被点击";
+        QString filePath = QFileDialog::getOpenFileName(this,"选择图片","","图片文件 (*.png *.jpg *.jpeg)");
+        if(filePath.isEmpty())
+            return;
+        HttpShortConnection::getHttpClient().uploadAvatar(filePath);
+    });
 
     this->label_camera_icon = new QLabel(this->btn_avatar);
     this->label_camera_icon->setObjectName("label_camera_icon");

@@ -3,7 +3,7 @@
 
 #include <QApplication>
 #include "utils/GlobalVariable.h"
-#include "network/chatclient.h"
+#include "network/tcplongconnection.h"
 
 int main(int argc, char *argv[])
 {
@@ -13,7 +13,8 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationName("ProChat");
     GlobalVariable::initGlobalSettings();
 
-    ChatClient::getChatClient();
+    TcpLongConnection::getTcpClient();
+    HttpShortConnection::getHttpClient();
 
     BodyWidget w(800,600,8);
     w.show();

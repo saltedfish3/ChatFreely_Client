@@ -10,9 +10,10 @@
 #include <QRegularExpressionValidator>
 #include <QStyle>
 #include <QTimer>
-#include "../network/chatclient.h"
+#include "../network/tcplongconnection.h"
 #include "loadinglabel.h"
 #include "../utils/GlobalVariable.h"
+#include "toastmanager.h"
 
 class LoginWidget : public QWidget
 {

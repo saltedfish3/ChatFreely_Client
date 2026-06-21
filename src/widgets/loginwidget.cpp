@@ -126,8 +126,7 @@ void LoginWidget::initWidget()
         this->btn_loginNow->setText("立即登录中...");
         this->animation_loading->start();
         this->label_loading->show();
-        ChatClient::getChatClient().sendLogin(email, password);
-        //超时计时器启动
+        TcpLongConnection::getTcpClient().sendLogin(email, password);
     });
 
     this->animation_btn_loginNow = new QPropertyAnimation(this->btn_loginNow,"geometry",this);
@@ -193,7 +192,7 @@ void LoginWidget::initWidget()
         this->label_toast->hide();
     });
 
-    connect(&ChatClient::getChatClient(), &ChatClient::LoginState, this, &LoginWidget::getLoginState);
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::LoginState, this, &LoginWidget::getLoginState);
 }
 
 //按钮 按下动画
@@ -281,13 +280,17 @@ void LoginWidget::clearError(QLineEdit* edit, QLabel* label)
 
 void LoginWidget::showToast(const QString &msg, bool isSuccess)
 {
-    this->label_toast->setText(msg);
-    this->label_toast->setProperty("toastType",isSuccess);
-    this->label_toast->style()->unpolish(this->label_toast);
-    this->label_toast->style()->polish(this->label_toast);
-    this->label_toast->show();
-    this->label_toast->raise();
-    this->timer_toast->start(3000);
+    // this->label_toast->setText(msg);
+    // this->label_toast->setProperty("toastType",isSuccess);
+    // this->label_toast->style()->unpolish(this->label_toast);
+    // this->label_toast->style()->polish(this->label_toast);
+    // this->label_toast->show();
+    // this->label_toast->raise();
+    // this->timer_toast->start(3000);
+    if(isSuccess)
+        ToastManager::getToastManager().success(msg, this);
+    else
+        ToastManager::getToastManager().error(msg, this);
 }
 
 //初始化 登录界面 样式表

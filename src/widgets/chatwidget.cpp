@@ -51,6 +51,7 @@ void ChatWidget::initSearchStyle()
                                         font-size: 12px;
                                         font-weight:bold;
                                         font-family: "Microsoft YaHei";
+                                        margin-top: 1px;
                                     }
                                     #edit_search:focus
                                     {

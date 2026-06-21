@@ -77,6 +77,7 @@ void ContactsWidget::initSideBarStyle()
                                 {
                                     background: #ffffff;
                                     border: 1px solid #4648d4;
+                                    margin-top: 1px;
                                 }
                                         )");
 }

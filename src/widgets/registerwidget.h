@@ -10,7 +10,7 @@
 #include <QRegularExpressionValidator>
 #include "../utils/GlobalVariable.h"
 #include "loadinglabel.h"
-#include "../network/chatclient.h"
+#include "../network/tcplongconnection.h"
 
 class RegisterWidget : public QWidget
 {

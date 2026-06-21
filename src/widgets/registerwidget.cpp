@@ -212,7 +212,7 @@ void RegisterWidget::initWidget()
         this->btn_registerNow->setText("立即注册中...");
         this->label_loading->show();
         this->animation_loading->start();
-        ChatClient::getChatClient().sendRegister(username,email,password);
+        TcpLongConnection::getTcpClient().sendRegister(username,email,password);
     });
 
     this->animation_btn_registerNow = new QPropertyAnimation(this->btn_registerNow,"geometry",this);
@@ -261,7 +261,7 @@ void RegisterWidget::initWidget()
         this->label_toast->hide();
     });
 
-    connect(&ChatClient::getChatClient(), &ChatClient::RegisterState, this, &RegisterWidget::getRegisterState);
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::RegisterState, this, &RegisterWidget::getRegisterState);
 }
 
 void RegisterWidget::initRegisterSytle()
@@ -330,6 +330,13 @@ void RegisterWidget::initRegisterSytle()
                                             font-size: 13px;
                                             font-weight:bold;
                                             selection-background-color: rgba(99, 102, 241, 100);
+                                            margin-top:1px;
+                                            margin-left:1px;
+                                        }
+                                        #edit_regEmail
+                                        {
+                                            margin-top: 0px;
+                                            margin-left: 0px;
                                         }
                                         #edit_regUsername[hasError="true"],
                                         #edit_regEmail[hasError="true"],

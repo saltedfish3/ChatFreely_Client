@@ -88,6 +88,10 @@ void MainWidget::initSideBar()
     setRadius(QIcon(":/default/images/defaultAvatar.png"),this->label_avatar,this->label_avatar->width());
     this->label_avatar->move((this->widget_sideBar->width() - this->label_avatar->width()) / 2,16);
 
+    connect(&UserInfo::getUserInfo(), &UserInfo::updateAvatar, this, [this](QPixmap avatar){
+        setRadius(QIcon(avatar), this->label_avatar, this->label_avatar->width());
+    });
+
     this->sideBarGroup = new QButtonGroup(this->widget_sideBar);
     //设置互斥
     this->sideBarGroup->setExclusive(true);

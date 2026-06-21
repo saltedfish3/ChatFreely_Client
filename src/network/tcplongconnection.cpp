@@ -1,12 +1,12 @@
-#include "chatclient.h"
+#include "tcplongconnection.h"
 
-ChatClient &ChatClient::getChatClient()
+TcpLongConnection &TcpLongConnection::getTcpClient()
 {
-    static ChatClient client;
+    static TcpLongConnection client;
     return client;
 }
 
-void ChatClient::sendLogin(QString email, QString password)
+void TcpLongConnection::sendLogin(QString email, QString password)
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
     {
@@ -24,6 +24,8 @@ void ChatClient::sendLogin(QString email, QString password)
     this->socket->write(data);
     this->socket->flush();
 
+    UserInfo::getUserInfo().setEmail(email);
+
     this->waiting_requestsID.insert(requestsID.toStdString());
     QTimer::singleShot(5000,[this,requestsID](){
         if(this->waiting_requestsID.erase(requestsID.toStdString()))
@@ -33,7 +35,7 @@ void ChatClient::sendLogin(QString email, QString password)
     });
 }
 
-void ChatClient::sendRegister(QString username, QString email, QString password)
+void TcpLongConnection::sendRegister(QString username, QString email, QString password)
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
     {
@@ -61,7 +63,44 @@ void ChatClient::sendRegister(QString username, QString email, QString password)
     });
 }
 
-void ChatClient::sendHello()
+void TcpLongConnection::sendUpadteAvatar(QString url)
+{
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        //报错未连接服务器给用户
+        qDebug()<<"未连接服务器";
+        UserInfo::getUserInfo().rollBackAvatar();
+        return;
+    }
+    QString requestsID = QString::number(getRequestsId());
+    QJsonObject obj;
+    obj["Requests_id"] = requestsID;
+    obj["Type"] = "Update_Avatar";
+    obj["Url"] = url;
+
+    QJsonDocument doc(obj);
+    QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
+    this->socket->write(data);
+    this->socket->flush();
+    qDebug()<<"发送完成";
+
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(5000,[this,requestsID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            //发送 设置头像超时 回滚
+            qDebug()<<"头像超时";
+            UserInfo::getUserInfo().rollBackAvatar();
+        }
+    });
+}
+
+bool TcpLongConnection::isConnect()
+{
+    return this->socket->state() == QAbstractSocket::ConnectedState;
+}
+
+void TcpLongConnection::sendHello()
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
     {
@@ -77,8 +116,8 @@ void ChatClient::sendHello()
 
     QJsonDocument doc(obj);
     QByteArray data =doc.toJson(QJsonDocument::Compact) + "\n";
-    socket->write(data);
-    socket->flush();
+    this->socket->write(data);
+    this->socket->flush();
 
     this->waiting_requestsID.insert(requestsID.toStdString());
     QTimer::singleShot(5000,[this,requestsID](){
@@ -89,7 +128,7 @@ void ChatClient::sendHello()
     });
 }
 
-void ChatClient::handleHelloResp(QJsonObject obj)
+void TcpLongConnection::handleHelloResp(QJsonObject obj)
 {
     QString requestsID = obj.value("Requests_id").toString();
     if(obj.contains("HeartbeatNum"))
@@ -103,7 +142,7 @@ void ChatClient::handleHelloResp(QJsonObject obj)
     }
 }
 
-void ChatClient::handleLoginResp(QJsonObject obj)
+void TcpLongConnection::handleLoginResp(QJsonObject obj)
 {
     QString requestsID = obj.value("Requests_id").toString();
     if(obj.contains("Result") && obj.contains("Info"))
@@ -114,8 +153,17 @@ void ChatClient::handleLoginResp(QJsonObject obj)
             emit LoginState(result,"",obj.value("Info").toString());
             if(obj.contains("Username") && obj.contains("SID"))
             {
-                emit UserData(obj.value("Username").toString(), obj.value("SID").toInteger());
-                //若获取失败重新申请
+                UserInfo::getUserInfo().setUsername(obj.value("Username").toString());
+                UserInfo::getUserInfo().setSID(obj.value("SID").toString());
+                UserInfo::getUserInfo().setUID(obj.value("UID").toString());
+                if(obj.value("Avatar_Url").toString().isEmpty())
+                    UserInfo::getUserInfo().setAvatar(QPixmap(":/default/images/defaultAvatar.png"));
+                else
+                {
+                    HttpShortConnection::getHttpClient().getAvatar(obj.value("Avatar_Url").toString(), 3);
+                }
+
+                UserInfo::getUserInfo().sendUpdateSignal();
             }
         }
         else
@@ -133,7 +181,7 @@ void ChatClient::handleLoginResp(QJsonObject obj)
     }
 }
 
-void ChatClient::handleRegisterResp(QJsonObject obj)
+void TcpLongConnection::handleRegisterResp(QJsonObject obj)
 {
     QString requestsID = obj.value("Requests_id").toString();
     bool result = obj.value("Result").toBool();
@@ -155,13 +203,32 @@ void ChatClient::handleRegisterResp(QJsonObject obj)
     this->waiting_requestsID.erase(requestsID.toStdString());
 }
 
-uint64_t ChatClient::getRequestsId()
+void TcpLongConnection::handleUpdateAvatarResp(QJsonObject obj)
+{
+    QString requestsID = obj.value("Requests_id").toString();
+    bool result = obj.value("Result").toBool();
+    if(!result)
+    {
+        //上传失败
+        qDebug()<<"上传失败";
+        UserInfo::getUserInfo().rollBackAvatar();
+    }
+    else
+    {
+        UserInfo::getUserInfo().confirmAvatar();
+        qDebug()<<"确认头像";
+    }
+
+    this->waiting_requestsID.erase(requestsID.toStdString());
+}
+
+uint64_t TcpLongConnection::getRequestsId()
 {
     static std::atomic<uint64_t> requestsid{0};
     return requestsid++;
 }
 
-ChatClient::ChatClient(QObject *parent)
+TcpLongConnection::TcpLongConnection(QObject *parent)
     : QObject{parent}
 {
     this->socket = new QTcpSocket(this);
@@ -218,6 +285,10 @@ ChatClient::ChatClient(QObject *parent)
                     {
                         this->handleRegisterResp(obj);
                     }
+                    else if(type == "UpdateAvatarResp")
+                    {
+                        this->handleUpdateAvatarResp(obj);
+                    }
                 }
             }
         }
@@ -229,6 +300,7 @@ ChatClient::ChatClient(QObject *parent)
 
     connect(this->clock_heartbeat, &QTimer::timeout, this, [this](){
         QJsonObject obj;
+        obj["Requests_id"] = QString::number(getRequestsId());
         obj["Type"] = "Heartbeat";
         QJsonDocument doc(obj);
         QByteArray data = doc.toJson(QJsonDocument::Compact) + '\n';
@@ -250,11 +322,11 @@ ChatClient::ChatClient(QObject *parent)
     startConnect();
 }
 
-ChatClient::~ChatClient()
+TcpLongConnection::~TcpLongConnection()
 {
 }
 
-void ChatClient::startConnect()
+void TcpLongConnection::startConnect()
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
     {

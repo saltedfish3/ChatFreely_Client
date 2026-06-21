@@ -1,5 +1,5 @@
-#ifndef CHATCLIENT_H
-#define CHATCLIENT_H
+#ifndef TCPLONGCONNECTION_H
+#define TCPLONGCONNECTION_H
 
 #include <QObject>
 #include <QtNetwork/QTcpSocket>
@@ -11,34 +11,39 @@
 #include <atomic>
 #include <unordered_set>
 #include "../utils/GlobalVariable.h"
+#include "../utils/userinfo.h"
+#include "httpshortconnection.h"
 
 #define SADDR "127.0.0.1"
 #define SPORT 9000
 
-class ChatClient : public QObject
+class TcpLongConnection : public QObject
 {
     Q_OBJECT
 public:
-    static ChatClient& getChatClient();
-    ChatClient(const ChatClient&) = delete;
-    ChatClient& operator=(const ChatClient&) = delete;
+    static TcpLongConnection& getTcpClient();
+    TcpLongConnection(const TcpLongConnection&) = delete;
+    TcpLongConnection& operator=(const TcpLongConnection&) = delete;
 
     void sendLogin(QString email, QString password);
     void sendRegister(QString email, QString password, QString username);
+    void sendUpadteAvatar(QString url);
+
+    bool isConnect();
 
 signals:
     void LoginState(bool isSuccess ,QString from, QString info);
     void RegisterState(bool isSuccess ,QString from, QString info);
-    void UserData(QString username, qint64 sid);
 
 private:
-    explicit ChatClient(QObject *parent = nullptr);
-    ~ChatClient();
+    explicit TcpLongConnection(QObject *parent = nullptr);
+    ~TcpLongConnection();
     void startConnect();
     void sendHello();
     void handleHelloResp(QJsonObject obj);
     void handleLoginResp(QJsonObject obj);
     void handleRegisterResp(QJsonObject obj);
+    void handleUpdateAvatarResp(QJsonObject obj);
     uint64_t getRequestsId();
 
     QTcpSocket* socket;
@@ -48,4 +53,4 @@ private:
     std::unordered_set<std::string> waiting_requestsID;
 };
 
-#endif // CHATCLIENT_H
+#endif // TCPLONGCONNECTION_H

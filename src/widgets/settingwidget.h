@@ -14,9 +14,12 @@
 #include <thread>
 #include <atomic>
 #include <QMessageBox>
+#include <QFileDialog>
 #include <chrono>
 #include "../utils/GlobalVariable.h"
-#include "../network/chatclient.h"
+#include "../utils/userinfo.h"
+#include "../network/tcplongconnection.h"
+#include "../network/httpshortconnection.h"
 
 class SettingWidget : public QWidget
 {
@@ -27,7 +30,6 @@ public:
 signals:
 
 private slots:
-    void getLoginUserData(QString username, qint64 sid);
 
 private:
 
@@ -84,6 +86,7 @@ private:
     QPushButton* btn_saveAllChange;
 
     QLabel* label_version;
+
 };
 
 #endif // SETTINGWIDGET_H
