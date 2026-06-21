@@ -20,6 +20,7 @@
 #include "../utils/userinfo.h"
 #include "../network/tcplongconnection.h"
 #include "../network/httpshortconnection.h"
+#include "avatarbutton.h"
 
 class SettingWidget : public QWidget
 {
@@ -52,7 +53,7 @@ private:
     QWidget* widget_personalData;
     QLabel* label_personalData_icon;
     QLabel* label_personalData;
-    QPushButton* btn_avatar;
+    AvatarButton* btn_avatar;
     QLabel* label_camera_icon;
     QLabel* label_changeAvatar;
     QLabel* label_username;

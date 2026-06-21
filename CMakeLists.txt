@@ -42,6 +42,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         src/utils/userinfo.h src/utils/userinfo.cpp
         src/widgets/toastmessage.h src/widgets/toastmessage.cpp
         src/widgets/toastmanager.h src/widgets/toastmanager.cpp
+        src/widgets/avatarbutton.h src/widgets/avatarbutton.cpp
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET ChatClient APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR

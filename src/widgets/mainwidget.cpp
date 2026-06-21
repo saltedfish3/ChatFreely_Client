@@ -275,7 +275,7 @@ void MainWidget::setRadius(QIcon pic, QLabel *label, int hei_wid)
 
     QPixmap roundedPix(pixmap.size());
     roundedPix.fill(Qt::transparent);
-    roundedPix.setDevicePixelRatio(pixmap.devicePixelRatio());
+    roundedPix.setDevicePixelRatio(pixmap.devicePixelRatioF());
 
     QPainter painter(&roundedPix);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);

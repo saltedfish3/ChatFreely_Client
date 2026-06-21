@@ -34,7 +34,7 @@ void SettingWidget::setRadius(QIcon pic, QPushButton *btn, int hei_wid)
 
     QPixmap roundedPix(pixmap.size());
     roundedPix.fill(Qt::transparent);
-    roundedPix.setDevicePixelRatio(pixmap.devicePixelRatio());
+    roundedPix.setDevicePixelRatio(pixmap.devicePixelRatioF());
 
     QPainter painter(&roundedPix);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
@@ -78,46 +78,11 @@ void SettingWidget::initWidget()
     initPersonalDataWidget();
     initSystemDataWidget();
 
-    this->line = new QFrame(this->widget_holy);
-    this->line->setObjectName("line");
-    this->line->resize(this->widget_systemData->width(),1);
-    this->line->move(this->widget_systemData->pos().x(),
-                     this->widget_systemData->pos().y()+this->widget_systemData->height() + 32);
-
-
-    this->btn_UnLoginMyself = new QPushButton("退出账号",this->widget_holy);
-    this->btn_UnLoginMyself->setObjectName("btn_UnLoginMyself");
-    this->btn_UnLoginMyself->resize(100,36);
-    this->btn_UnLoginMyself->move(this->line->pos().x(),this->line->pos().y()+this->line->height()+24);
-
-    this->btn_saveAllChange = new QPushButton("保存所有修改",this->widget_holy);
-    this->btn_saveAllChange->setObjectName("btn_saveAllChange");
-    this->btn_saveAllChange->resize(100,36);
-    this->btn_saveAllChange->move(this->widget_systemData->pos().x()+this->widget_systemData->width() - this->btn_saveAllChange->width(),
-                                  this->btn_UnLoginMyself->pos().y());
-
-    connect(this->btn_saveAllChange,&QPushButton::clicked,this,[this](){
-        GlobalVariable::saveAllChange();
-        this->label_occupyNumber->setText(GlobalVariable::getChatRecordSize());
-    });
-
-    this->btn_cancel = new QPushButton("取消",this->widget_holy);
-    this->btn_cancel->setObjectName("btn_cancel");
-    this->btn_cancel->resize(80,36);
-    this->btn_cancel->move(this->btn_saveAllChange->pos().x() - this->btn_cancel->width() - 12,
-                           this->btn_UnLoginMyself->pos().y());
-
-    connect(this->btn_cancel,&QPushButton::clicked,this,[this](){
-        GlobalVariable::clearAllChange();
-        this->edit_fileSavePos->setText(GlobalVariable::getPosOfDownloadFile());
-        this->edit_chatRecordSavePos->setText(GlobalVariable::getPosOfChatRecord());
-    });
-
     this->label_version = new QLabel(QString(AppEnglishName) +" v" + QString(AppVersion),this->widget_holy);
     this->label_version->setObjectName("label_version");
     this->label_version->setAlignment(Qt::AlignCenter);
     this->label_version->resize(this->widget_holy->width(),20);
-    this->label_version->move(0,this->btn_UnLoginMyself->pos().y()+this->btn_UnLoginMyself->height()+40);
+    this->label_version->move(0,this->widget_systemData->pos().y()+this->widget_systemData->height()+40);
 
     int contentHeight = this->label_version->pos().y()
                         + this->label_version->height() + 20;
@@ -362,6 +327,7 @@ void SettingWidget::initThisStyle()
                                     #edit_chatRecordSavePos
                                     {
                                         margin-bottom: 1px;
+                                        margin-top: 1px;
                                     }
                                     #edit_fileSavePos:focus,#edit_chatRecordSavePos:focus
                                     {
@@ -382,6 +348,10 @@ void SettingWidget::initThisStyle()
                                         color: rgba(75, 85, 99, 255);
                                         font-size: 13px;
                                         font-weight:bold;
+                                    }
+                                    #btn_changechatRecordSavePos
+                                    {
+                                        margin-top: 1px;
                                     }
                                     #btn_changechatRecordSavePos:hover,#btn_changeFileSavePos:hover
                                     {
@@ -423,7 +393,7 @@ void SettingWidget::initPersonalDataWidget()
 {
     this->widget_personalData = new QWidget(this->widget_holy);
     this->widget_personalData->setObjectName("widget_personalData");
-    this->widget_personalData->resize(560,380);
+    this->widget_personalData->resize(560,450);
     this->widget_personalData->move((this->scrollArea->width() - this->widget_personalData->width())/2,
                                     this->label_settingLittleTitle->pos().y()+this->label_settingLittleTitle->height()+40);
     this->widget_personalData->setAttribute(Qt::WA_StyledBackground);
@@ -439,14 +409,15 @@ void SettingWidget::initPersonalDataWidget()
     this->label_personalData_icon->resize(20,20);
     this->label_personalData_icon->move(24,(this->label_personalData->height() - this->label_personalData_icon->height())/2);
 
-    this->btn_avatar = new QPushButton(this->widget_personalData);
+    this->btn_avatar = new AvatarButton(this->widget_personalData);
     this->btn_avatar->setObjectName("btn_avatar");
     this->btn_avatar->resize(84,84);
-    setRadius(QIcon(":/default/images/defaultAvatar.png"),this->btn_avatar,80);
+    setRadius(QIcon(":/default/images/defaultAvatar.png"),this->btn_avatar, this->btn_avatar->height() - 1);//80
     this->btn_avatar->move((this->widget_personalData->width() - this->btn_avatar->width())/2,
                            this->label_personalData->pos().y()+this->label_personalData->height()+20);
+    this->btn_avatar->updateAnimation();
+
     connect(this->btn_avatar, &QPushButton::clicked, this, [this](){
-        qDebug()<<"头像按钮被点击";
         QString filePath = QFileDialog::getOpenFileName(this,"选择图片","","图片文件 (*.png *.jpg *.jpeg)");
         if(filePath.isEmpty())
             return;
@@ -460,6 +431,12 @@ void SettingWidget::initPersonalDataWidget()
     this->label_camera_icon->setPixmap(QIcon(":/default/images/camera.png").pixmap(16));
     this->label_camera_icon->move(this->btn_avatar->width() - this->label_camera_icon->width() -5,
                                   this->btn_avatar->height()-this->label_camera_icon->height() -5);
+
+    connect(this->btn_avatar, &AvatarButton::sizeChanged, this, [this](){
+        this->label_camera_icon->move(this->btn_avatar->width() - this->label_camera_icon->width() -5,
+                                      this->btn_avatar->height()-this->label_camera_icon->height() -5);
+        this->btn_avatar->setIconSize(this->btn_avatar->size() - QSize(1,1));
+    });
 
     this->label_username = new QLabel("昵称",this->widget_personalData);
     this->label_username->setObjectName("label_username");
@@ -498,6 +475,41 @@ void SettingWidget::initPersonalDataWidget()
     this->edit_email->resize(512,40);
     this->edit_email->move(this->label_email->pos().x(),
                            this->label_email->pos().y()+this->label_email->height()+8);
+
+    this->line = new QFrame(this->widget_personalData);
+    this->line->setObjectName("line");
+    this->line->resize(this->widget_personalData->width() - 20,1);
+    this->line->move(10,
+                     this->edit_email->pos().y() + this->edit_email->height() + 32);
+
+
+    this->btn_UnLoginMyself = new QPushButton("退出账号",this->widget_personalData);
+    this->btn_UnLoginMyself->setObjectName("btn_UnLoginMyself");
+    this->btn_UnLoginMyself->resize(100,36);
+    this->btn_UnLoginMyself->move(this->line->pos().x(),this->line->pos().y()+this->line->height()+24);
+
+    this->btn_saveAllChange = new QPushButton("保存修改",this->widget_personalData);
+    this->btn_saveAllChange->setObjectName("btn_saveAllChange");
+    this->btn_saveAllChange->resize(80,36);
+    this->btn_saveAllChange->move(this->widget_personalData->width() - this->btn_saveAllChange->width() - 10,
+                                  this->btn_UnLoginMyself->pos().y());
+
+    connect(this->btn_saveAllChange,&QPushButton::clicked,this,[this](){
+        GlobalVariable::saveAllChange();
+        this->label_occupyNumber->setText(GlobalVariable::getChatRecordSize());
+    });
+
+    this->btn_cancel = new QPushButton("取消",this->widget_personalData);
+    this->btn_cancel->setObjectName("btn_cancel");
+    this->btn_cancel->resize(80,36);
+    this->btn_cancel->move(this->btn_saveAllChange->pos().x() - this->btn_cancel->width() - 12,
+                           this->btn_UnLoginMyself->pos().y());
+
+    connect(this->btn_cancel,&QPushButton::clicked,this,[this](){
+        GlobalVariable::clearAllChange();
+        this->edit_fileSavePos->setText(GlobalVariable::getPosOfDownloadFile());
+        this->edit_chatRecordSavePos->setText(GlobalVariable::getPosOfChatRecord());
+    });
 }
 
 void SettingWidget::initSystemDataWidget()
