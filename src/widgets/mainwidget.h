@@ -11,6 +11,7 @@
 #include "chatwidget.h"
 #include "contactswidget.h"
 #include "settingwidget.h"
+#include "toastmanager.h"
 
 class MainWidget : public QWidget
 {
@@ -22,6 +23,7 @@ signals:
 
 private slots:
     void buttonColorChange(QAbstractButton* button);
+    void handleMainState(bool isSuccess, QString info);
 
 private:
     void initSideBar();

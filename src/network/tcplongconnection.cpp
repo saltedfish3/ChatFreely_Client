@@ -67,8 +67,7 @@ void TcpLongConnection::sendUpadteAvatar(QString url)
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
     {
-        //报错未连接服务器给用户
-        qDebug()<<"未连接服务器";
+        emit mainState(false, "无法连接服务器，请稍后再试");
         UserInfo::getUserInfo().rollBackAvatar();
         return;
     }
@@ -82,14 +81,12 @@ void TcpLongConnection::sendUpadteAvatar(QString url)
     QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
     this->socket->write(data);
     this->socket->flush();
-    qDebug()<<"发送完成";
 
     this->waiting_requestsID.insert(requestsID.toStdString());
     QTimer::singleShot(5000,[this,requestsID](){
         if(this->waiting_requestsID.erase(requestsID.toStdString()))
         {
-            //发送 设置头像超时 回滚
-            qDebug()<<"头像超时";
+            emit mainState(false, "连接超时，请稍后再试");
             UserInfo::getUserInfo().rollBackAvatar();
         }
     });
@@ -209,14 +206,12 @@ void TcpLongConnection::handleUpdateAvatarResp(QJsonObject obj)
     bool result = obj.value("Result").toBool();
     if(!result)
     {
-        //上传失败
-        qDebug()<<"上传失败";
+        emit mainState(false, "上传失败，请稍后再试");
         UserInfo::getUserInfo().rollBackAvatar();
     }
     else
     {
         UserInfo::getUserInfo().confirmAvatar();
-        qDebug()<<"确认头像";
     }
 
     this->waiting_requestsID.erase(requestsID.toStdString());

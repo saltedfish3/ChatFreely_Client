@@ -75,6 +75,14 @@ void MainWidget::buttonColorChange(QAbstractButton* button)
     }
 }
 
+void MainWidget::handleMainState(bool isSuccess, QString info)
+{
+    if(isSuccess)
+        ToastManager::getToastManager().success(info, this, this->stackedWidget_Chat);
+    else
+        ToastManager::getToastManager().error(info, this, this->stackedWidget_Chat);
+}
+
 void MainWidget::initSideBar()
 {
     this->widget_sideBar = new QWidget(this);
@@ -265,6 +273,9 @@ void MainWidget::initPage()
         });
 
     this->stackedWidget_Chat->setCurrentWidget(this->widget_chat);
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::mainState, this, &MainWidget::handleMainState);
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::mainState, this, &MainWidget::handleMainState);
 }
 
 void MainWidget::setRadius(QIcon pic, QLabel *label, int hei_wid)

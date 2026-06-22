@@ -34,6 +34,7 @@ public:
 signals:
     void LoginState(bool isSuccess ,QString from, QString info);
     void RegisterState(bool isSuccess ,QString from, QString info);
+    void mainState(bool isSuccess, QString info);
 
 private:
     explicit TcpLongConnection(QObject *parent = nullptr);

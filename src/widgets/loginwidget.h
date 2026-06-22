@@ -49,11 +49,6 @@ private:
     QLabel* label_noAccount;
     QLabel* label_version;
 
-    //顶部错误提示悬浮标签
-    QLabel* label_toast;
-    QTimer* timer_toast;
-
-
     QLineEdit* edit_loginEmail;
     QRegularExpressionValidator* regular_email;
     QLineEdit* edit_loginPassd;

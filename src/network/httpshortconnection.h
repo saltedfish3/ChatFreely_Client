@@ -30,6 +30,7 @@ public:
 
 signals:
     void AvatarReady(QPixmap pixmap);
+    void mainState(bool isSuccess, QString info);
 
 private:
     explicit HttpShortConnection(QObject *parent = nullptr);

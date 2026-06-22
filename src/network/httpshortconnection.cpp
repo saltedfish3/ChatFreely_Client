@@ -10,19 +10,19 @@ void HttpShortConnection::uploadAvatar(const QString &filePath)
 {
     if(!TcpLongConnection::getTcpClient().isConnect())
     {
-        //提示用户连接服务器失败
+        emit mainState(false, "无法连接服务器，请稍后再试");
         return;
     }
     if(filePath.isEmpty())
     {
-        //提示用户上传失败
+        emit mainState(false, "上传失败，请稍后再试");
         return;
     }
 
     QImage image(filePath);
     if(image.isNull())
     {
-        //提示用户上传失败
+        emit mainState(false, "上传失败，请稍后再试");
         return;
     }
     //备份当前头像
@@ -54,8 +54,7 @@ void HttpShortConnection::uploadAvatar(const QString &filePath)
         reply->deleteLater();
         if(reply->error() != QNetworkReply::NoError)
         {
-            //提示用户上传失败
-            qDebug()<<"上传失败:" << reply->errorString();
+            emit mainState(false, "上传失败，请稍后再试");
             return;
         }
 
@@ -63,15 +62,13 @@ void HttpShortConnection::uploadAvatar(const QString &filePath)
         QJsonDocument doc = QJsonDocument::fromJson(responseData);
         if(doc.isNull() || !doc.isObject())
         {
-            //提示用户上传失败
-            qDebug()<<"错误的Json回复";
+            emit mainState(false, "上传失败，请稍后再试");
             return;
         }
         QString url = doc.object().value("Url").toString();
         if(url.isEmpty())
         {
-            //提示用户上传失败
-            qDebug()<<"没有收到url";
+            emit mainState(false, "上传失败，请稍后再试");
             return;
         }
 
@@ -98,7 +95,7 @@ void HttpShortConnection::getAvatar(const QString &url, size_t retryTime)
             }
             else
             {
-                //发送获取头像错误
+                emit mainState(false, "获取头像信息失败");
             }
             return;
         }
@@ -107,7 +104,7 @@ void HttpShortConnection::getAvatar(const QString &url, size_t retryTime)
         avatar.loadFromData(reply->readAll());
         if(avatar.isNull())
         {
-            //提示用户获取头像失败
+            emit mainState(false, "获取头像信息失败");
             return;
         }
         emit AvatarReady(avatar);

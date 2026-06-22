@@ -178,20 +178,6 @@ void LoginWidget::initWidget()
     this->label_version->resize(440,20);
     this->label_version->move(180,this->height() - this->label_version->height() - 30);
 
-    //初始化 "顶部 错误提示" 标签
-    this->label_toast = new QLabel("", this);
-    this->label_toast->setObjectName("label_toast");
-    this->label_toast->setAlignment(Qt::AlignCenter);
-    this->label_toast->resize(this->width(), 44);
-    this->label_toast->move(0, 0);
-    this->label_toast->hide();
-
-    this->timer_toast = new QTimer(this);
-    this->timer_toast->setSingleShot(true);
-    connect(this->timer_toast, &QTimer::timeout, this, [=](){
-        this->label_toast->hide();
-    });
-
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::LoginState, this, &LoginWidget::getLoginState);
 }
 
@@ -280,13 +266,6 @@ void LoginWidget::clearError(QLineEdit* edit, QLabel* label)
 
 void LoginWidget::showToast(const QString &msg, bool isSuccess)
 {
-    // this->label_toast->setText(msg);
-    // this->label_toast->setProperty("toastType",isSuccess);
-    // this->label_toast->style()->unpolish(this->label_toast);
-    // this->label_toast->style()->polish(this->label_toast);
-    // this->label_toast->show();
-    // this->label_toast->raise();
-    // this->timer_toast->start(3000);
     if(isSuccess)
         ToastManager::getToastManager().success(msg, this);
     else

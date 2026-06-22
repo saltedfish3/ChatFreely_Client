@@ -10,18 +10,18 @@ class ToastManager : public QObject
 public:
     static ToastManager& getToastManager();
 
-    void show(ToastMessage::Type type, const QString& text, QWidget* parent);
-    void success(const QString& msg, QWidget* parent);
-    void error  (const QString& msg, QWidget* parent);
-    void info   (const QString& msg, QWidget* parent);
-    void warning(const QString& msg, QWidget* parent);
+    void show(ToastMessage::Type type, const QString& text, QWidget* parent, QWidget* mapping = nullptr);
+    void success(const QString& msg, QWidget* parent, QWidget* mapping = nullptr);
+    void error  (const QString& msg, QWidget* parent, QWidget* mapping = nullptr);
+    void info   (const QString& msg, QWidget* parent, QWidget* mapping = nullptr);
+    void warning(const QString& msg, QWidget* parent, QWidget* mapping = nullptr);
 
 signals:
 
 private:
     explicit ToastManager(QObject *parent = nullptr);
 
-    void relayout(QWidget* parent);
+    void relayout(QWidget* parent, QWidget* mapping = nullptr);
 
     QList<ToastMessage*> active;
 };
