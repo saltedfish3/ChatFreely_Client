@@ -15,7 +15,7 @@ SettingWidget::SettingWidget(int width, int height, QWidget *parent)
 
     //头像更新
     connect(&UserInfo::getUserInfo(), &UserInfo::updateAvatar, this, [this](QPixmap avatar){
-        setRadius(QIcon(avatar), this->btn_avatar, 80);
+        setRadius(QIcon(avatar), this->btn_avatar, this->btn_avatar->height() - 1);
     });
 }
 
@@ -488,6 +488,10 @@ void SettingWidget::initPersonalDataWidget()
     this->btn_UnLoginMyself->resize(100,36);
     this->btn_UnLoginMyself->move(this->line->pos().x(),this->line->pos().y()+this->line->height()+24);
 
+    connect(this->btn_UnLoginMyself, &QPushButton::clicked, this, [this](){
+        TcpLongConnection::getTcpClient().sendUnLogin();
+    });
+
     this->btn_saveAllChange = new QPushButton("保存修改",this->widget_personalData);
     this->btn_saveAllChange->setObjectName("btn_saveAllChange");
     this->btn_saveAllChange->resize(80,36);
@@ -495,8 +499,7 @@ void SettingWidget::initPersonalDataWidget()
                                   this->btn_UnLoginMyself->pos().y());
 
     connect(this->btn_saveAllChange,&QPushButton::clicked,this,[this](){
-        GlobalVariable::saveAllChange();
-        this->label_occupyNumber->setText(GlobalVariable::getChatRecordSize());
+        UserInfo::getUserInfo().updateUsername(this->edit_username->text().trimmed());
     });
 
     this->btn_cancel = new QPushButton("取消",this->widget_personalData);
@@ -506,9 +509,7 @@ void SettingWidget::initPersonalDataWidget()
                            this->btn_UnLoginMyself->pos().y());
 
     connect(this->btn_cancel,&QPushButton::clicked,this,[this](){
-        GlobalVariable::clearAllChange();
-        this->edit_fileSavePos->setText(GlobalVariable::getPosOfDownloadFile());
-        this->edit_chatRecordSavePos->setText(GlobalVariable::getPosOfChatRecord());
+        this->edit_username->setText(UserInfo::getUserInfo().getUsername());
     });
 }
 

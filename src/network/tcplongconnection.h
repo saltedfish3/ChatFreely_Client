@@ -11,11 +11,12 @@
 #include <atomic>
 #include <unordered_set>
 #include "../utils/GlobalVariable.h"
-#include "../utils/userinfo.h"
-#include "httpshortconnection.h"
 
 #define SADDR "127.0.0.1"
 #define SPORT 9000
+
+class UserInfo;
+class HttpShortConnection;
 
 class TcpLongConnection : public QObject
 {
@@ -28,6 +29,8 @@ public:
     void sendLogin(QString email, QString password);
     void sendRegister(QString email, QString password, QString username);
     void sendUpadteAvatar(QString url);
+    void sendUpdateUsername(QString username);
+    void sendUnLogin();
 
     bool isConnect();
 
@@ -35,6 +38,7 @@ signals:
     void LoginState(bool isSuccess ,QString from, QString info);
     void RegisterState(bool isSuccess ,QString from, QString info);
     void mainState(bool isSuccess, QString info);
+    void exitAccount();
 
 private:
     explicit TcpLongConnection(QObject *parent = nullptr);
@@ -45,6 +49,8 @@ private:
     void handleLoginResp(QJsonObject obj);
     void handleRegisterResp(QJsonObject obj);
     void handleUpdateAvatarResp(QJsonObject obj);
+    void handleUpdateUsernameResp(QJsonObject obj);
+    void handleUnLoginResp(QJsonObject obj);
     uint64_t getRequestsId();
 
     QTcpSocket* socket;

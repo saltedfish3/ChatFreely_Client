@@ -3,8 +3,6 @@
 QString GlobalVariable::pos_ini;
 QString GlobalVariable::pos_downloadFile;
 QString GlobalVariable::pos_chatRecord;
-QString GlobalVariable::temp_posDownloadFile;
-QString GlobalVariable::temp_posChatRecord;
 GlobalVariable GlobalVariable::myself;
 
 GlobalVariable::GlobalVariable()
@@ -58,7 +56,8 @@ QString GlobalVariable::getPosOfDownloadFile()
 
 void GlobalVariable::setPosOfDownloadFile(const QString &dir)
 {
-    temp_posDownloadFile = dir;
+    QSettings settings(pos_ini,QSettings::IniFormat);
+    settings.setValue("pos_downloadFile",pos_downloadFile);
 }
 
 QString GlobalVariable::getPosOfChatRecord()
@@ -68,7 +67,8 @@ QString GlobalVariable::getPosOfChatRecord()
 
 void GlobalVariable::setPosOfChatRecord(const QString &dir)
 {
-    temp_posChatRecord = dir;
+    QSettings settings(pos_ini,QSettings::IniFormat);
+    settings.setValue("pos_chatRecord",pos_chatRecord);
 }
 
 QString GlobalVariable::getChatRecordSize()
@@ -100,27 +100,4 @@ void GlobalVariable::clearAllChatRecord()
     {
         dir.mkdir(".");
     }
-}
-
-void GlobalVariable::saveAllChange()
-{
-    QSettings settings(pos_ini,QSettings::IniFormat);
-    if(!temp_posChatRecord.isEmpty())
-    {
-        pos_chatRecord = temp_posChatRecord;
-        settings.setValue("pos_chatRecord",pos_chatRecord);
-        temp_posChatRecord.clear();
-    }
-    if(!temp_posDownloadFile.isEmpty())
-    {
-        pos_downloadFile = temp_posDownloadFile;
-        settings.setValue("pos_downloadFile",pos_downloadFile);
-        temp_posDownloadFile.clear();
-    }
-}
-
-void GlobalVariable::clearAllChange()
-{
-    temp_posChatRecord.clear();
-    temp_posDownloadFile.clear();
 }

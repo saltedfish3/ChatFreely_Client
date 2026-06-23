@@ -1,4 +1,6 @@
 #include "tcplongconnection.h"
+#include "httpshortconnection.h"
+#include "../utils/userinfo.h"
 
 TcpLongConnection &TcpLongConnection::getTcpClient()
 {
@@ -92,6 +94,66 @@ void TcpLongConnection::sendUpadteAvatar(QString url)
     });
 }
 
+void TcpLongConnection::sendUpdateUsername(QString username)
+{
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        emit mainState(false, "无法连接服务器，请稍后再试");
+        return;
+    }
+    if(username.isEmpty())
+    {
+        emit mainState(false, "更新失败, 用户名不能为空");
+        return;
+    }
+
+    QJsonObject obj;
+    QString requestsID = QString::number(getRequestsId());
+    obj["Requests_id"] = requestsID;
+    obj["Type"] = "UpdateUsername";
+    obj["Username"] = username;
+
+    QJsonDocument doc(obj);
+    QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
+    this->socket->write(data);
+    this->socket->flush();
+
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(5000,[this,requestsID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            emit mainState(false, "连接超时，请稍后再试");
+        }
+    });
+}
+
+void TcpLongConnection::sendUnLogin()
+{
+    //发送退出登录请求json
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        emit mainState(false, "无法连接服务器，请稍后再试");
+        return;
+    }
+    QJsonObject obj;
+    QString requestsID = QString::number(getRequestsId());
+    obj["Requests_id"] = requestsID;
+    obj["Type"] = "UnLogin";
+
+    QJsonDocument doc(obj);
+    QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
+
+    this->socket->write(data);
+    this->socket->flush();
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(5000,[this,requestsID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            emit mainState(false, "连接超时，请稍后再试");
+        }
+    });
+}
+
 bool TcpLongConnection::isConnect()
 {
     return this->socket->state() == QAbstractSocket::ConnectedState;
@@ -128,6 +190,7 @@ void TcpLongConnection::sendHello()
 void TcpLongConnection::handleHelloResp(QJsonObject obj)
 {
     QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
     if(obj.contains("HeartbeatNum"))
     {
         int interval = obj.value("HeartbeatNum").toInt();
@@ -135,13 +198,13 @@ void TcpLongConnection::handleHelloResp(QJsonObject obj)
             return;
         this->clock_heartbeat->setInterval(interval*1000);
         this->clock_heartbeat->start();
-        this->waiting_requestsID.erase(requestsID.toStdString());
     }
 }
 
 void TcpLongConnection::handleLoginResp(QJsonObject obj)
 {
     QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
     if(obj.contains("Result") && obj.contains("Info"))
     {
         bool result = obj.value("Result").toBool();
@@ -174,13 +237,13 @@ void TcpLongConnection::handleLoginResp(QJsonObject obj)
                 emit LoginState(result,"",obj.value("Info").toString());
             }
         }
-        this->waiting_requestsID.erase(requestsID.toStdString());
     }
 }
 
 void TcpLongConnection::handleRegisterResp(QJsonObject obj)
 {
     QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
     bool result = obj.value("Result").toBool();
     if(result)
     {
@@ -197,12 +260,12 @@ void TcpLongConnection::handleRegisterResp(QJsonObject obj)
             emit RegisterState(result,"",obj.value("Info").toString());
         }
     }
-    this->waiting_requestsID.erase(requestsID.toStdString());
 }
 
 void TcpLongConnection::handleUpdateAvatarResp(QJsonObject obj)
 {
     QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
     bool result = obj.value("Result").toBool();
     if(!result)
     {
@@ -213,8 +276,33 @@ void TcpLongConnection::handleUpdateAvatarResp(QJsonObject obj)
     {
         UserInfo::getUserInfo().confirmAvatar();
     }
+}
 
+void TcpLongConnection::handleUnLoginResp(QJsonObject obj)
+{
+    QString requestsID = obj.value("Requests_id").toString();
     this->waiting_requestsID.erase(requestsID.toStdString());
+    //发送退出账号信号
+    emit exitAccount();
+}
+
+void TcpLongConnection::handleUpdateUsernameResp(QJsonObject obj)
+{
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+    if(!obj.contains("Result") || !obj.value("Result").isBool())
+    {
+        emit mainState(false, "更新失败，请稍后重试");
+        return;
+    }
+    bool success = obj.value("Result").toBool();
+    if(success)
+    {
+        emit mainState(true, "更新成功");
+        UserInfo::getUserInfo().confirmUsername();
+    }
+    else
+        emit mainState(false, "更新失败");
 }
 
 uint64_t TcpLongConnection::getRequestsId()
@@ -283,6 +371,14 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
                     else if(type == "UpdateAvatarResp")
                     {
                         this->handleUpdateAvatarResp(obj);
+                    }
+                    else if(type == "UnLoginResp")
+                    {
+                        this->handleUnLoginResp(obj);
+                    }
+                    else if(type == "UpdateUsernameResp")
+                    {
+                        this->handleUpdateUsernameResp(obj);
                     }
                 }
             }

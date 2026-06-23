@@ -7,6 +7,15 @@ MainWidget::MainWidget(int width, int height, QWidget *parent)
     initSideBar();
     initSideBarDefaultStyle();
     initStackedChat();
+
+}
+
+void MainWidget::changeToChat()
+{
+    this->stackedWidget_Chat->setCurrentWidget(this->widget_chat);
+    QPushButton* btn = this->sideBarButton.value("btn_chats");
+    if(btn)
+        btn->click();
 }
 
 void MainWidget::buttonColorChange(QAbstractButton* button)
@@ -78,9 +87,9 @@ void MainWidget::buttonColorChange(QAbstractButton* button)
 void MainWidget::handleMainState(bool isSuccess, QString info)
 {
     if(isSuccess)
-        ToastManager::getToastManager().success(info, this, this->stackedWidget_Chat);
+        ToastManager::getToastManager(true).success(info, this, this->stackedWidget_Chat);
     else
-        ToastManager::getToastManager().error(info, this, this->stackedWidget_Chat);
+        ToastManager::getToastManager(true).error(info, this, this->stackedWidget_Chat);
 }
 
 void MainWidget::initSideBar()

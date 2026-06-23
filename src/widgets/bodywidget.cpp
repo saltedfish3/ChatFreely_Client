@@ -30,6 +30,12 @@ BodyWidget::BodyWidget(int width, int height, int radius, QWidget* parent)
     //
     initTitleBar();
     initStackWidget();
+
+    //退出账户信号接收
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, [this](){
+        this->stackedWidget_page->setCurrentWidget(this->widget_login);
+        ToastManager::getToastManager(false).success("退出成功", this, this->stackedWidget_page);
+    });
 }
 
 void BodyWidget::paintEvent(QPaintEvent * event)
@@ -148,7 +154,10 @@ void BodyWidget::changeWidget(GlobalVariable::MainPage id)
     else if(id == GlobalVariable::MainPage::Register)
         this->stackedWidget_page->setCurrentWidget(this->widget_register);
     else if(id == GlobalVariable::MainPage::Main)
+    {
+        this->widget_main->changeToChat();
         this->stackedWidget_page->setCurrentWidget(this->widget_main);
+    }
 }
 
 

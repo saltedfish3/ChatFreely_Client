@@ -11,6 +11,7 @@
 #include "../utils/GlobalVariable.h"
 #include "loadinglabel.h"
 #include "../network/tcplongconnection.h"
+#include "toastmanager.h"
 
 class RegisterWidget : public QWidget
 {
@@ -48,10 +49,6 @@ private:
     QLabel* label_usernameError;
     QLabel* label_confirmPError;
     QLabel* label_haveAccount;
-
-    //顶部错误提示悬浮标签
-    QLabel* label_toast;
-    QTimer* timer_toast;
 
     //一定时间跳转到登录界面
     QTimer* timer_jump;

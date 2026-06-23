@@ -8,7 +8,7 @@ class ToastManager : public QObject
 {
     Q_OBJECT
 public:
-    static ToastManager& getToastManager();
+    static ToastManager& getToastManager(bool isMainPage);
 
     void show(ToastMessage::Type type, const QString& text, QWidget* parent, QWidget* mapping = nullptr);
     void success(const QString& msg, QWidget* parent, QWidget* mapping = nullptr);

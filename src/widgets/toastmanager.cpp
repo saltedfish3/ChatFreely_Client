@@ -1,9 +1,11 @@
 #include "toastmanager.h"
 
-ToastManager &ToastManager::getToastManager()
+ToastManager &ToastManager::getToastManager(bool isMainPage)
 {
+    //若为true代表是聊天界面
     static ToastManager tm;
-    return tm;
+    static ToastManager maintm;
+    return isMainPage ? maintm : tm;
 }
 
 void ToastManager::show(ToastMessage::Type type, const QString &text, QWidget *parent, QWidget* mapping)
@@ -53,17 +55,25 @@ void ToastManager::relayout(QWidget *parent, QWidget* mapping)
     if(!parent)
         return;
 
+    int baseX = 0, baseY = 0;
+    int refWidth = parent->width();
+    if(mapping)
+    {
+        QPoint origin = mapping->mapTo(parent, QPoint(0, 0));
+        baseX = origin.x();
+        baseY = origin.y();
+        refWidth = mapping->width();
+    }
+
     int offset = 16;
     for(auto* toast : std::as_const(this->active))
     {
         if(!toast || !toast->isVisible())
             continue;
-        int x = 0;
-        if(!mapping)
-            x = (parent->width() - toast->width()) / 2;
-        else
-            x = (parent->width() - mapping->width()) + (mapping->width() - toast->width()) / 2;
-        int y = offset;
+
+        int x = baseX + (refWidth - toast->width()) / 2;
+        int y = baseY + offset;
+
         toast->move(x, y);
         offset += toast->height() + 8;
     }

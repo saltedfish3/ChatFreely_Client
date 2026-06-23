@@ -1,4 +1,6 @@
 #include "userinfo.h"
+#include "../network/httpshortconnection.h"
+#include "../network/tcplongconnection.h"
 
 UserInfo &UserInfo::getUserInfo()
 {
@@ -12,6 +14,28 @@ void UserInfo::setUsername(const QString &username)
     if(username.isEmpty())
         return;
     this->username = username;
+}
+
+QString UserInfo::getUsername()
+{
+    return this->username;
+}
+
+void UserInfo::updateUsername(const QString &username)
+{
+    if(username.trimmed() == UserInfo::getUserInfo().getUsername())
+        return;
+    this->waitingUpdate_username = username;
+    TcpLongConnection::getTcpClient().sendUpdateUsername(username);
+}
+
+void UserInfo::confirmUsername()
+{
+    if(this->waitingUpdate_username.isEmpty())
+        return;
+    this->username = this->waitingUpdate_username;
+    this->waitingUpdate_username.clear();
+    emit sendUpdateSignal();
 }
 
 void UserInfo::setEmail(const QString &email)

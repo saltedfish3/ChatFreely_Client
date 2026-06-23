@@ -28,7 +28,6 @@ public:
 
 signals:
 
-
 private slots:
     void changeWidget(GlobalVariable::MainPage id);
 

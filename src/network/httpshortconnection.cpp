@@ -1,4 +1,6 @@
 #include "httpshortconnection.h"
+#include "tcplongconnection.h"
+#include "../utils/userinfo.h"
 
 HttpShortConnection &HttpShortConnection::getHttpClient()
 {

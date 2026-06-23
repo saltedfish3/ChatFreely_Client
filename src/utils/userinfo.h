@@ -5,7 +5,9 @@
 #include <QString>
 #include <QPixmap>
 #include <mutex>
-#include "../network/httpshortconnection.h"
+
+class HttpShortConnection;
+class TcpLongConnection;
 
 class UserInfo : public QObject
 {
@@ -13,6 +15,10 @@ class UserInfo : public QObject
 public:
     static UserInfo& getUserInfo();
     void setUsername(const QString& username);
+    QString getUsername();
+    void updateUsername(const QString& username);
+    void confirmUsername();
+
     void setEmail(const QString& email);
     void setSID(const QString& SID);
     void setUID(const QString& UID);
@@ -32,6 +38,7 @@ private:
     explicit UserInfo(QObject *parent = nullptr);
 
     QString username;
+    QString waitingUpdate_username;
     QString email;
     QString sid;
     QString uid;

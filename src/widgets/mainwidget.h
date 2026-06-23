@@ -18,6 +18,7 @@ class MainWidget : public QWidget
     Q_OBJECT
 public:
     explicit MainWidget(int width, int height, QWidget *parent = nullptr);
+    void changeToChat();
 
 signals:
 

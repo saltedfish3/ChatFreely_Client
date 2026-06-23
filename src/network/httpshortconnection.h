@@ -14,7 +14,9 @@
 #include <QJsonObject>
 #include <QPixmap>
 #include <QTimer>
-#include "tcplongconnection.h"
+
+class TcpLongConnection;
+class UserInfo;
 
 class HttpShortConnection : public QObject
 {

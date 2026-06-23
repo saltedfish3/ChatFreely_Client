@@ -35,9 +35,6 @@ public:
     static QString getChatRecordSize();
     static void clearAllChatRecord();
 
-    static void saveAllChange();
-    static void clearAllChange();
-
 private:
     GlobalVariable();
 
@@ -46,9 +43,6 @@ private:
     static QString pos_ini;
     static QString pos_downloadFile;
     static QString pos_chatRecord;
-
-    static QString temp_posDownloadFile;
-    static QString temp_posChatRecord;
 };
 
 
