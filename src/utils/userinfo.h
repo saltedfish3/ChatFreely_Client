@@ -22,6 +22,7 @@ public:
     void setEmail(const QString& email);
     void setSID(const QString& SID);
     void setUID(const QString& UID);
+    QString getUID();
 
     void setAvatar(const QPixmap& avatar);
     void confirmAvatar();

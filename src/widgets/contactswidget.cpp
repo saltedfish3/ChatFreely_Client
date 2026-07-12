@@ -27,6 +27,14 @@ void ContactsWidget::initSideBar()
     this->btn_addFriend->resize(this->widget_sideBar->width() - 32,35);
     this->btn_addFriend->move((this->widget_sideBar->width() - this->btn_addFriend->width())/2 , (this->widget_sideBar->width() - this->btn_addFriend->width())/2);
 
+    connect(this->btn_addFriend, &QPushButton::clicked, this, [this](){
+        AddNewFriendWidget* anfw = new AddNewFriendWidget(this);
+        connect(anfw, &AddNewFriendWidget::add, this, [this](){
+            //ToastManager::getToastManager(false).success("成功发送好友申请，请等待好友通过", this);
+        });
+        anfw->show();
+    });
+
     this->edit_searchFriend = new QLineEdit(this->widget_sideBar);
     this->edit_searchFriend->setObjectName("edit_searchFriend");
     this->edit_searchFriend->setPlaceholderText("搜索联系人");

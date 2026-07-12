@@ -30,6 +30,7 @@ public:
     void sendRegister(QString email, QString password, QString username);
     void sendUpadteAvatar(QString url);
     void sendUpdateUsername(QString username);
+    void sendAddNewFriendRequest(QString sid = "", QString email = "");
     void sendUnLogin();
 
     bool isConnect();
@@ -42,7 +43,7 @@ signals:
 
 private:
     explicit TcpLongConnection(QObject *parent = nullptr);
-    ~TcpLongConnection();
+
     void startConnect();
     void sendHello();
     void handleHelloResp(QJsonObject obj);
@@ -50,6 +51,7 @@ private:
     void handleRegisterResp(QJsonObject obj);
     void handleUpdateAvatarResp(QJsonObject obj);
     void handleUpdateUsernameResp(QJsonObject obj);
+    void handleAddNewFriendRequestResp(QJsonObject obj);
     void handleUnLoginResp(QJsonObject obj);
     uint64_t getRequestsId();
 

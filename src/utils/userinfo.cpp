@@ -62,6 +62,11 @@ void UserInfo::setUID(const QString &UID)
     this->uid = UID;
 }
 
+QString UserInfo::getUID()
+{
+    return this->uid;
+}
+
 void UserInfo::setAvatar(const QPixmap &avatar)
 {
     std::lock_guard<std::mutex> lock(this->mutex);

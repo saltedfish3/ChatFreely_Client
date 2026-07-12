@@ -11,6 +11,7 @@
 #include "newfriendbutton.h"
 #include "newfriendmanagewidget.h"
 #include "contactsinfowidget.h"
+#include "addnewfriendwidget.h"
 
 class ContactsWidget : public QWidget
 {

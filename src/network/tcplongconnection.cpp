@@ -187,6 +187,42 @@ void TcpLongConnection::sendHello()
     });
 }
 
+void TcpLongConnection::sendAddNewFriendRequest(QString sid, QString email)
+{
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        emit mainState(false, "无法连接服务器，请稍后再试");
+        return;
+    }
+    if(sid.isEmpty() && email.isEmpty())
+    {
+        emit mainState(false, "申请添加好友失败");
+        return;
+    }
+    QString requestsID = QString::number(getRequestsId());
+    QJsonObject obj;
+    obj["Requests_id"] = requestsID;
+    obj["Type"] = "AddNewFriendRequest";
+    obj["UID"] = UserInfo::getUserInfo().getUID();
+    if(sid.isEmpty())
+        obj["Receiver_Email"] = email;
+    else
+        obj["Receiver_SID"] = sid;
+
+    QJsonDocument doc(obj);
+    QByteArray data =doc.toJson(QJsonDocument::Compact) + "\n";
+    this->socket->write(data);
+    this->socket->flush();
+
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(5000,[this,requestsID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            emit mainState(false, "申请添加好友超时，请稍后再试");
+        }
+    });
+}
+
 void TcpLongConnection::handleHelloResp(QJsonObject obj)
 {
     QString requestsID = obj.value("Requests_id").toString();
@@ -305,6 +341,31 @@ void TcpLongConnection::handleUpdateUsernameResp(QJsonObject obj)
         emit mainState(false, "更新失败");
 }
 
+void TcpLongConnection::handleAddNewFriendRequestResp(QJsonObject obj)
+{
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+    if(!obj.contains("Result") || !obj.value("Result").isBool())
+    {
+        emit mainState(false, "申请添加好友失败，请稍后重试");
+        return;
+    }
+    bool success = obj.value("Result").toBool();
+    if(success)
+    {
+        emit mainState(true, "成功发送添加好友申请");
+    }
+    else
+    {
+        if(!obj.contains("Info") || !obj.value("Info").isString())
+        {
+            emit mainState(false, "申请添加好友失败，请稍后重试");
+            return;
+        }
+        emit mainState(false, obj.value("Info").toString());
+    }
+}
+
 uint64_t TcpLongConnection::getRequestsId()
 {
     static std::atomic<uint64_t> requestsid{0};
@@ -380,6 +441,10 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
                     {
                         this->handleUpdateUsernameResp(obj);
                     }
+                    else if(type == "AddNewFriendRequestResp")
+                    {
+                        this->handleAddNewFriendRequestResp(obj);
+                    }
                 }
             }
         }
@@ -411,10 +476,6 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
         }
     });
     startConnect();
-}
-
-TcpLongConnection::~TcpLongConnection()
-{
 }
 
 void TcpLongConnection::startConnect()
