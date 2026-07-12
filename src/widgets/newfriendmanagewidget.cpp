@@ -44,7 +44,7 @@ void NewFriendManageWidget::initstyle()
                             {
                                 color: rgba(17, 24, 39, 255);
                                 padding-left: 24px;
-                                font-size:14px;
+                                font-size:13px;
                             }
                             #listWidget_friendApplyManage
                             {

@@ -82,12 +82,20 @@ void AddNewFriendWidget::initWidget()
         }
         QRegularExpression regExp_email("^[0-9a-zA-Z._%+\\-]+@[0-9a-zA-Z.\\-]+\\.[a-zA-Z]{2,}$");
         QRegularExpression regExp_sid("^\\d{10}$");
-        if(!regExp_email.match(sid_email).hasMatch() && !regExp_sid.match(sid_email).hasMatch())
+        if(regExp_email.match(sid_email).hasMatch())
+        {
+            qDebug()<<"email分支";
+            TcpLongConnection::getTcpClient().sendAddNewFriendRequest("", sid_email);
+        }
+        else if(regExp_sid.match(sid_email).hasMatch())
+        {
+            TcpLongConnection::getTcpClient().sendAddNewFriendRequest(sid_email, "");
+        }
+        else
         {
             ToastManager::getToastManager(true).error("输入为非邮箱或者用户ID", this);
             return;
         }
-        TcpLongConnection::getTcpClient().sendAddNewFriendRequest(sid_email);
 
         this->hide();
         this->deleteLater();

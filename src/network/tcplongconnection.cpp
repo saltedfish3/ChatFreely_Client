@@ -205,9 +205,13 @@ void TcpLongConnection::sendAddNewFriendRequest(QString sid, QString email)
     obj["Type"] = "AddNewFriendRequest";
     obj["UID"] = UserInfo::getUserInfo().getUID();
     if(sid.isEmpty())
+    {
         obj["Receiver_Email"] = email;
+    }
     else
+    {
         obj["Receiver_SID"] = sid;
+    }
 
     QJsonDocument doc(obj);
     QByteArray data =doc.toJson(QJsonDocument::Compact) + "\n";
