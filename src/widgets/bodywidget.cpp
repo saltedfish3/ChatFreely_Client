@@ -39,11 +39,13 @@ BodyWidget::BodyWidget(int width, int height, int radius, QWidget* parent)
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, [this](){
         this->stackedWidget_page->setCurrentWidget(this->widget_login);
+        UserInfo::getUserInfo().cleanALL();
         ToastManager::getToastManager(false).info("登录凭证过期，请重新登录", this, this->stackedWidget_page);
     });
 
     connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::refreshExpiredExit, this, [this](){
         this->stackedWidget_page->setCurrentWidget(this->widget_login);
+        UserInfo::getUserInfo().cleanALL();
         ToastManager::getToastManager(false).info("登录凭证过期，请重新登录", this, this->stackedWidget_page);
     });
 }

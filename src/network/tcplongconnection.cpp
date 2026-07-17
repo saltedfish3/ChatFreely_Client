@@ -233,7 +233,7 @@ void TcpLongConnection::sendAccessTokenLogin()
         this->socket->write(data);
         this->socket->flush();
         this->waiting_requestsID.insert(requestsID.toStdString());
-        QTimer::singleShot(5000,[this,requestsID](){
+        QTimer::singleShot(10000,[this,requestsID](){
             if(this->waiting_requestsID.erase(requestsID.toStdString()))
             {
                 emit refreshExpiredExit();
@@ -278,9 +278,6 @@ void TcpLongConnection::sendHello()
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
     {
-        QTimer::singleShot(100,[this](){
-            sendHello();
-        });
         return;
     }
     QString requestsID = QString::number(getRequestsId());
@@ -297,7 +294,8 @@ void TcpLongConnection::sendHello()
     QTimer::singleShot(5000,[this,requestsID](){
         if(this->waiting_requestsID.erase(requestsID.toStdString()))
         {
-            sendHello();
+            if(this->socket->state() == QAbstractSocket::ConnectedState)
+                sendHello();
         }
     });
 }
@@ -389,6 +387,10 @@ void TcpLongConnection::handleHelloResp(QJsonObject obj)
             return;
         this->clock_heartbeat->setInterval(interval*1000);
         this->clock_heartbeat->start();
+    }
+    if(UserInfo::getUserInfo().isLogin())
+    {
+        sendAccessTokenLogin();
     }
 }
 
@@ -512,7 +514,17 @@ void TcpLongConnection::handleAccessTokenLoginResp(QJsonObject obj)
 
     if(!obj.contains("Result") || !obj.value("Result").isBool())
     {
-        emit refreshExpiredExit();
+        sendRefreshToken([this](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired) {
+            if(isSuccess && !newAccessToken.isEmpty())
+            {
+                UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                sendAccessTokenLogin();
+            }else
+            {
+                if(isRefreshTokenExpired)
+                    emit refreshExpiredExit();
+            }
+        });
         return;
     }
     bool result = obj.value("Result").toBool();
@@ -875,11 +887,6 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
     connect(this->socket, &QTcpSocket::connected, this, [this](){
         this->clock_retry->stop();
         sendHello();
-
-        if(UserInfo::getUserInfo().isLogin())
-        {
-            sendAccessTokenLogin();
-        }
     });
 
     connect(this->socket, &QTcpSocket::disconnected, this, [this](){
@@ -952,7 +959,7 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
                     {
                         this->handleRefreshTokenResp(obj);
                     }
-                    else if(type == "AccessTokenResp")
+                    else if(type == "AccessTokenLoginResp")
                     {
                         this->handleAccessTokenLoginResp(obj);
                     }

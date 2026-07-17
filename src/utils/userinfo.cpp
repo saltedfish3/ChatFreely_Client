@@ -152,6 +152,7 @@ void UserInfo::cleanALL()
     this->accessToken = QString();
     this->refreshToken = QString();
     this->email = QString();
+    this->is_login = false;
 }
 
 UserInfo::UserInfo(QObject *parent)
