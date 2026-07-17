@@ -36,6 +36,16 @@ BodyWidget::BodyWidget(int width, int height, int radius, QWidget* parent)
         this->stackedWidget_page->setCurrentWidget(this->widget_login);
         ToastManager::getToastManager(false).success("退出成功", this, this->stackedWidget_page);
     });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, [this](){
+        this->stackedWidget_page->setCurrentWidget(this->widget_login);
+        ToastManager::getToastManager(false).info("登录凭证过期，请重新登录", this, this->stackedWidget_page);
+    });
+
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::refreshExpiredExit, this, [this](){
+        this->stackedWidget_page->setCurrentWidget(this->widget_login);
+        ToastManager::getToastManager(false).info("登录凭证过期，请重新登录", this, this->stackedWidget_page);
+    });
 }
 
 void BodyWidget::paintEvent(QPaintEvent * event)
@@ -112,6 +122,7 @@ void BodyWidget::initStackWidget()
     initLoginWidget();
     initRegisterWidget();
     initMainWidget();
+
 
     this->stackedWidget_page->setCurrentWidget(this->widget_login);
 }

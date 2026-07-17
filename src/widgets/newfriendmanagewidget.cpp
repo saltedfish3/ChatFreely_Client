@@ -9,6 +9,18 @@ NewFriendManageWidget::NewFriendManageWidget(int width, int height, QWidget *par
     initstyle();
 }
 
+void NewFriendManageWidget::addRequestsItem(QString uid, QString sid, QString username, QString avatar_url, QString verMsg)
+{
+    //添加项目
+    QStandardItem* item = new QStandardItem();
+    item->setData(uid, FriendApplyDelegate::UIDRole);
+    item->setData(sid, FriendApplyDelegate::SIDRole);
+    item->setData(username, FriendApplyDelegate::UsernameRole);
+    //item->setData(avatar_url, FriendApplyDelegate::AvatarRole);
+    item->setData(verMsg, FriendApplyDelegate::VerMsgRole);
+    this->model->appendRow(item);
+}
+
 void NewFriendManageWidget::initWidget()
 {
     this->widget_friendApply = new QWidget(this);
@@ -26,11 +38,39 @@ void NewFriendManageWidget::initWidget()
     this->label_friendApply->setMinimumHeight(this->widget_friendApply->height());
     this->label_friendApply->move(0,(this->widget_friendApply->height() - this->label_friendApply->height())/2);
 
-    this->listWidget_friendApplyManage = new QListWidget(this);
-    this->listWidget_friendApplyManage->setObjectName("listWidget_friendApplyManage");
-    this->listWidget_friendApplyManage->resize(this->width(),this->height() - this->widget_friendApply->height());
-    this->listWidget_friendApplyManage->move(0,this->widget_friendApply->height());
+    this->listView_friendApplyManage = new QListView(this);
+    this->listView_friendApplyManage->setObjectName("listView_friendApplyManage");
+    this->listView_friendApplyManage->resize(this->width(),this->height() - this->widget_friendApply->height());
+    this->listView_friendApplyManage->move(0,this->widget_friendApply->height());
+    this->listView_friendApplyManage->setMouseTracking(true);
+    this->listView_friendApplyManage->viewport()->setMouseTracking(true);
 
+    this->model = new QStandardItemModel(this);
+    this->listView_friendApplyManage->setModel(this->model);
+
+    this->delegate = new FriendApplyDelegate(this);
+    this->listView_friendApplyManage->setItemDelegate(this->delegate);
+
+    this->listView_friendApplyManage->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    this->listView_friendApplyManage->setSelectionMode(QAbstractItemView::NoSelection);
+    this->listView_friendApplyManage->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    this->listView_friendApplyManage->setResizeMode(QListView::Fixed);
+
+    connect(this->delegate, &FriendApplyDelegate::agreeClicked, this, [](QString UID, const QModelIndex& index){
+        TcpLongConnection::getTcpClient().sendHandleNewFriendRequest(UserInfo::getUserInfo().getUID(), UID, true);
+    });
+
+    connect(this->delegate, &FriendApplyDelegate::refuseClicked, this, [](QString UID, const QModelIndex& index){
+        TcpLongConnection::getTcpClient().sendHandleNewFriendRequest(UserInfo::getUserInfo().getUID(), UID, false);
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newFriendRequests, this, [this](QString uid, QString sid, QString username, QString avatar_url, QString verMsg){
+        addRequestsItem(uid, sid, username, avatar_url, verMsg);
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::cleanNewFriendRequestsList, this, [this](){
+        this->model->clear();
+    });
 }
 
 void NewFriendManageWidget::initstyle()
@@ -46,10 +86,11 @@ void NewFriendManageWidget::initstyle()
                                 padding-left: 24px;
                                 font-size:13px;
                             }
-                            #listWidget_friendApplyManage
+                            #listView_friendApplyManage
                             {
                                 border-radius:0px;
                                 background:transparent;
+                                padding-bottom: 10px;
                             }
                                 )");
 }

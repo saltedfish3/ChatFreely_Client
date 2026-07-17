@@ -47,13 +47,44 @@ void HttpShortConnection::uploadAvatar(const QString &filePath)
     multiPart->append(imagePart);
 
     QNetworkRequest request(QUrl("http://192.168.153.128:9001/upload"));
+    request.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
 
     QNetworkReply* reply = this->httpmanager->post(request, multiPart);
     multiPart->setParent(reply);
 
     //绑定发回来的事件
-    connect(reply, &QNetworkReply::finished, this, [reply, this](){
+    connect(reply, &QNetworkReply::finished, this, [reply, this, filePath](){
         reply->deleteLater();
+        if(reply->error() == QNetworkReply::AuthenticationRequiredError)
+        {
+            TcpLongConnection::getTcpClient().sendRefreshToken([this, filePath](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                if(isSuccess)
+                {
+                    if(!newAccessToken.isEmpty())
+                    {
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        uploadAvatar(filePath);
+                    }
+                    else
+                    {
+                        emit refreshExpiredExit();
+                    }
+                    return;
+                }
+                else
+                {
+                    if(isRefreshTokenExpired)
+                    {
+                        emit refreshExpiredExit();
+                        return;
+                    }
+                    else
+                        emit mainState(false, "上传失败，请稍后再试");
+                }
+            });
+            return;
+        }
+
         if(reply->error() != QNetworkReply::NoError)
         {
             emit mainState(false, "上传失败，请稍后再试");
@@ -79,25 +110,57 @@ void HttpShortConnection::uploadAvatar(const QString &filePath)
     });
 }
 
-void HttpShortConnection::getAvatar(const QString &url, size_t retryTime)
+void HttpShortConnection::getAvatar(const QString &url, size_t retryTime, std::function<void(const QPixmap&)> onSuccess, bool failed_notice)
 {
     QNetworkRequest request(url);
+    request.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
     QNetworkReply* reply = this->httpmanager->get(request);
 
-    connect(reply, &QNetworkReply::finished, this, [reply, this, url, retryTime](){
+    connect(reply, &QNetworkReply::finished, this, [reply, this, url, retryTime, failed_notice, onSuccess](){
         reply->deleteLater();
+
+        if(reply->error() == QNetworkReply::AuthenticationRequiredError)
+        {
+            TcpLongConnection::getTcpClient().sendRefreshToken([this, url, retryTime, onSuccess, failed_notice](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                if(isSuccess)
+                {
+                    if(!newAccessToken.isEmpty())
+                    {
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        getAvatar(url, retryTime, onSuccess, failed_notice);
+                    }
+                    else
+                    {
+                        emit refreshExpiredExit();
+                    }
+                    return;
+                }
+                else
+                {
+                    if(isRefreshTokenExpired)
+                    {
+                        emit refreshExpiredExit();
+                        return;
+                    }
+                    else
+                        emit mainState(false, "获取头像信息失败");
+                }
+            });
+            return;
+        }
 
         if(reply->error() != QNetworkReply::NoError)
         {
             if(retryTime > 1)
             {
-                QTimer::singleShot(2000, [url, retryTime](){
-                    HttpShortConnection::getHttpClient().getAvatar(url, retryTime - 1);
+                QTimer::singleShot(2000, [url, retryTime, onSuccess, failed_notice](){
+                    HttpShortConnection::getHttpClient().getAvatar(url, retryTime - 1, onSuccess, failed_notice);
                 });
             }
             else
             {
-                emit mainState(false, "获取头像信息失败");
+                if(failed_notice)
+                    emit mainState(false, "获取头像信息失败");
             }
             return;
         }
@@ -106,10 +169,14 @@ void HttpShortConnection::getAvatar(const QString &url, size_t retryTime)
         avatar.loadFromData(reply->readAll());
         if(avatar.isNull())
         {
-            emit mainState(false, "获取头像信息失败");
+            if(failed_notice)
+                emit mainState(false, "获取头像信息失败");
             return;
         }
-        emit AvatarReady(avatar);
+        if(onSuccess)
+            onSuccess(avatar);
+        else
+            emit AvatarReady(avatar);
     });
 }
 

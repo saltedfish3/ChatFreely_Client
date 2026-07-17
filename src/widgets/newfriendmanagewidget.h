@@ -3,13 +3,19 @@
 
 #include <QWidget>
 #include <QLabel>
-#include <QListWidget>
+#include <QListView>
+#include <QStandardItemModel>
+#include <QModelIndex>
+#include "friendapplydelegate.h"
+#include "../network/tcplongconnection.h"
+#include "../utils/userinfo.h"
 
 class NewFriendManageWidget : public QWidget
 {
     Q_OBJECT
 public:
     explicit NewFriendManageWidget(int width, int height, QWidget *parent = nullptr);
+    void addRequestsItem(QString uid, QString sid, QString username, QString avatar_url, QString verMsg);
 
 signals:
 
@@ -21,7 +27,11 @@ private:
 
     QWidget* widget_friendApply;
 
-    QListWidget* listWidget_friendApplyManage;
+    QListView* listView_friendApplyManage;
+    QStandardItemModel* model;
+    FriendApplyDelegate* delegate;
+
+    QString handle_uid;
 };
 
 #endif // NEWFRIENDMANAGEWIDGET_H

@@ -18,7 +18,7 @@ void ChatWidget::initSearchWidget()
     this->widget_search = new QWidget(this);
     this->widget_search->setObjectName("widget_search");
     this->widget_search->setAttribute(Qt::WA_StyledBackground,true);
-    this->widget_search->setGeometry(0,0,260,64);
+    this->widget_search->setGeometry(0,0,200,64);
 
     this->edit_search = new QLineEdit(this->widget_search);
     this->edit_search->setObjectName("edit_search");
@@ -26,7 +26,7 @@ void ChatWidget::initSearchWidget()
     this->edit_search->setMaxLength(50);
     searchIcon = new QAction(QIcon(":/default/images/search.png"),"",this->edit_search);
     this->edit_search->addAction(searchIcon,QLineEdit::LeadingPosition);
-    this->edit_search->resize(228,36);
+    this->edit_search->resize(this->widget_search->width() - 32,36);
     this->edit_search->move((this->widget_search->width() - this->edit_search->width()) / 2,(this->widget_search->height() - this->edit_search->height()) / 2);
 }
 

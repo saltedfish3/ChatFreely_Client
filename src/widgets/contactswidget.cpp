@@ -19,7 +19,7 @@ void ContactsWidget::initSideBar()
 {
     this->widget_sideBar = new QWidget(this);
     this->widget_sideBar->setObjectName("widget_sideBar");
-    this->widget_sideBar->resize(260,this->height());
+    this->widget_sideBar->resize(200,this->height());
     this->widget_sideBar->move(0,0);
 
     this->btn_addFriend = new QPushButton("添加联系人",this->widget_sideBar);
@@ -29,9 +29,6 @@ void ContactsWidget::initSideBar()
 
     connect(this->btn_addFriend, &QPushButton::clicked, this, [this](){
         AddNewFriendWidget* anfw = new AddNewFriendWidget(this);
-        connect(anfw, &AddNewFriendWidget::add, this, [this](){
-            //ToastManager::getToastManager(false).success("成功发送好友申请，请等待好友通过", this);
-        });
         anfw->show();
     });
 

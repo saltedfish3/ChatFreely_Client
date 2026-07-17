@@ -17,7 +17,7 @@ public:
 
     static QWidget* findRootWidget(QWidget *caller);
 signals:
-    void add();
+    //void add();
 
 private:
     void initWidget();
@@ -28,9 +28,11 @@ private:
     QLabel* label_bigTitle;
     QLabel* label_smallTitle;
     QLabel* label_UserIDOrEmail;
+    QLabel* label_verMsg;
     QLabel* label_atIcon;
 
     QLineEdit* edit_IDOrEmail;
+    QLineEdit* edit_verMsg;
     QRegularExpressionValidator* regular_email;
     QRegularExpressionValidator* regular_password;
 

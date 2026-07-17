@@ -213,8 +213,14 @@ void LoginWidget::sendSignalsChangeToRegister()
     emit changeWidget(GlobalVariable::MainPage::Register);
 }
 
-void LoginWidget::getLoginState(bool isSuccess, QString from, QString info)
+void LoginWidget::getLoginState(bool isSuccess, QString from, QString info, bool reLogin)
 {
+    if(reLogin)
+    {
+        TcpLongConnection::getTcpClient().sendLogin(this->edit_loginEmail->text().trimmed(),
+                                                    this->edit_loginPassd->text().trimmed());
+        return;
+    }
     this->btn_loginNow->setDisabled(false);
     this->btn_loginNow->setText("立即登录");
     this->animation_loading->stop();
@@ -223,6 +229,7 @@ void LoginWidget::getLoginState(bool isSuccess, QString from, QString info)
     {
         showToast(info + " 将在2秒后为您跳转...",isSuccess);
         this->timer_jump->start();
+        TcpLongConnection::getTcpClient().getNewFriendRequestsList([](){});
         return;
     }
     if(from.isEmpty())

@@ -14,6 +14,7 @@
 #include <QJsonObject>
 #include <QPixmap>
 #include <QTimer>
+#include "../utils/userinfo.h"
 
 class TcpLongConnection;
 class UserInfo;
@@ -28,11 +29,12 @@ public:
     static HttpShortConnection& getHttpClient();
 
     void uploadAvatar(const QString& filePath);
-    void getAvatar(const QString& url, size_t retryTime);
+    void getAvatar(const QString& url, size_t retryTime, std::function<void(const QPixmap&)> onSuccess = nullptr, bool failed_notice = true);
 
 signals:
     void AvatarReady(QPixmap pixmap);
     void mainState(bool isSuccess, QString info);
+    void refreshExpiredExit();
 
 private:
     explicit HttpShortConnection(QObject *parent = nullptr);

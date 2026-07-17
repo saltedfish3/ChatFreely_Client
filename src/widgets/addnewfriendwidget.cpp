@@ -28,7 +28,7 @@ void AddNewFriendWidget::initWidget()
 {
     this->widget_card = new QWidget(this);
     this->widget_card->setObjectName("widget_card");
-    this->widget_card->resize(360,220);
+    this->widget_card->resize(360,290);//220
     this->widget_card->move((this->width() - this->widget_card->width()) / 2,
                             (this->height() - this->widget_card->height()) / 2);
 
@@ -39,18 +39,19 @@ void AddNewFriendWidget::initWidget()
 
     this->label_smallTitle = new QLabel("输入对方信息即可添加好友", this->widget_card);
     this->label_smallTitle->setObjectName("label_smallTitle");
-    this->label_smallTitle->move(24, 50);
+    this->label_smallTitle->move(24, this->label_bigTitle->pos().y() + this->label_bigTitle->height() + 4);//50
     this->label_smallTitle->resize(280, 18);
 
     this->label_UserIDOrEmail = new QLabel("用户ID 或 邮箱", this->widget_card);
     this->label_UserIDOrEmail->setObjectName("label_UserIDOrEmail");
-    this->label_UserIDOrEmail->move(24, 88);
+    this->label_UserIDOrEmail->move(24, this->label_smallTitle->pos().y() + this->label_smallTitle->height() + 20);//88
     this->label_UserIDOrEmail->resize(200, 16);
 
     this->edit_IDOrEmail = new QLineEdit(this->widget_card);
     this->edit_IDOrEmail->setObjectName("edit_IDOrEmail");
     this->edit_IDOrEmail->setPlaceholderText("name@example.com 或 123456789");
-    this->edit_IDOrEmail->move(24, 110);
+    this->edit_IDOrEmail->setMaxLength(254);
+    this->edit_IDOrEmail->move(24, this->label_UserIDOrEmail->pos().y() + this->label_UserIDOrEmail->height() + 6);//110
     this->edit_IDOrEmail->resize(this->widget_card->width() - 48, 38);
 
     this->label_atIcon = new QLabel("@", this->edit_IDOrEmail);
@@ -58,15 +59,28 @@ void AddNewFriendWidget::initWidget()
     this->label_atIcon->resize(16, 16);
     this->label_atIcon->move(10, (this->edit_IDOrEmail->height() - this->label_atIcon->height()) / 2);
 
+    this->label_verMsg = new QLabel("验证消息(选填)", this->widget_card);
+    this->label_verMsg->setObjectName("label_varMsg");
+    this->label_verMsg->move(24, this->edit_IDOrEmail->pos().y() + this->edit_IDOrEmail->height() + 8);//156
+    this->label_verMsg->resize(200, 16);
+
+    this->edit_verMsg = new QLineEdit(this->widget_card);
+    this->edit_verMsg->setObjectName("edit_varMsg");
+    this->edit_verMsg->setPlaceholderText("打个招呼...");
+    this->edit_verMsg->setMaxLength(25);
+    this->edit_verMsg->move(24, this->label_verMsg->pos().y() + this->label_verMsg->height() + 6);//176
+    this->edit_verMsg->resize(this->widget_card->width() - 48, 38);
+
     this->btn_add = new QPushButton("添加", this->widget_card);
     this->btn_add->setObjectName("btn_add");
     this->btn_add->resize(80, 36);
-    this->btn_add->move(this->widget_card->width() - 24 - this->btn_add->width(), 166);
+    this->btn_add->move(this->widget_card->width() - 24 - this->btn_add->width(),
+                        this->edit_verMsg->pos().y() + this->edit_verMsg->height() + 18);//166
 
     this->btn_cancel = new QPushButton("取消", this->widget_card);
     this->btn_cancel->setObjectName("btn_cancel");
     this->btn_cancel->resize(70, 36);
-    this->btn_cancel->move(this->btn_add->pos().x() - 12 - this->btn_cancel->width(), 166);
+    this->btn_cancel->move(this->btn_add->pos().x() - 12 - this->btn_cancel->width(), this->btn_add->pos().y());
 
     connect(this->btn_cancel, &QPushButton::clicked, this, [this](){
         this->hide();
@@ -74,7 +88,8 @@ void AddNewFriendWidget::initWidget()
     });
 
     connect(this->btn_add, &QPushButton::clicked, this, [this](){
-        QString sid_email = edit_IDOrEmail->text().trimmed();
+        QString sid_email = this->edit_IDOrEmail->text().trimmed();
+        QString verMsg = this->edit_verMsg->text().trimmed();
         if(sid_email == "")
         {
             ToastManager::getToastManager(true).error("待添加人信息不能为空", this);
@@ -84,12 +99,11 @@ void AddNewFriendWidget::initWidget()
         QRegularExpression regExp_sid("^\\d{10}$");
         if(regExp_email.match(sid_email).hasMatch())
         {
-            qDebug()<<"email分支";
-            TcpLongConnection::getTcpClient().sendAddNewFriendRequest("", sid_email);
+            TcpLongConnection::getTcpClient().sendAddNewFriendRequest("", sid_email, verMsg);
         }
         else if(regExp_sid.match(sid_email).hasMatch())
         {
-            TcpLongConnection::getTcpClient().sendAddNewFriendRequest(sid_email, "");
+            TcpLongConnection::getTcpClient().sendAddNewFriendRequest(sid_email, "", verMsg);
         }
         else
         {
@@ -125,7 +139,7 @@ void AddNewFriendWidget::initStyle()
             color: #8a8a99;
             font-size: 12px;
         }
-        #label_UserIDOrEmail
+        #label_UserIDOrEmail,#label_varMsg
         {
             color: #1f2937;
             font-size: 12px;
@@ -138,7 +152,7 @@ void AddNewFriendWidget::initStyle()
             font-weight: bold;
             background: transparent;
         }
-        #edit_IDOrEmail
+        #edit_IDOrEmail,#edit_varMsg
         {
             background: #f7f7fb;
             border: 1px solid #e4e4ec;
@@ -147,8 +161,14 @@ void AddNewFriendWidget::initStyle()
             padding-left: 30px;
             font-size: 12px;
             color: #1b1b23;
+            margin: 1px;
         }
-        #edit_IDOrEmail:focus
+        #edit_varMsg
+        {
+            padding: 6px 10px;
+            padding-left: 20px;
+        }
+        #edit_IDOrEmail:focus,#edit_varMsg:focus
         {
             background: #ffffff;
             border: 1px solid #4648d4;

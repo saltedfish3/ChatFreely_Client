@@ -21,6 +21,16 @@ QString UserInfo::getUsername()
     return this->username;
 }
 
+QString UserInfo::getAccessToken()
+{
+    return this->accessToken;
+}
+
+QString UserInfo::getRefreshToken()
+{
+    return this->refreshToken;
+}
+
 void UserInfo::updateUsername(const QString &username)
 {
     if(username.trimmed() == UserInfo::getUserInfo().getUsername())
@@ -36,6 +46,11 @@ void UserInfo::confirmUsername()
     this->username = this->waitingUpdate_username;
     this->waitingUpdate_username.clear();
     emit sendUpdateSignal();
+}
+
+bool UserInfo::isLogin()
+{
+    return this->is_login;
 }
 
 void UserInfo::setEmail(const QString &email)
@@ -60,6 +75,24 @@ void UserInfo::setUID(const QString &UID)
     if(UID.isEmpty())
         return;
     this->uid = UID;
+}
+
+void UserInfo::setLogin(bool islogin)
+{
+    std::lock_guard<std::mutex> lock(this->mutex);
+    this->is_login = islogin;
+}
+
+void UserInfo::setAccessToken(const QString &accessToken)
+{
+    std::lock_guard<std::mutex> lock(this->mutex);
+    this->accessToken = accessToken;
+}
+
+void UserInfo::setRefreshToken(const QString &refreshToken)
+{
+    std::lock_guard<std::mutex> lock(this->mutex);
+    this->refreshToken = refreshToken;
 }
 
 QString UserInfo::getUID()
@@ -107,6 +140,20 @@ void UserInfo::sendUpdateSignal()
     emit updateInfo(this->username, this->email, this->sid);
 }
 
+void UserInfo::cleanALL()
+{
+    std::lock_guard<std::mutex> lock(this->mutex);
+    this->username = QString();
+    this->waitingUpdate_username = QString();
+    this->avatar = QString();
+    this->old_avatar = QString();
+    this->uid = QString();
+    this->sid = QString();
+    this->accessToken = QString();
+    this->refreshToken = QString();
+    this->email = QString();
+}
+
 UserInfo::UserInfo(QObject *parent)
     : QObject{parent}
 {
@@ -114,5 +161,5 @@ UserInfo::UserInfo(QObject *parent)
         setAvatar(pixmap);
         emit updateAvatar(this->avatar);
     });
-
+    this->is_login = false;
 }

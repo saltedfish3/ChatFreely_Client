@@ -15,14 +15,21 @@ class UserInfo : public QObject
 public:
     static UserInfo& getUserInfo();
     void setUsername(const QString& username);
-    QString getUsername();
     void updateUsername(const QString& username);
     void confirmUsername();
+    bool isLogin();
 
     void setEmail(const QString& email);
     void setSID(const QString& SID);
     void setUID(const QString& UID);
+    void setLogin(bool islogin);
+    void setAccessToken(const QString& accessToken);
+    void setRefreshToken(const QString& refreshToken);
+
     QString getUID();
+    QString getUsername();
+    QString getAccessToken();
+    QString getRefreshToken();
 
     void setAvatar(const QPixmap& avatar);
     void confirmAvatar();
@@ -30,6 +37,8 @@ public:
     void backupAvatar();
 
     void sendUpdateSignal();
+
+    void cleanALL();
 
 signals:
     void updateInfo(QString username, QString email, QString sid);
@@ -45,6 +54,9 @@ private:
     QString uid;
     QPixmap avatar;
     QPixmap old_avatar;
+    QString accessToken;
+    QString refreshToken;
+    bool is_login;
 
     std::mutex mutex;
 };
