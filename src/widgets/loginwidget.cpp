@@ -229,7 +229,6 @@ void LoginWidget::getLoginState(bool isSuccess, QString from, QString info, bool
     {
         showToast(info + " 将在2秒后为您跳转...",isSuccess);
         this->timer_jump->start();
-        //TcpLongConnection::getTcpClient().getNewFriendRequestsList([](){});
         return;
     }
     if(from.isEmpty())

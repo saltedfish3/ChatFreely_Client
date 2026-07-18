@@ -143,7 +143,10 @@ void HttpShortConnection::getAvatar(const QString &url, size_t retryTime, std::f
                         return;
                     }
                     else
-                        emit mainState(false, "获取头像信息失败");
+                    {
+                        if(failed_notice)
+                            emit mainState(false, "获取头像信息失败");
+                    }
                 }
             });
             return;
@@ -174,7 +177,9 @@ void HttpShortConnection::getAvatar(const QString &url, size_t retryTime, std::f
             return;
         }
         if(onSuccess)
+        {
             onSuccess(avatar);
+        }
         else
             emit AvatarReady(avatar);
     });

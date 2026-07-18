@@ -32,7 +32,7 @@ public:
     void sendUpadteAvatar(QString url);
     void sendUpdateUsername(QString username);
     void sendAddNewFriendRequest(QString sid = "", QString email = "", QString verMsg = "");
-    void sendHandleNewFriendRequest(QString uid, QString handle_uid, bool isAgree);
+    void sendHandleNewFriendRequest(QString handle_uid, bool isAgree);
     void sendUnLogin();
 
     void sendRefreshToken(std::function<void(bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired)> callback);
@@ -46,6 +46,8 @@ signals:
     void LoginState(bool isSuccess ,QString from, QString info, bool reLogin = false);
     void RegisterState(bool isSuccess ,QString from, QString info);
     void mainState(bool isSuccess, QString info);
+    void newFriendRequestsState(bool isEmpty);
+    void newFriendRequestsHandleResult(bool isSuccess);
     void newFriendRequests(QString uid, QString sid, QString username, QString avatar_url, QString verMsg);
     void cleanNewFriendRequestsList();
     void refreshExpiredExit();
@@ -82,8 +84,14 @@ private:
     bool isTryToLoginAgain = false;
     bool isTryToAccessTokenLogin = false;
 
-    QString avatarUrl_waitingRefresh;
-    QString username_waitingRefresh;
+    QString avatarUrl_updateAvatarWaitingRefresh;
+    QString username_updateUsernameWaitingRefresh;
+    QString sid_addNewFriendWaitingRefresh;
+    QString email_addNewFriendWaitingRefresh;
+    QString verMsg_addNewFriendWaitingRefresh;
+    QString uid_handleAddNewFriendWaitingRefresh;
+    std::optional<bool> isAgree_handleAddNewFriendWaitingRefresh;
+
 };
 
 #endif // TCPLONGCONNECTION_H

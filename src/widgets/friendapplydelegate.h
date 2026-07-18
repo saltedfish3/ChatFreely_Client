@@ -29,8 +29,8 @@ public:
     bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem& option, const QModelIndex& index) override;
 
 signals:
-    void agreeClicked(QString UID, const QModelIndex& index);
-    void refuseClicked(QString UID, const QModelIndex& index);
+    void agreeClicked(QString UID, QModelIndex index);
+    void refuseClicked(QString UID, QModelIndex index);
 
 private:
     enum ButtonState

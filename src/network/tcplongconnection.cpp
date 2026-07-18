@@ -79,7 +79,7 @@ void TcpLongConnection::sendUpadteAvatar(QString url)
     obj["Type"] = "Update_Avatar";
     obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
     obj["Url"] = url;
-    this->avatarUrl_waitingRefresh = url;
+    this->avatarUrl_updateAvatarWaitingRefresh = url;
 
     QJsonDocument doc(obj);
     QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
@@ -115,7 +115,7 @@ void TcpLongConnection::sendUpdateUsername(QString username)
     obj["Type"] = "UpdateUsername";
     obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
     obj["Username"] = username;
-    this->username_waitingRefresh = username;
+    this->username_updateUsernameWaitingRefresh = username;
 
     QJsonDocument doc(obj);
     QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
@@ -246,14 +246,13 @@ void TcpLongConnection::getNewFriendRequestsList(std::function<void ()> callBack
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
     {
-        emit mainState(false, "nc");
         return;
     }
     QJsonObject obj;
     QString requestsID = QString::number(getRequestsId());
     obj["Requests_id"] = requestsID;
     obj["Type"] = "GetNewFriendRequestsList";
-    obj["UID"] = UserInfo::getUserInfo().getUID();
+    obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
 
     QJsonDocument doc(obj);
     QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
@@ -261,7 +260,7 @@ void TcpLongConnection::getNewFriendRequestsList(std::function<void ()> callBack
     this->socket->write(data);
     this->socket->flush();
     this->waiting_requestsID.insert(requestsID.toStdString());
-    QTimer::singleShot(5000,[this,requestsID](){
+    QTimer::singleShot(7000,[this,requestsID](){
         if(this->waiting_requestsID.erase(requestsID.toStdString()))
         {
             emit mainState(false, "连接超时，请稍后再试");
@@ -316,17 +315,23 @@ void TcpLongConnection::sendAddNewFriendRequest(QString sid, QString email, QStr
     QJsonObject obj;
     obj["Requests_id"] = requestsID;
     obj["Type"] = "AddNewFriendRequest";
-    obj["UID"] = UserInfo::getUserInfo().getUID();
+    obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
+
     if(sid.isEmpty())
     {
         obj["Receiver_Email"] = email;
+        this->email_addNewFriendWaitingRefresh = email;
     }
     else
     {
         obj["Receiver_SID"] = sid;
+        this->sid_addNewFriendWaitingRefresh = sid;
     }
     if(!verMsg.isEmpty())
+    {
         obj["VerMsg"] = verMsg;
+        this->verMsg_addNewFriendWaitingRefresh = verMsg;
+    }
 
     QJsonDocument doc(obj);
     QByteArray data =doc.toJson(QJsonDocument::Compact) + "\n";
@@ -338,29 +343,37 @@ void TcpLongConnection::sendAddNewFriendRequest(QString sid, QString email, QStr
         if(this->waiting_requestsID.erase(requestsID.toStdString()))
         {
             emit mainState(false, "申请添加好友超时，请稍后再试");
+            this->email_addNewFriendWaitingRefresh.clear();
+            this->sid_addNewFriendWaitingRefresh.clear();
+            this->verMsg_addNewFriendWaitingRefresh.clear();
         }
     });
 }
 
-void TcpLongConnection::sendHandleNewFriendRequest(QString uid, QString handle_uid, bool isAgree)
+void TcpLongConnection::sendHandleNewFriendRequest(QString handle_uid, bool isAgree)
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
     {
         emit mainState(false, "无法连接服务器，请稍后再试");
         return;
     }
-    if(uid.isEmpty() && handle_uid.isEmpty())
+    if(handle_uid.isEmpty())
     {
         emit mainState(false, "处理申请错误，请稍后再试");
         return;
     }
+    //显示loading
+    emit newFriendRequestsState(false);
     QString requestsID = QString::number(getRequestsId());
     QJsonObject obj;
     obj["Requests_id"] = requestsID;
     obj["Type"] = "HandleNewFriendRequest";
+    obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
     obj["Status"] = isAgree;
-    obj["UID"] = uid;
     obj["HandleUID"] = handle_uid;
+
+    this->isAgree_handleAddNewFriendWaitingRefresh = isAgree;
+    this->uid_handleAddNewFriendWaitingRefresh = handle_uid;
 
     QJsonDocument doc(obj);
     QByteArray data =doc.toJson(QJsonDocument::Compact) + "\n";
@@ -371,7 +384,10 @@ void TcpLongConnection::sendHandleNewFriendRequest(QString uid, QString handle_u
     QTimer::singleShot(5000,[this,requestsID](){
         if(this->waiting_requestsID.erase(requestsID.toStdString()))
         {
+            emit newFriendRequestsHandleResult(false);
             emit mainState(false, "处理好友申请超时，请稍后再试");
+            this->isAgree_handleAddNewFriendWaitingRefresh.reset();
+            this->uid_handleAddNewFriendWaitingRefresh.clear();
         }
     });
 }
@@ -601,10 +617,11 @@ void TcpLongConnection::handleUpdateAvatarResp(QJsonObject obj)
                         if(newAccessToken.isEmpty())
                         {
                             emit refreshExpiredExit();
+                            this->avatarUrl_updateAvatarWaitingRefresh.clear();
                             return;
                         }
                         UserInfo::getUserInfo().setAccessToken(newAccessToken);
-                        sendUpadteAvatar(this->avatarUrl_waitingRefresh);
+                        sendUpadteAvatar(this->avatarUrl_updateAvatarWaitingRefresh);
                         return;
                     }
                     else
@@ -614,6 +631,7 @@ void TcpLongConnection::handleUpdateAvatarResp(QJsonObject obj)
                         else
                         {
                             emit mainState(false, "上传失败，请稍后再试");
+                            this->avatarUrl_updateAvatarWaitingRefresh.clear();
                             UserInfo::getUserInfo().rollBackAvatar();
                         }
                     }
@@ -622,10 +640,12 @@ void TcpLongConnection::handleUpdateAvatarResp(QJsonObject obj)
             return;
         }
         emit mainState(false, "上传失败，请稍后再试");
+        this->avatarUrl_updateAvatarWaitingRefresh.clear();
         UserInfo::getUserInfo().rollBackAvatar();
     }
     else
     {
+        this->avatarUrl_updateAvatarWaitingRefresh.clear();
         UserInfo::getUserInfo().confirmAvatar();
     }
 }
@@ -666,6 +686,12 @@ void TcpLongConnection::handleUnLoginResp(QJsonObject obj)
                     emit exitAccount();
                     UserInfo::getUserInfo().cleanALL();
                     this->isTryToUnLoginRefresh = false;
+
+                    this->avatarUrl_updateAvatarWaitingRefresh.clear();
+                    this->email_addNewFriendWaitingRefresh.clear();
+                    this->username_updateUsernameWaitingRefresh.clear();
+                    this->sid_addNewFriendWaitingRefresh.clear();
+                    this->verMsg_addNewFriendWaitingRefresh.clear();
                 }
             });
             return;
@@ -680,6 +706,12 @@ void TcpLongConnection::handleUnLoginResp(QJsonObject obj)
     emit exitAccount();
     this->isTryToUnLoginRefresh = false;
     UserInfo::getUserInfo().cleanALL();
+
+    this->avatarUrl_updateAvatarWaitingRefresh.clear();
+    this->email_addNewFriendWaitingRefresh.clear();
+    this->username_updateUsernameWaitingRefresh.clear();
+    this->sid_addNewFriendWaitingRefresh.clear();
+    this->verMsg_addNewFriendWaitingRefresh.clear();
 }
 
 void TcpLongConnection::handleRefreshTokenResp(QJsonObject obj)
@@ -739,13 +771,249 @@ void TcpLongConnection::handleUpdateUsernameResp(QJsonObject obj)
     if(!obj.contains("Result") || !obj.value("Result").isBool())
     {
         emit mainState(false, "更新失败，请稍后重试");
+        this->username_updateUsernameWaitingRefresh.clear();
         return;
     }
     bool success = obj.value("Result").toBool();
     if(success)
     {
         emit mainState(true, "更新成功");
+        this->username_updateUsernameWaitingRefresh.clear();
         UserInfo::getUserInfo().confirmUsername();
+    }
+    else
+    {
+        if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
+        {
+            bool isExpired = obj.value("AccessTokenExpired").toBool();
+            if(isExpired)
+            {
+                sendRefreshToken([this](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                    if(isSuccess)
+                    {
+                        if(newAccessToken.isEmpty())
+                        {
+                            emit refreshExpiredExit();
+                            this->username_updateUsernameWaitingRefresh.clear();
+                            return;
+                        }
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        sendUpdateUsername(this->username_updateUsernameWaitingRefresh);
+                        return;
+                    }
+                    else
+                    {
+                        if(isRefreshTokenExpired)
+                        {
+                            emit refreshExpiredExit();
+                            this->username_updateUsernameWaitingRefresh.clear();
+                            return;
+                        }
+                        this->username_updateUsernameWaitingRefresh.clear();
+                        emit mainState(false, "更新失败");
+                    }
+                });
+                return;
+            }
+        }
+        this->username_updateUsernameWaitingRefresh.clear();
+        emit mainState(false, "更新失败");
+    }
+}
+
+void TcpLongConnection::handleAddNewFriendRequestResp(QJsonObject obj)
+{
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+    if(!obj.contains("Result") || !obj.value("Result").isBool())
+    {
+        emit mainState(false, "申请添加好友失败，请稍后重试");
+        this->sid_addNewFriendWaitingRefresh.clear();
+        this->email_addNewFriendWaitingRefresh.clear();
+        this->verMsg_addNewFriendWaitingRefresh.clear();
+        return;
+    }
+
+    bool success = obj.value("Result").toBool();
+    if(success)
+    {
+        emit mainState(true, "成功发送添加好友申请");
+        this->sid_addNewFriendWaitingRefresh.clear();
+        this->email_addNewFriendWaitingRefresh.clear();
+        this->verMsg_addNewFriendWaitingRefresh.clear();
+    }
+    else
+    {
+        if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
+        {
+            bool isExpired = obj.value("AccessTokenExpired").toBool();
+            if(isExpired)
+            {
+                sendRefreshToken([this](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                    if(isSuccess)
+                    {
+                        if(newAccessToken.isEmpty())
+                        {
+                            emit refreshExpiredExit();
+                            this->sid_addNewFriendWaitingRefresh.clear();
+                            this->email_addNewFriendWaitingRefresh.clear();
+                            this->verMsg_addNewFriendWaitingRefresh.clear();
+                            return;
+                        }
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        sendAddNewFriendRequest(this->sid_addNewFriendWaitingRefresh,
+                                                this->email_addNewFriendWaitingRefresh,
+                                                this->verMsg_addNewFriendWaitingRefresh);
+                        return;
+                    }
+                    else
+                    {
+                        if(isRefreshTokenExpired)
+                        {
+                            emit refreshExpiredExit();
+                            this->sid_addNewFriendWaitingRefresh.clear();
+                            this->email_addNewFriendWaitingRefresh.clear();
+                            this->verMsg_addNewFriendWaitingRefresh.clear();
+                            return;
+                        }
+                        emit mainState(false, "申请添加好友失败，请稍后重试");
+                    }
+                });
+                return;
+            }
+            emit mainState(false, "申请添加好友失败，请稍后重试");
+            this->sid_addNewFriendWaitingRefresh.clear();
+            this->email_addNewFriendWaitingRefresh.clear();
+            this->verMsg_addNewFriendWaitingRefresh.clear();
+            return;
+        }
+        if(!obj.contains("Info") || !obj.value("Info").isString())
+        {
+            emit mainState(false, "申请添加好友失败，请稍后重试");
+            this->sid_addNewFriendWaitingRefresh.clear();
+            this->email_addNewFriendWaitingRefresh.clear();
+            this->verMsg_addNewFriendWaitingRefresh.clear();
+            return;
+        }
+        emit mainState(false, obj.value("Info").toString());
+        this->sid_addNewFriendWaitingRefresh.clear();
+        this->email_addNewFriendWaitingRefresh.clear();
+        this->verMsg_addNewFriendWaitingRefresh.clear();
+    }
+}
+
+void TcpLongConnection::handleHandleNewFriendRequestResp(QJsonObject obj)
+{
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+    if(!obj.contains("Result") || !obj.value("Result").isBool())
+    {
+        emit newFriendRequestsHandleResult(false);
+        emit mainState(false, "处理好友申请失败，请稍后再试");
+        this->isAgree_handleAddNewFriendWaitingRefresh.reset();
+        this->uid_handleAddNewFriendWaitingRefresh.clear();
+        return;
+    }
+    bool success = obj.value("Result").toBool();
+    if(success)
+    {
+        emit newFriendRequestsHandleResult(true);
+        emit mainState(true, "处理成功");
+        this->isAgree_handleAddNewFriendWaitingRefresh.reset();
+        this->uid_handleAddNewFriendWaitingRefresh.clear();
+        return;
+    }
+    else
+    {
+        if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
+        {
+            bool isExpired = obj.value("AccessTokenExpired").toBool();
+            if(isExpired)
+            {
+                sendRefreshToken([this](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                    if(isSuccess)
+                    {
+                        if(newAccessToken.isEmpty())
+                        {
+                            emit refreshExpiredExit();
+                            this->isAgree_handleAddNewFriendWaitingRefresh.reset();
+                            this->uid_handleAddNewFriendWaitingRefresh.clear();
+                            return;
+                        }
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        //静默重试 或者 让用户重新操作
+                        if(this->isAgree_handleAddNewFriendWaitingRefresh.has_value())
+                            sendHandleNewFriendRequest(this->uid_handleAddNewFriendWaitingRefresh,
+                                                        this->isAgree_handleAddNewFriendWaitingRefresh.value());
+                        return;
+                    }
+                    else
+                    {
+                        if(isRefreshTokenExpired)
+                        {
+                            emit refreshExpiredExit();
+                            this->isAgree_handleAddNewFriendWaitingRefresh.reset();
+                            this->uid_handleAddNewFriendWaitingRefresh.clear();
+                            return;
+                        }
+                        emit newFriendRequestsHandleResult(false);
+                        emit mainState(false, "处理好友申请失败，请稍后再试");
+                        this->isAgree_handleAddNewFriendWaitingRefresh.reset();
+                        this->uid_handleAddNewFriendWaitingRefresh.clear();
+                    }
+                });
+                return;
+            }
+            emit newFriendRequestsHandleResult(false);
+            emit mainState(false, "处理好友申请失败，请稍后再试");
+            this->isAgree_handleAddNewFriendWaitingRefresh.reset();
+            this->uid_handleAddNewFriendWaitingRefresh.clear();
+            return;
+        }
+        emit newFriendRequestsHandleResult(false);
+        emit mainState(false, "处理好友申请失败，请稍后再试");
+        this->isAgree_handleAddNewFriendWaitingRefresh.reset();
+        this->uid_handleAddNewFriendWaitingRefresh.clear();
+    }
+}
+
+void TcpLongConnection::handleGetNewFriendRequestsListResp(QJsonObject obj)
+{
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+    if(!obj.contains("Result") || !obj.value("Result").isBool())
+    {
+        emit newFriendRequestsState(true);
+        return;
+    }
+    bool success = obj.value("Result").toBool();
+    if(success)
+    {
+        if(!obj.contains("List") || !obj.value("List").isArray())
+        {
+            emit newFriendRequestsState(true);
+            return;
+        }
+        const QJsonArray arr = obj.value("List").toArray();
+        if(arr.isEmpty())
+        {
+            emit newFriendRequestsState(true);
+            return;
+        }
+        emit cleanNewFriendRequestsList();
+        emit newFriendRequestsState(false);
+        for(const QJsonValue& jv : arr)
+        {
+            if(!jv.isObject())
+                continue;
+            QJsonObject obj = jv.toObject();
+
+            emit newFriendRequests(obj.value("UID").toString(),
+                                   obj.value("SID").toString(),
+                                   obj.value("Username").toString(),
+                                   obj.value("Avatar_Url").toString(),
+                                   obj.value("VerMsg").toString());
+        }
     }
     else
     {
@@ -763,108 +1031,24 @@ void TcpLongConnection::handleUpdateUsernameResp(QJsonObject obj)
                             return;
                         }
                         UserInfo::getUserInfo().setAccessToken(newAccessToken);
-                        sendUpdateUsername(this->username_waitingRefresh);
+                        emit newFriendRequestsState(false);
+                        getNewFriendRequestsList([](){});
                         return;
                     }
                     else
                     {
                         if(isRefreshTokenExpired)
-                        {
                             emit refreshExpiredExit();
-                            return;
+                        else
+                        {
+                            emit newFriendRequestsState(true);
                         }
-                        emit mainState(false, "更新失败");
                     }
                 });
-                return;
             }
-
-        }
-        emit mainState(false, "更新失败");
-    }
-}
-
-void TcpLongConnection::handleAddNewFriendRequestResp(QJsonObject obj)
-{
-    QString requestsID = obj.value("Requests_id").toString();
-    this->waiting_requestsID.erase(requestsID.toStdString());
-    if(!obj.contains("Result") || !obj.value("Result").isBool())
-    {
-        emit mainState(false, "申请添加好友失败，请稍后重试");
-        return;
-    }
-    bool success = obj.value("Result").toBool();
-    if(success)
-    {
-        emit mainState(true, "成功发送添加好友申请");
-    }
-    else
-    {
-        if(!obj.contains("Info") || !obj.value("Info").isString())
-        {
-            emit mainState(false, "申请添加好友失败，请稍后重试");
             return;
         }
-        emit mainState(false, obj.value("Info").toString());
-    }
-}
-
-void TcpLongConnection::handleHandleNewFriendRequestResp(QJsonObject obj)
-{
-    QString requestsID = obj.value("Requests_id").toString();
-    this->waiting_requestsID.erase(requestsID.toStdString());
-    if(!obj.contains("Result") || !obj.value("Result").isBool())
-    {
-        emit mainState(false, "处理好友申请失败，请稍后再试");
-        return;
-    }
-    bool success = obj.value("Result").toBool();
-    if(success)
-    {
-        emit mainState(true, "成功发送添加好友申请");
-    }
-    else
-    {
-        emit mainState(false, "处理好友申请失败，请稍后再试");
-    }
-}
-
-void TcpLongConnection::handleGetNewFriendRequestsListResp(QJsonObject obj)
-{
-    QString requestsID = obj.value("Requests_id").toString();
-    this->waiting_requestsID.erase(requestsID.toStdString());
-    if(!obj.contains("Result") || !obj.value("Result").isBool())
-    {
-        emit mainState(false, "获取好友申请失败，请稍后再试");
-        return;
-    }
-    bool success = obj.value("Result").toBool();
-    if(success)
-    {
-        if(!obj.contains("List") || !obj.value("List").isArray())
-        {
-            emit mainState(false, "获取好友申请失败，请稍后再试");
-            return;
-        }
-        const QJsonArray arr = obj.value("List").toArray();
-        emit cleanNewFriendRequestsList();
-        for(const QJsonValue& jv : arr)
-        {
-            if(!jv.isObject())
-                continue;
-            QJsonObject obj = jv.toObject();
-
-            emit newFriendRequests(obj.value("UID").toString(),
-                                   obj.value("SID").toString(),
-                                   obj.value("Username").toString(),
-                                   obj.value("Avatar_Url").toString(),
-                                   obj.value("VerMsg").toString());
-        }
-    }
-    else
-    {
-        //显示没有好友申请
-        qDebug()<<"没有好友申请";
+        emit newFriendRequestsState(true);
     }
 }
 

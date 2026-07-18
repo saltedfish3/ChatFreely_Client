@@ -6,9 +6,17 @@
 #include <QListView>
 #include <QStandardItemModel>
 #include <QModelIndex>
+#include <QPropertyAnimation>
+#include <QPushButton>
+#include <QMetaObject>
+#include <QPersistentModelIndex>
+#include <QPointer>
+#include <QPersistentModelIndex>
 #include "friendapplydelegate.h"
 #include "../network/tcplongconnection.h"
+#include "../network/httpshortconnection.h"
 #include "../utils/userinfo.h"
+#include "loadinglabel.h"
 
 class NewFriendManageWidget : public QWidget
 {
@@ -20,18 +28,34 @@ public:
 signals:
 
 private:
+    enum Status
+    {
+        Loading = 0,
+        Empty,
+        Hide
+    };
     void initWidget();
     void initstyle();
+    void changeStatus(Status status);
 
     QLabel* label_friendApply;
+    LoadingLabel* label_loadingIcon;
+    QLabel* label_loading;
+    QLabel* label_empty;
 
     QWidget* widget_friendApply;
+    QWidget* widget_status;
+
+    QPushButton* btn_refresh;
+    QPropertyAnimation* animation_loading;
 
     QListView* listView_friendApplyManage;
     QStandardItemModel* model;
     FriendApplyDelegate* delegate;
 
     QString handle_uid;
+
+    QPersistentModelIndex waitingHandleIndex;
 };
 
 #endif // NEWFRIENDMANAGEWIDGET_H
