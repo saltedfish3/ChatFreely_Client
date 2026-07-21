@@ -242,7 +242,7 @@ void TcpLongConnection::sendAccessTokenLogin()
     }
 }
 
-void TcpLongConnection::getNewFriendRequestsList(std::function<void ()> callBack)
+void TcpLongConnection::getNewFriendRequestsList()
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
     {
@@ -252,6 +252,32 @@ void TcpLongConnection::getNewFriendRequestsList(std::function<void ()> callBack
     QString requestsID = QString::number(getRequestsId());
     obj["Requests_id"] = requestsID;
     obj["Type"] = "GetNewFriendRequestsList";
+    obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
+
+    QJsonDocument doc(obj);
+    QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
+
+    this->socket->write(data);
+    this->socket->flush();
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(7000,[this,requestsID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            emit mainState(false, "连接超时，请稍后再试");
+        }
+    });
+}
+
+void TcpLongConnection::getFriendList()
+{
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        return;
+    }
+    QJsonObject obj;
+    QString requestsID = QString::number(getRequestsId());
+    obj["Requests_id"] = requestsID;
+    obj["Type"] = "GetFriendList";
     obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
 
     QJsonDocument doc(obj);
@@ -474,7 +500,8 @@ void TcpLongConnection::handleLoginResp(QJsonObject obj)
                         }
                         UserInfo::getUserInfo().setAccessToken(newAccessToken);
                         UserInfo::getUserInfo().setLogin(true);
-                        getNewFriendRequestsList([](){});
+                        getNewFriendRequestsList();
+                        getFriendList();
                         UserInfo::getUserInfo().sendUpdateSignal();
                         this->isTryToLoginAgain = false;
                         emit LoginState(isSuccess, "", info);
@@ -488,7 +515,8 @@ void TcpLongConnection::handleLoginResp(QJsonObject obj)
                 UserInfo::getUserInfo().setLogin(true);
                 UserInfo::getUserInfo().sendUpdateSignal();
                 this->isTryToLoginAgain = false;
-                getNewFriendRequestsList([](){});
+                getNewFriendRequestsList();
+                getFriendList();
                 emit LoginState(result,"",obj.value("Info").toString());
             }
             else
@@ -574,7 +602,8 @@ void TcpLongConnection::handleAccessTokenLoginResp(QJsonObject obj)
         return;
     }
     UserInfo::getUserInfo().setLogin(true);
-    getNewFriendRequestsList([](){});
+    getNewFriendRequestsList();
+    getFriendList();
 }
 
 void TcpLongConnection::handleRegisterResp(QJsonObject obj)
@@ -1032,7 +1061,7 @@ void TcpLongConnection::handleGetNewFriendRequestsListResp(QJsonObject obj)
                         }
                         UserInfo::getUserInfo().setAccessToken(newAccessToken);
                         emit newFriendRequestsState(false);
-                        getNewFriendRequestsList([](){});
+                        getNewFriendRequestsList();
                         return;
                     }
                     else
@@ -1052,9 +1081,133 @@ void TcpLongConnection::handleGetNewFriendRequestsListResp(QJsonObject obj)
     }
 }
 
+void TcpLongConnection::handleGetFriendListResp(QJsonObject obj)
+{
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+    if(!obj.contains("Result") || !obj.value("Result").isBool())
+    {
+        emit newFriendRequestsState(true);
+        return;
+    }
+    bool success = obj.value("Result").toBool();
+    if(success)
+    {
+        if(!obj.contains("List") || !obj.value("List").isArray())
+        {
+            emit newFriendState(true);
+            return;
+        }
+        const QJsonArray arr = obj.value("List").toArray();
+        if(arr.isEmpty())
+        {
+            emit newFriendState(true);
+            return;
+        }
+        emit cleanFriendList();
+        emit newFriendState(false);
+        for(const QJsonValue& jv : arr)
+        {
+            if(!jv.isObject())
+                continue;
+            QJsonObject obj = jv.toObject();
+
+            emit newFriend(obj.value("UID").toString(),
+                                   obj.value("SID").toString(),
+                                   obj.value("Username").toString(),
+                                   obj.value("Avatar_Url").toString(),
+                                   obj.value("Email").toString(),
+                                   obj.value("IsOnline").toBool(false));
+        }
+    }
+    else
+    {
+        if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
+        {
+            bool isExpired = obj.value("AccessTokenExpired").toBool();
+            if(isExpired)
+            {
+                sendRefreshToken([this](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                    if(isSuccess)
+                    {
+                        if(newAccessToken.isEmpty())
+                        {
+                            emit refreshExpiredExit();
+                            return;
+                        }
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        emit newFriendState(false);
+                        getFriendList();
+                        return;
+                    }
+                    else
+                    {
+                        if(isRefreshTokenExpired)
+                            emit refreshExpiredExit();
+                        else
+                        {
+                            emit newFriendState(true);
+                        }
+                    }
+                });
+            }
+            return;
+        }
+        emit newFriendState(true);
+    }
+}
+
+void TcpLongConnection::handlePushNewFriendRequests(QJsonObject obj)
+{
+    if(obj.contains("SID") && obj.value("SID").isString() &&
+        obj.contains("UID") && obj.value("UID").isString() &&
+        obj.contains("Username") && obj.value("Username").isString() &&
+        obj.contains("VerMsg") && obj.value("VerMsg").isString() &&
+        obj.contains("Avatar_Url") && obj.value("Avatar_Url").isString())
+    {
+        emit newFriendRequests(obj.value("UID").toString(),
+                               obj.value("SID").toString(),
+                               obj.value("Username").toString(),
+                               obj.value("Avatar_Url").toString(),
+                               obj.value("VerMsg").toString());
+        return;
+    }
+    getNewFriendRequestsList();
+}
+
+void TcpLongConnection::handlePushNewFriend(QJsonObject obj)
+{
+    if(obj.contains("SID") && obj.value("SID").isString() &&
+        obj.contains("UID") && obj.value("UID").isString() &&
+        obj.contains("Username") && obj.value("Username").isString() &&
+        obj.contains("Email") && obj.value("Email").isString() &&
+        obj.contains("Avatar_Url") && obj.value("Avatar_Url").isString() &&
+        obj.contains("IsOnline") && obj.value("IsOnline").isBool())
+    {
+        emit newFriend(obj.value("UID").toString(),
+                               obj.value("SID").toString(),
+                               obj.value("Username").toString(),
+                               obj.value("Avatar_Url").toString(),
+                               obj.value("Email").toString(),
+                               obj.value("IsOnline").toBool());
+        return;
+    }
+    getFriendList();
+}
+
+void TcpLongConnection::handlePushFriendStatus(QJsonObject obj)
+{
+    if(obj.contains("UID") && obj.value("UID").isString() && obj.contains("IsOnline") && obj.value("IsOnline").isBool())
+    {
+        emit FriendStatus(obj.value("UID").toString(), obj.value("IsOnline").toBool());
+    }
+}
+
 uint64_t TcpLongConnection::getRequestsId()
 {
     static std::atomic<uint64_t> requestsid{0};
+    while(requestsid >= 125433700 && requestsid <= 125433710)
+        requestsid++;
     return requestsid++;
 }
 
@@ -1094,8 +1247,6 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
             if(!qjd.isNull() && qjd.isObject())
             {
                 QJsonObject obj = qjd.object();
-                if(!obj.contains("Requests_id"))
-                    return;
                 if(obj.contains("Type"))
                 {
                     QString type = obj.value("Type").toString();
@@ -1139,6 +1290,10 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
                     {
                         this->handleGetNewFriendRequestsListResp(obj);
                     }
+                    else if(type == "GetFriendListResp")
+                    {
+                        this->handleGetFriendListResp(obj);
+                    }
                     else if(type == "RefreshTokenResp")
                     {
                         this->handleRefreshTokenResp(obj);
@@ -1146,6 +1301,30 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
                     else if(type == "AccessTokenLoginResp")
                     {
                         this->handleAccessTokenLoginResp(obj);
+                    }
+                    else if(type == "PushNewFriendRequests")
+                    {
+                        //125433701
+                        if(obj.value("Requests_id").toString() == "125433701")
+                        {
+                            this->handlePushNewFriendRequests(obj);
+                        }
+                    }
+                    else if(type == "PushNewFriend")
+                    {
+                        //125433702
+                        if(obj.value("Requests_id").toString() == "125433702")
+                        {
+                            this->handlePushNewFriend(obj);
+                        }
+                    }
+                    else if(type == "PushFriendStatus")
+                    {
+                        //125433703
+                        if(obj.value("Requests_id").toString() == "125433703")
+                        {
+                            this->handlePushFriendStatus(obj);
+                        }
                     }
                     else
                     {

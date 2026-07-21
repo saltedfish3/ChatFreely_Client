@@ -11,6 +11,7 @@
 #include <QMetaObject>
 #include <QPersistentModelIndex>
 #include <QPointer>
+#include <QScrollBar>
 #include <QPersistentModelIndex>
 #include "friendapplydelegate.h"
 #include "../network/tcplongconnection.h"
@@ -26,6 +27,7 @@ public:
     void addRequestsItem(QString uid, QString sid, QString username, QString avatar_url, QString verMsg);
 
 signals:
+    void RequestsNumberChange(size_t number);
 
 private:
     enum Status
@@ -56,6 +58,8 @@ private:
     QString handle_uid;
 
     QPersistentModelIndex waitingHandleIndex;
+
+    size_t unProcessedRequests = 0;
 };
 
 #endif // NEWFRIENDMANAGEWIDGET_H

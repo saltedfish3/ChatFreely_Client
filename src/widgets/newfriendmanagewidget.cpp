@@ -35,6 +35,7 @@ void NewFriendManageWidget::addRequestsItem(QString uid, QString sid, QString us
             }, Qt::QueuedConnection);
         }, false);
     }
+    emit RequestsNumberChange(this->model->rowCount());
 }
 
 void NewFriendManageWidget::initWidget()
@@ -70,6 +71,7 @@ void NewFriendManageWidget::initWidget()
     this->listView_friendApplyManage->setEditTriggers(QAbstractItemView::NoEditTriggers);
     this->listView_friendApplyManage->setSelectionMode(QAbstractItemView::NoSelection);
     this->listView_friendApplyManage->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    this->listView_friendApplyManage->verticalScrollBar()->setSingleStep(8);
     this->listView_friendApplyManage->setResizeMode(QListView::Fixed);
 
     this->widget_status = new QWidget(this->listView_friendApplyManage);
@@ -133,12 +135,14 @@ void NewFriendManageWidget::initWidget()
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::cleanNewFriendRequestsList, this, [this](){
         this->model->clear();
+        emit RequestsNumberChange(this->model->rowCount());
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newFriendRequestsState, this, [this](bool isEmpty){
         if(isEmpty)
         {
             this->model->clear();
+            emit RequestsNumberChange(this->model->rowCount());
             changeStatus(Empty);
         }
         else
@@ -149,11 +153,12 @@ void NewFriendManageWidget::initWidget()
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newFriendRequestsHandleResult, this, [this](bool isSuccess){
         //处理index删除还是保留
-        if(this->waitingHandleIndex.isValid())
+        if(isSuccess)
         {
-            if(isSuccess)
+            if(this->waitingHandleIndex.isValid())
             {
                 this->model->removeRow(this->waitingHandleIndex.row());
+                emit RequestsNumberChange(this->model->rowCount());
             }
         }
         changeStatus(Hide);
@@ -164,7 +169,7 @@ void NewFriendManageWidget::initWidget()
 
     connect(this->btn_refresh, &QPushButton::clicked, this, [this](){
         changeStatus(Loading);
-        TcpLongConnection::getTcpClient().getNewFriendRequestsList([](){});
+        TcpLongConnection::getTcpClient().getNewFriendRequestsList();
     });
 }
 
@@ -186,6 +191,33 @@ void NewFriendManageWidget::initstyle()
                                 border-radius:0px;
                                 background:transparent;
                                 padding-bottom: 10px;
+                            }
+                            #listView_friendApplyManage QScrollBar:vertical
+                            {
+                                width: 6px;
+                                background: transparent;
+                                margin: 0px;
+                                margin-top: 2px;
+                            }
+                            #listView_friendApplyManage QScrollBar::handle:vertical
+                            {
+                                background: rgba(0, 0, 0, 0.2);
+                                border-radius: 3px;
+                                min-height: 30px;
+                            }
+                            #listView_friendApplyManage QScrollBar::handle:vertical:hover
+                            {
+                                background: rgba(0, 0, 0, 0.35);
+                            }
+                            #listView_friendApplyManage QScrollBar::add-line:vertical,
+                            #listView_friendApplyManage QScrollBar::sub-line:vertical
+                            {
+                                height: 0px;
+                            }
+                            #listView_friendApplyManage QScrollBar::add-page:vertical,
+                            #listView_friendApplyManage QScrollBar::sub-page:vertical
+                            {
+                                background: none;
                             }
                             #widget_status[status = "loading"]
                             {

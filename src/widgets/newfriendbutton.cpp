@@ -8,6 +8,12 @@ NewFriendButton::NewFriendButton(int width, int height, QWidget *parent)
     initStyle();
 }
 
+void NewFriendButton::setUnProcessedRequests(size_t num)
+{
+    this->unProcessedRequests = num;
+    this->update();
+}
+
 void NewFriendButton::enterEvent(QEnterEvent *e)
 {
     QPushButton::enterEvent(e);
@@ -50,6 +56,39 @@ void NewFriendButton::nextCheckState()
 {
     if(!this->isChecked())
         QPushButton::nextCheckState();
+}
+
+void NewFriendButton::paintEvent(QPaintEvent *event)
+{
+    QPushButton::paintEvent(event);
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    if(this->unProcessedRequests > 0)
+    {
+        QRect rect = this->rect();
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(247, 76, 48));
+
+        QRect rect_unProcessedRequests(QPoint(rect.width() - 55, (rect.height() - 18)/2), QSize(18, 18));
+        painter.drawRoundedRect(rect_unProcessedRequests, rect_unProcessedRequests.height() / 2, rect_unProcessedRequests.height() / 2);
+
+        QFont font;
+        font.setPointSize(8);
+        painter.setFont(font);
+        painter.setPen(QPen(QColor(Qt::white), 1));
+
+        QString count;
+        if(this->unProcessedRequests > 99)
+        {
+            count = "99+";
+            font.setPointSize(7);
+            painter.setFont(font);
+        }
+        else
+            count = QString::number(this->unProcessedRequests);
+        painter.drawText(rect_unProcessedRequests, Qt::AlignCenter, count);
+    }
 }
 
 void NewFriendButton::initButton()

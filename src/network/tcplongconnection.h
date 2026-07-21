@@ -38,7 +38,8 @@ public:
     void sendRefreshToken(std::function<void(bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired)> callback);
     void sendAccessTokenLogin();
 
-    void getNewFriendRequestsList(std::function<void()> callBack);
+    void getNewFriendRequestsList();
+    void getFriendList();
 
     bool isConnect();
 
@@ -49,7 +50,11 @@ signals:
     void newFriendRequestsState(bool isEmpty);
     void newFriendRequestsHandleResult(bool isSuccess);
     void newFriendRequests(QString uid, QString sid, QString username, QString avatar_url, QString verMsg);
+    void newFriend(QString uid, QString sid, QString username, QString avatar_url, QString email, bool isOnline);
+    void newFriendState(bool isEmpty);
+    void FriendStatus(QString uid, bool isOnline);
     void cleanNewFriendRequestsList();
+    void cleanFriendList();
     void refreshExpiredExit();
     void exitAccount();
 
@@ -67,6 +72,10 @@ private:
     void handleAddNewFriendRequestResp(QJsonObject obj);
     void handleHandleNewFriendRequestResp(QJsonObject obj);
     void handleGetNewFriendRequestsListResp(QJsonObject obj);
+    void handleGetFriendListResp(QJsonObject obj);
+    void handlePushNewFriendRequests(QJsonObject obj);
+    void handlePushNewFriend(QJsonObject obj);
+    void handlePushFriendStatus(QJsonObject obj);
     void handleUnLoginResp(QJsonObject obj);
 
     void handleRefreshTokenResp(QJsonObject obj);

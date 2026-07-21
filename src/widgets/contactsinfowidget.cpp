@@ -41,10 +41,13 @@ void ContactsInfoWidget::init()
     this->label_status_icon->resize(8,8);
     this->label_status_icon->move(12,(this->label_status->height() - this->label_status_icon->height())/2);
 
+    int pos_middle = this->width() / 2;
+
     this->btn_sendMsg = new QPushButton("发送消息",this);
     this->btn_sendMsg->setObjectName("btn_sendMsg");
     this->btn_sendMsg->resize(150,48);
-    this->btn_sendMsg->move(78,this->label_status->pos().y() + this->label_status->height() + 32);
+    this->btn_sendMsg->move(pos_middle - this->btn_sendMsg->width() - 10,
+                            this->label_status->pos().y() + this->label_status->height() + 32);
 
     this->label_sendMsg_icon = new QLabel(this->btn_sendMsg);
     this->label_sendMsg_icon->setObjectName("label_sendMsg_icon");
@@ -55,7 +58,7 @@ void ContactsInfoWidget::init()
     this->btn_deleteFriend = new QPushButton("删除好友",this);
     this->btn_deleteFriend->setObjectName("btn_deleteFriend");
     this->btn_deleteFriend->resize(150,48);
-    this->btn_deleteFriend->move(this->btn_sendMsg->pos().x()+this->btn_sendMsg->width()+20,
+    this->btn_deleteFriend->move(pos_middle + 10,
                                  this->label_status->pos().y() + this->label_status->height() + 32);
 
     this->label_deleteFriend = new QLabel(this->btn_deleteFriend);
@@ -151,8 +154,9 @@ void ContactsInfoWidget::initStyle()
                     #widget_emailRegion
                     {
                         background-color: rgba(255, 255, 255, 255);
-                        border: 1px solid rgba(0, 0, 0, 13);
+                        border: 1px solid rgba(0, 0, 0, 25);
                         border-radius: 12px;
+                        margin: 1px;
                     }
                     #label_emailChinese
                     {

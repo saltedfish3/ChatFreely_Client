@@ -3,6 +3,9 @@
 
 #include <QPushButton>
 #include <QLabel>
+#include <QPainter>
+#include <QRect>
+#include <QPoint>
 
 class NewFriendButton : public QPushButton
 {
@@ -10,13 +13,14 @@ class NewFriendButton : public QPushButton
 public:
     explicit NewFriendButton(int width, int height, QWidget *parent = nullptr);
 
-    void setNotRead(size_t num);
+    void setUnProcessedRequests(size_t num);
 signals:
 
 protected:
     void enterEvent(QEnterEvent* e) override;
     void leaveEvent(QEvent* e) override;
     void nextCheckState() override;
+    void paintEvent(QPaintEvent* event) override;
 
 private:
     void initButton();
@@ -26,7 +30,8 @@ private:
     QLabel* label_Icon;
     QLabel* label_checkApply;
     QLabel* label_arrow;
-    QLabel* label_notRead;
+
+    size_t unProcessedRequests = 0;
 };
 
 #endif // NEWFRIENDBUTTON_H
