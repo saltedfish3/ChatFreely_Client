@@ -33,6 +33,7 @@ public:
     void sendUpdateUsername(QString username);
     void sendAddNewFriendRequest(QString sid = "", QString email = "", QString verMsg = "");
     void sendHandleNewFriendRequest(QString handle_uid, bool isAgree);
+    void sendMessageTo(QString uid, QString message, QString tempMsgID);
     void sendUnLogin();
 
     void sendRefreshToken(std::function<void(bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired)> callback);
@@ -76,6 +77,7 @@ private:
     void handlePushNewFriendRequests(QJsonObject obj);
     void handlePushNewFriend(QJsonObject obj);
     void handlePushFriendStatus(QJsonObject obj);
+    void handleSendMessageResp(QJsonObject obj);
     void handleUnLoginResp(QJsonObject obj);
 
     void handleRefreshTokenResp(QJsonObject obj);
@@ -93,13 +95,27 @@ private:
     bool isTryToLoginAgain = false;
     bool isTryToAccessTokenLogin = false;
 
-    QString avatarUrl_updateAvatarWaitingRefresh;
-    QString username_updateUsernameWaitingRefresh;
-    QString sid_addNewFriendWaitingRefresh;
-    QString email_addNewFriendWaitingRefresh;
-    QString verMsg_addNewFriendWaitingRefresh;
     QString uid_handleAddNewFriendWaitingRefresh;
     std::optional<bool> isAgree_handleAddNewFriendWaitingRefresh;
+
+    //幂等变量
+    enum OperationName
+    {
+        UpdateAvatar = 0,
+        UpdateUsername,
+        AddNewFriendRequest,
+        Register,
+        UnLogin,
+        HandleNewFriendRequest
+    };
+    struct PendingRequest
+    {
+        QString requestID;
+        OperationName name;
+        QVariantMap params;
+        QVariantMap tokenParams;
+    };
+    QMap<QString, PendingRequest> map_idempotentCache;
 
 };
 

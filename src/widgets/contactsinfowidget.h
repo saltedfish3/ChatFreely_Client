@@ -7,15 +7,18 @@
 #include <QPixmap>
 #include <QPainter>
 #include <QPainterPath>
+#include <QStyle>
 
 class ContactsInfoWidget : public QWidget
 {
     Q_OBJECT
 public:
     explicit ContactsInfoWidget(int width, int height, QWidget *parent = nullptr);
+    void changeInfo(QPixmap avatar, QString username, QString uid, QString sid, QString email, bool isOnline);
+    void changeOnlineStatus(bool isOnline);
 
 signals:
-
+    void openConversation(const QString &uid, const QString &username, const QPixmap &avatar, bool isOnline);
 private:
     void init();
     void initStyle();
@@ -36,6 +39,13 @@ private:
     QWidget* widget_emailRegion;
     QLabel* label_emailChinese;
     QLabel* label_email;
+
+    QString username;
+    QString sid;
+    QString email;
+    QString uid;
+    QPixmap avatar;
+    bool isOnline = false;
 };
 
 #endif // CONTACTSINFOWIDGET_H

@@ -22,8 +22,10 @@
         <file>images/camera.png</file>
         <file>images/systemSetting.png</file>
         <file>images/loading.png</file>
+        <file>images/loading_gray.png</file>
     </qresource>
     <qresource prefix="/icon">
         <file>images/favicon.ico</file>
+        <file>images/blackIcon.png</file>
     </qresource>
 </RCC>

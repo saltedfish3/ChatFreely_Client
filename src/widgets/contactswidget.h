@@ -28,7 +28,7 @@ public:
     void addFriendItem(QString uid, QString sid, QString username, QString avatar_url, QString email, bool isOnline);
 
 signals:
-
+    void openConversation(const QString &uid, const QString &username, const QPixmap &avatar, bool isOnline);
 private:
     enum Status
     {
@@ -56,6 +56,7 @@ private:
     void changeStatus(Status status);
     void sortedFriendList();
     void searchFriend(const QString& text);
+    void restoreSelect();
 
     QString getFirstLetter(const QString& str);
 
@@ -85,6 +86,7 @@ private:
     QPropertyAnimation* animation_loading;
 
     QList<FriendInfo> list_friend;
+    QString selectedUID;
 
     QStackedWidget* stackedWidget;
 };

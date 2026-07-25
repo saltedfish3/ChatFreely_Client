@@ -11,8 +11,14 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QMenu>
-#include <QVBoxLayout>
+#include <QStandardItemModel>
+#include <QScrollBar>
+#include <QPointer>
 #include "morewidget.h"
+#include "../network/tcplongconnection.h"
+#include "../network/httpshortconnection.h"
+#include "conversationlistdelegate.h"
+#include "conversationwidget.h"
 
 
 class ChatWidget : public QWidget
@@ -20,6 +26,8 @@ class ChatWidget : public QWidget
     Q_OBJECT
 public:
     explicit ChatWidget(int width, int height, QWidget *parent = nullptr);
+    void openConversation(const QString &uid, const QString &username, const QPixmap &avatar, bool isOnline);
+    void addListItem(QString uid, QString username, QPixmap avatar, bool isOnline);
 
 signals:
 
@@ -32,10 +40,6 @@ private:
     void initListWidget();
     void initListStyle();
 
-    void addConversation();
-    void initConversationStyle(QWidget* conversation);
-    void initMoreMenu(QWidget* conversation,QPushButton* more);
-
     void initStackedConversation();
     // void initStackedConversationStyle();
     //--------------------------------
@@ -43,14 +47,18 @@ private:
     QLineEdit* edit_search;
 
     //--------------------------------
-    QListWidget* listWidget_userList;
+    QListView* listView_conversationList;
+    QStandardItemModel* model;
+    ConversationListDelegate* delegate;
+
+    QWidget* widget_noSelect;
+    QLabel* label_appIcon;
 
     QWidget* widget_search;
-    QWidget* widget_header;
-    QListView* listView_messages;
-    QWidget* widget_input;
 
     QStackedWidget* stackedWidget_Conversation;
+
+    QMap<QString, ConversationWidget*> map_conversation;
 };
 
 #endif // CHATWIDGET_H

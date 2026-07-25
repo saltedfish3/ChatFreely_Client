@@ -9,6 +9,59 @@ ContactsInfoWidget::ContactsInfoWidget(int width, int height, QWidget *parent)
     this->setObjectName("this");
 }
 
+void ContactsInfoWidget::changeInfo(QPixmap avatar, QString username, QString uid, QString sid, QString email, bool isOnline)
+{
+    this->username = username;
+    this->avatar = avatar;
+    this->uid = uid;
+    this->sid = sid;
+    this->email = email;
+    this->isOnline = isOnline;
+
+    setRadius(avatar,this->label_avatar,128);
+    this->label_username->setText(username);
+    this->label_userID->setText("ID:" + sid);
+    this->label_email->setText(email);
+    if(isOnline)
+    {
+        this->label_status->setText("在线");
+        this->label_status->setProperty("status", "online");
+        this->label_status_icon->setProperty("status", "online");
+    }
+    else
+    {
+        this->label_status->setText("离线");
+        this->label_status->setProperty("status", "offline");
+        this->label_status_icon->setProperty("status", "offline");
+    }
+
+    this->label_status->style()->unpolish(this->label_status);
+    this->label_status_icon->style()->unpolish(this->label_status_icon);
+    this->label_status->style()->polish(this->label_status);
+    this->label_status_icon->style()->polish(this->label_status_icon);
+}
+
+void ContactsInfoWidget::changeOnlineStatus(bool isOnline)
+{
+    if(isOnline)
+    {
+        this->label_status->setText("在线");
+        this->label_status->setProperty("status", "online");
+        this->label_status_icon->setProperty("status", "online");
+    }
+    else
+    {
+        this->label_status->setText("离线");
+        this->label_status->setProperty("status", "offline");
+        this->label_status_icon->setProperty("status", "offline");
+    }
+
+    this->label_status->style()->unpolish(this->label_status);
+    this->label_status_icon->style()->unpolish(this->label_status_icon);
+    this->label_status->style()->polish(this->label_status);
+    this->label_status_icon->style()->polish(this->label_status_icon);
+}
+
 void ContactsInfoWidget::init()
 {
     this->label_avatar = new QLabel(this);
@@ -29,17 +82,19 @@ void ContactsInfoWidget::init()
     this->label_userID->setObjectName("label_userID");
     this->label_userID->move(0,this->label_username->pos().y() + this->label_username->height() + 4);
 
-    this->label_status = new QLabel("在线",this);
+    this->label_status = new QLabel("离线",this);
     this->label_status->resize(60,24);
     this->label_status->setAlignment(Qt::AlignCenter);
     this->label_status->setObjectName("label_status");
     this->label_status->move((this->width()-this->label_status->width())/2,
                              this->label_userID->pos().y() + this->label_userID->height() + 16);
+    this->label_status->setProperty("status", "offline");
 
     this->label_status_icon = new QLabel(this->label_status);
     this->label_status_icon->setObjectName("label_status_icon");
     this->label_status_icon->resize(8,8);
     this->label_status_icon->move(12,(this->label_status->height() - this->label_status_icon->height())/2);
+    this->label_status_icon->setProperty("status", "offline");
 
     int pos_middle = this->width() / 2;
 
@@ -48,6 +103,10 @@ void ContactsInfoWidget::init()
     this->btn_sendMsg->resize(150,48);
     this->btn_sendMsg->move(pos_middle - this->btn_sendMsg->width() - 10,
                             this->label_status->pos().y() + this->label_status->height() + 32);
+
+    connect(this->btn_sendMsg, &QPushButton::clicked, this, [this](){
+        emit openConversation(this->uid, this->username, this->avatar, this->isOnline);
+    });
 
     this->label_sendMsg_icon = new QLabel(this->btn_sendMsg);
     this->label_sendMsg_icon->setObjectName("label_sendMsg_icon");
@@ -104,18 +163,31 @@ void ContactsInfoWidget::initStyle()
                         font-size:14px;
                         color:rgba(107, 114, 128, 255);
                     }
-                    #label_status
+                    #label_status[status="online"]
                     {
                         background-color: rgba(220, 252, 231, 255);
                         color:rgba(21, 128, 61, 255);
                         font-size: 12px;
                         border-radius: 12px;
-                        padding-left:15px;
+                        padding-left: 15px;
                     }
-                    #label_status_icon
+                    #label_status_icon[status="online"]
                     {
                         border-radius:%2px;
                         background:rgba(34, 197, 94, 255);
+                    }
+                    #label_status[status="offline"]
+                    {
+                        background-color: rgba(229, 231, 235, 255);
+                        color: rgba(75, 85, 99, 255);
+                        font-size: 12px;
+                        border-radius: 12px;
+                        padding-left: 15px;
+                    }
+                    #label_status_icon[status="offline"]
+                    {
+                        border-radius:%2px;
+                        background: rgba(156, 163, 175, 255);
                     }
                     #btn_sendMsg
                     {

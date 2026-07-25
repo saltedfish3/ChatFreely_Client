@@ -13,6 +13,42 @@ ChatWidget::ChatWidget(int width, int height,QWidget *parent)
     initStackedConversation();
 }
 
+void ChatWidget::openConversation(const QString &uid, const QString &username, const QPixmap &avatar, bool isOnline)
+{
+    auto it = map_conversation.find(uid);
+    if(it != map_conversation.end())
+    {
+        this->stackedWidget_Conversation->setCurrentWidget(it.value());
+        for(int i = 0; i < this->model->rowCount(); i++)
+        {
+            QModelIndex index = this->model->index(i, 0);
+            if(uid == index.data(ConversationListDelegate::UIDRole).toString())
+            {
+                this->listView_conversationList->setCurrentIndex(index);
+                this->listView_conversationList->selectionModel()->select(index, QItemSelectionModel::ClearAndSelect);
+            }
+        }
+        return;
+    }
+    ConversationWidget* item = new ConversationWidget(this->stackedWidget_Conversation->width(),
+                                                      this->stackedWidget_Conversation->height(),
+                                                      username, isOnline, uid, avatar, this->stackedWidget_Conversation);
+    map_conversation.insert(uid, item);
+    this->stackedWidget_Conversation->addWidget(item);
+    this->stackedWidget_Conversation->setCurrentWidget(item);
+    addListItem(uid, username, avatar, isOnline);
+
+    for(int i = 0; i < this->model->rowCount(); i++)
+    {
+        QModelIndex index = this->model->index(i, 0);
+        if(uid == index.data(ConversationListDelegate::UIDRole).toString())
+        {
+            this->listView_conversationList->setCurrentIndex(index);
+            this->listView_conversationList->selectionModel()->select(index, QItemSelectionModel::ClearAndSelect);
+        }
+    }
+}
+
 void ChatWidget::initSearchWidget()
 {
     this->widget_search = new QWidget(this);
@@ -63,16 +99,33 @@ void ChatWidget::initSearchStyle()
 
 void ChatWidget::initListWidget()
 {
-    //userList
-    this->listWidget_userList = new QListWidget(this);
-    this->listWidget_userList->setObjectName("listWidget_userList");
-    this->listWidget_userList->setGeometry(0, this->widget_search->height(), this->widget_search->width(), this->height());
+    this->listView_conversationList = new QListView(this);
+    this->listView_conversationList->setObjectName("listView_conversationList");
+    this->listView_conversationList->setGeometry(0, this->widget_search->height(), this->widget_search->width(), this->height());
+
+    this->model = new QStandardItemModel(this);
+    this->listView_conversationList->setModel(this->model);
+
+    this->delegate = new ConversationListDelegate(this);
+    this->listView_conversationList->setItemDelegate(this->delegate);
+
+    this->listView_conversationList->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    this->listView_conversationList->setSelectionMode(QAbstractItemView::SingleSelection);
+    this->listView_conversationList->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+    this->listView_conversationList->verticalScrollBar()->setSingleStep(6);
+    this->listView_conversationList->setResizeMode(QListView::Fixed);
+
+    connect(this->delegate, &ConversationListDelegate::itemClicked, this, [this](const QModelIndex& index){
+        QString uid = index.data(ConversationListDelegate::UIDRole).toString();
+        auto it = this->map_conversation.find(uid);
+        this->stackedWidget_Conversation->setCurrentWidget(it.value());
+    });
 }
 
 void ChatWidget::initListStyle()
 {
-    this->listWidget_userList->setStyleSheet(R"(
-                                            #listWidget_userList
+    this->listView_conversationList->setStyleSheet(R"(
+                                            #listView_conversationList
                                             {
                                                 background: #ffffff;
                                                 border-radius: 0;
@@ -81,259 +134,67 @@ void ChatWidget::initListStyle()
                                             )");
 }
 
-void ChatWidget::addConversation()
-{
-    QWidget* conversation = new QWidget(this->stackedWidget_Conversation);
-    conversation->setObjectName("conversation");
-    conversation->resize(this->stackedWidget_Conversation->width(), this->stackedWidget_Conversation->height());
-    conversation->move(0,0);
-
-    //初始化 头部 信息栏
-    QWidget* header = new QWidget(conversation);
-    header->setObjectName("header");
-    header->resize(conversation->width(), 56);
-    header->move(0,0);
-
-    //初始化 对方用户名
-    QLabel* name = new QLabel("Sarah Miller",header);
-    name->setObjectName("name");
-    name->setMaximumHeight(24);
-    name->setMinimumHeight(24);
-    QFont font = name->font();
-    font.setPointSize(12);
-    font.setWeight(QFont::Bold);
-    name->setFont(font);
-    name->adjustSize();
-    name->move(16,(header->height() - name->height())/2);
-
-    //初始化 在线状态图标
-    QLabel* status_color = new QLabel(header);
-    status_color->setObjectName("status_color");
-    status_color->setFixedSize(8, 8);
-    status_color->adjustSize();
-    status_color->move(name->pos().x() + name->width() + 8,(header->height() - status_color->height())/2);
-
-    //初始化 在线状态文字
-    QLabel* status = new QLabel("在线",header);
-    status->setObjectName("status");
-    status->setMaximumHeight(20);
-    status->setMinimumHeight(20);
-    font = status->font();
-    font.setPointSize(12);
-    status->adjustSize();
-    status->move(status_color->pos().x() + status_color->width() + 8,(header->height() - status->height())/2);
-
-    //初始化 更多 按钮
-    QPushButton* more = new QPushButton(header);
-    more->setObjectName("more");
-    more->resize(32,32);
-    more->move(header->width() - more->width() - 16, (header->height() - more->height())/2);
-    more->setIcon(QIcon(":/default/images/more.png"));
-    more->setIconSize(QSize(16,16));
-    more->setCheckable(true);
-    more->setChecked(false);
-    initMoreMenu(conversation,more);
-
-    //初始化 消息显示 部分
-    QListView* messages = new QListView(conversation);
-    messages->setObjectName("messages");
-    messages->resize(conversation->width(),(conversation->height() - header->height()) * 0.75);
-    messages->move(0, header->height());
-
-    //初始化 编辑框 区域
-    QWidget* editRegion = new QWidget(conversation);
-    editRegion->setObjectName("editRegion");
-    editRegion->resize(conversation->width() * 0.98,(conversation->height() - messages->height() - header->height()) * 0.9);
-    int editRegion_mheight = conversation->height() - header->height() - messages->height();
-    editRegion->move((conversation->width() - editRegion->width()) / 2, messages->pos().y() + messages->height() + (editRegion_mheight - editRegion->height()) / 2);
-
-    //初始化 编辑框
-    QPlainTextEdit* edit = new QPlainTextEdit(editRegion);
-    edit->setObjectName("edit");
-    edit->setPlaceholderText("输入些什么...");
-    edit->resize(editRegion->width() * 0.98, editRegion->height() * 0.6);
-    edit->move((editRegion->width() - edit->width()) / 2, editRegion->height() * 0.07);
-
-    connect(edit,&QPlainTextEdit::textChanged,this,[=](){
-        QString text = edit->toPlainText();
-        if(text.length() > 10000)
-        {
-            //设置截断信号
-            edit->blockSignals(true);
-            int cursorPos = edit->textCursor().position();
-            text.truncate(10000);
-            edit->setPlainText(text);
-            // 恢复光标位置（不超出文本长度）
-            QTextCursor cursor = edit->textCursor();
-            cursor.setPosition(qMin(cursorPos, text.length()));
-            edit->setTextCursor(cursor);
-            edit->blockSignals(false);
-        }
-    });
-
-    //初始化 发送 按钮
-    QPushButton* send = new QPushButton(editRegion);
-    send->setObjectName("send");
-    int sendSize = editRegion->height() - edit->pos().y() - edit->height();
-    send->resize(sendSize*0.8,sendSize*0.8);
-    send->setIcon(QIcon(":/default/images/send.png"));
-    send->setIconSize(QSize(send->width()*0.4,send->height()*0.4));
-    int send_h = edit->pos().y() + edit->height();
-    send->move(editRegion->width() * 0.99 - send->width(), send_h + (editRegion->height() - send_h - send->height())/2);
-    connect(send,&QPushButton::clicked,this,[edit](){
-        if(edit->toPlainText().trimmed().length() == 0)
-            qDebug()<<"请输入文本";
-    });
-
-    initConversationStyle(conversation);
-
-    this->stackedWidget_Conversation->addWidget(conversation);
-    this->stackedWidget_Conversation->setCurrentWidget(conversation);
-}
-
-void ChatWidget::initConversationStyle(QWidget* conversation)
-{
-    conversation->setStyleSheet(R"(
-                            #conversation
-                            {
-                                background-color: #ffffff;
-                                border-left: none;
-                            }
-                            #header
-                            {
-                                background-color: rgba(252, 255, 255, 255);
-                                border-bottom: 1px solid #e0e0e0;
-                            }
-                            #name
-                            {
-                                color:rgba(31, 41, 55, 255);
-                                font-family: "Microsoft YaHei";
-                            }
-                            #status
-                            {
-                                color: rgba(107, 114, 128, 255);
-                            }
-                            #status_color
-                            {
-                                background-color: #66FF00;
-                                border-radius: 4px;
-                                border: none;
-                            }
-                            #more
-                            {
-                                border:none;
-                                background:transparent;
-                                border-radius:16px;
-                            }
-                            #more:hover
-                            {
-                                background-color: rgba(243, 244, 246, 255);
-                            }
-                            #more:pressed
-                            {
-                                background-color: rgba(229, 231, 235, 255);
-                            }
-                            #messages
-                            {
-                                background-color: #f9f9f9;
-                                border-bottom: 1px solid #e0e0e0;
-                            }
-                            #editRegion
-                            {
-                                background-color: #ffffff;
-                                border: 1px solid rgba(99, 102, 241, 255);
-                                border-radius: 8px;
-                            }
-                            #edit QScrollBar:vertical
-                            {
-                                width:6px;
-                                margin:0px;
-                                background:transparent;
-                            }
-                            #edit QScrollBar::sub-line:vertical,
-                            #edit QScrollBar::add-line:vertical
-                            {
-                                width:0px;
-                                height:0px;
-                            }
-                            #edit QScrollBar::add-page:vertical,
-                            #edit QScrollBar::sub-page:vertical
-                            {
-                                background:none;
-                            }
-                            #edit QScrollBar::handle:vertical
-                            {
-                                background: rgba(209, 213, 219, 255);
-                                border-radius: 3px;
-                                min-height: 30px;
-                            }
-                            #edit QScrollBar::handle:vertical:hover
-                            {
-                                background: rgba(156, 163, 175, 255);
-                            }
-                            #edit
-                            {
-                                border:none;
-                                outline:none;
-                                border-bottom: 1px solid rgba(229, 231, 235, 255);
-                                font-size: 13px;
-                                font-weight:bold;
-                                color: rgba(31, 41, 55, 255);
-                                background: transparent;
-                                padding: 0px;
-                            }
-                            #edit:focus
-                            {
-                                border:none;
-                                outline:none;
-                                border-bottom: 1px solid rgba(229, 231, 235, 255);
-                            }
-                            #send
-                            {
-                                background-color: rgba(99, 102, 241, 255);
-                                border: none;
-                                border-radius: 6px;
-                            }
-                            #send:hover
-                            {
-                                background-color: rgba(79, 70, 229, 255);
-                            }
-                            #send:pressed
-                            {
-                                background-color: rgba(67, 56, 202, 255);
-                            }
-                                )");
-}
-
-void ChatWidget::initMoreMenu(QWidget* conversation,QPushButton* more)
-{
-    MoreWidget* menu = new MoreWidget(conversation);
-
-    connect(more,&QPushButton::toggled,this,[=](bool checked){
-        if(checked)
-        {
-            menu->move(more->mapToGlobal(QPoint(0 - menu->width() + more->width(),more->height())));
-            menu->show();
-            menu->activateWindow();
-            menu->setFocus();
-        }
-        else
-        {
-            menu->hide();
-        }
-    });
-    connect(menu,&MoreWidget::closed,more,[=](){
-        if(more->underMouse())
-            return;
-        more->setChecked(false);
-    });
-}
-
 void ChatWidget::initStackedConversation()
 {
     this->stackedWidget_Conversation = new QStackedWidget(this);
     this->stackedWidget_Conversation->resize(this->width() - this->widget_search->width(),this->height());
     this->stackedWidget_Conversation->move(this->widget_search->width(), 0);
 
-    addConversation();
+    this->widget_noSelect = new QWidget(this->stackedWidget_Conversation);
+    this->widget_noSelect->resize(this->stackedWidget_Conversation->width(), this->stackedWidget_Conversation->height());
+    this->widget_noSelect->move(0, 0);
+
+    this->label_appIcon = new QLabel(this->widget_noSelect);
+    this->label_appIcon->resize(60, 60);
+    this->label_appIcon->setPixmap(QIcon(":/icon/images/blackIcon.png").pixmap(60));
+    this->label_appIcon->move((this->widget_noSelect->width() - this->label_appIcon->width())/2,
+                              (this->widget_noSelect->height() - this->label_appIcon->height())/2);
+
+    this->stackedWidget_Conversation->addWidget(this->widget_noSelect);
+    this->stackedWidget_Conversation->setCurrentWidget(this->widget_noSelect);
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::FriendStatus, this, [this](QString uid, bool isOnline){
+        auto it = map_conversation.find(uid);
+        if(it != map_conversation.end())
+        {
+            QWidget* conversation = it.value();
+            QLabel* statusColor = conversation->findChild<QLabel*>("status_color");
+            QLabel* statusText = conversation->findChild<QLabel*>("status");
+            if(statusColor && statusText)
+            {
+                if(isOnline)
+                {
+                    statusColor->setProperty("status", "online");
+                    statusText->setText("在线");
+                }
+                else
+                {
+                    statusColor->setProperty("status", "offline");
+                    statusText->setText("离线");
+                }
+                statusColor->style()->unpolish(statusColor);
+                statusColor->style()->polish(statusColor);
+                for(int i = 0; i < this->model->rowCount(); i++)
+                {
+                    QModelIndex index = this->model->index(i, 0);
+                    if(uid == index.data(ConversationListDelegate::UIDRole).toString())
+                    {
+                        QStandardItem* item = this->model->itemFromIndex(index);
+                        item->setData(isOnline, ConversationListDelegate::IsOnlineRole);
+                    }
+                }
+            }
+        }
+    });
+}
+
+void ChatWidget::addListItem(QString uid, QString username, QPixmap avatar, bool isOnline)
+{
+    //添加项目
+    QStandardItem* item = new QStandardItem();
+    item->setData(uid, ConversationListDelegate::UIDRole);
+    item->setData(username, ConversationListDelegate::UsernameRole);
+    item->setData(avatar, ConversationListDelegate::AvatarRole);
+    item->setData(isOnline, ConversationListDelegate::IsOnlineRole);
+    this->model->appendRow(item);
 }

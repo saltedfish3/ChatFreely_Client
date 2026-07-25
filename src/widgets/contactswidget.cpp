@@ -22,7 +22,7 @@ void ContactsWidget::addFriendItem(QString uid, QString sid, QString username, Q
     item->setData(uid, FriendDelegate::UIDRole);
     item->setData(sid, FriendDelegate::SIDRole);
     item->setData(username, FriendDelegate::UsernameRole);
-    item->setData("", FriendDelegate::AvatarRole);
+    item->setData(QPixmap(":/default/images/defaultAvatar.png"), FriendDelegate::AvatarRole);
 
     item->setData(email, FriendDelegate::EmailRole);
     item->setData(isOnline, FriendDelegate::IsOnlineRole);
@@ -196,6 +196,13 @@ void ContactsWidget::initSideUn()
 
     connect(this->delegate, &FriendDelegate::itemClicked, this, [this](const QModelIndex& item){
         this->btn_newFriend->setChecked(false);
+        selectedUID = item.data(FriendDelegate::UIDRole).toString();
+        this->widget_contactsInfo->changeInfo(item.data(FriendDelegate::AvatarRole).value<QPixmap>(),
+                                              item.data(FriendDelegate::UsernameRole).toString(),
+                                              item.data(FriendDelegate::UIDRole).toString(),
+                                              item.data(FriendDelegate::SIDRole).toString(),
+                                              item.data(FriendDelegate::EmailRole).toString(),
+                                              item.data(FriendDelegate::IsOnlineRole).toBool());
         this->stackedWidget->setCurrentWidget(this->widget_contactsInfo);
     });
 
@@ -249,6 +256,10 @@ void ContactsWidget::initSideUn()
         {
             this->model->clear();
             sortedFriendList();
+        }
+        if(UID == this->selectedUID)
+        {
+            this->widget_contactsInfo->changeOnlineStatus(isOnline);
         }
     });
 
@@ -345,25 +356,15 @@ void ContactsWidget::initStacked()
     this->stackedWidget->resize(this->width() - this->widget_sideBar->width(),this->height());
     this->stackedWidget->move(this->widget_sideBar->width(),0);
 
-    this->widget_noSelect = new QWidget();
+    this->widget_noSelect = new QWidget(this->stackedWidget);
     this->widget_noSelect->resize(this->stackedWidget->width(),this->stackedWidget->height());
 
-    this->label_noSelect = new QLabel("Please choose....",this->widget_noSelect);
+    this->label_noSelect = new QLabel(this->widget_noSelect);
     this->label_noSelect->setObjectName("label_noSelect");
-    this->label_noSelect->resize(this->widget_noSelect->width(),this->widget_noSelect->height());
-    this->label_noSelect->setAlignment(Qt::AlignCenter);
-    QFont font = this->label_noSelect->font();
-    font.setPixelSize(16);
-    font.setWeight(QFont::Bold);
-    this->label_noSelect->setFont(font);
-
-    this->label_noSelect->move(0,0);
-    this->label_noSelect->setStyleSheet(R"(
-                            #label_noSelect
-                            {
-                                color:black;
-                            }
-                                    )");
+    this->label_noSelect->resize(60, 60);
+    this->label_noSelect->setPixmap(QIcon(":/icon/images/blackIcon.png").pixmap(60));
+    this->label_noSelect->move((this->widget_noSelect->width() - this->label_noSelect->width())/2,
+                              (this->widget_noSelect->height() - this->label_noSelect->height())/2);
 
     this->widget_newFriend = new NewFriendManageWidget(this->stackedWidget->width(),this->stackedWidget->height());
 
@@ -378,6 +379,11 @@ void ContactsWidget::initStacked()
     this->stackedWidget->addWidget(this->widget_contactsInfo);
 
     this->stackedWidget->setCurrentWidget(this->widget_noSelect);
+
+    connect(this->widget_contactsInfo, &ContactsInfoWidget::openConversation, this, [this](const QString &uid, const QString &username, const QPixmap &avatar, bool isOnline){
+        //转发信号
+        emit openConversation(uid, username, avatar, isOnline);
+    });
 }
 
 void ContactsWidget::changeStatus(Status status)
@@ -443,7 +449,7 @@ void ContactsWidget::sortedFriendList()
         }
         addFriendItem(fi.uid, fi.sid, fi.username, fi.avatar_url, fi.email, fi.isOnline);
     }
-
+    restoreSelect();
 }
 
 void ContactsWidget::searchFriend(const QString& text)
@@ -453,6 +459,28 @@ void ContactsWidget::searchFriend(const QString& text)
         if(fi.username.contains(text))
             addFriendItem(fi.uid, fi.sid, fi.username, fi.avatar_url, fi.email, fi.isOnline);
     }
+    restoreSelect();
+}
+
+void ContactsWidget::restoreSelect()
+{
+    if(this->list_friend.empty() || this->selectedUID.isEmpty())
+        return;
+    for(int i = 0; i < this->model->rowCount(); i++)
+    {
+        QModelIndex index = this->model->index(i, 0);
+        QVariant vi = index.data(FriendDelegate::GroupRole);
+        bool isGroup = vi.isValid() ? vi.toBool() : false;
+        if(isGroup)
+            continue;
+        if(index.data(FriendDelegate::UIDRole).toString() == this->selectedUID)
+        {
+            this->listView_myFriend->setCurrentIndex(index);
+            this->listView_myFriend->selectionModel()->select(index, QItemSelectionModel::ClearAndSelect);
+            break;
+        }
+    }
+    // this->selectedUID.clear();
 }
 
 QString ContactsWidget::getFirstLetter(const QString &str)
