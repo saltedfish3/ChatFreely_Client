@@ -14,6 +14,10 @@ class UserInfo : public QObject
     Q_OBJECT
 public:
     static UserInfo& getUserInfo();
+
+    UserInfo(const UserInfo&) = delete;
+    UserInfo& operator=(const UserInfo&) = delete;
+
     void setUsername(const QString& username);
     void updateUsername(const QString& username);
     void confirmUsername();
@@ -28,6 +32,7 @@ public:
 
     QString getUID();
     QString getUsername();
+    QPixmap getAvatar();
     QString getAccessToken();
     QString getRefreshToken();
 

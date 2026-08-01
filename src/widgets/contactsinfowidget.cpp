@@ -11,12 +11,7 @@ ContactsInfoWidget::ContactsInfoWidget(int width, int height, QWidget *parent)
 
 void ContactsInfoWidget::changeInfo(QPixmap avatar, QString username, QString uid, QString sid, QString email, bool isOnline)
 {
-    this->username = username;
-    this->avatar = avatar;
     this->uid = uid;
-    this->sid = sid;
-    this->email = email;
-    this->isOnline = isOnline;
 
     setRadius(avatar,this->label_avatar,128);
     this->label_username->setText(username);
@@ -39,6 +34,16 @@ void ContactsInfoWidget::changeInfo(QPixmap avatar, QString username, QString ui
     this->label_status_icon->style()->unpolish(this->label_status_icon);
     this->label_status->style()->polish(this->label_status);
     this->label_status_icon->style()->polish(this->label_status_icon);
+}
+
+void ContactsInfoWidget::changeSelectedUsername(QString username)
+{
+    this->label_username->setText(username);
+}
+
+void ContactsInfoWidget::changeSelectedAvatar(QPixmap avatar)
+{
+    setRadius(avatar, this->label_avatar, 128);
 }
 
 void ContactsInfoWidget::changeOnlineStatus(bool isOnline)
@@ -105,7 +110,7 @@ void ContactsInfoWidget::init()
                             this->label_status->pos().y() + this->label_status->height() + 32);
 
     connect(this->btn_sendMsg, &QPushButton::clicked, this, [this](){
-        emit openConversation(this->uid, this->username, this->avatar, this->isOnline);
+        emit openConversation(this->uid);
     });
 
     this->label_sendMsg_icon = new QLabel(this->btn_sendMsg);

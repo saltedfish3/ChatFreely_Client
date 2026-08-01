@@ -9,6 +9,8 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QDateTime>
+#include <QList>
+#include <QVariantMap>
 #include <atomic>
 #include <unordered_set>
 #include "../utils/GlobalVariable.h"
@@ -35,7 +37,6 @@ public:
     void sendHandleNewFriendRequest(QString handle_uid, bool isAgree);
     void sendMessageTo(QString uid, QString message, QString tempMsgID);
     void sendUnLogin();
-
     void sendRefreshToken(std::function<void(bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired)> callback);
     void sendAccessTokenLogin();
 
@@ -51,11 +52,23 @@ signals:
     void newFriendRequestsState(bool isEmpty);
     void newFriendRequestsHandleResult(bool isSuccess);
     void newFriendRequests(QString uid, QString sid, QString username, QString avatar_url, QString verMsg);
+
+    //全量获取好友列表
+    void allFriendList(const QList<QVariantMap>& list);
+    //接收服务器的push
     void newFriend(QString uid, QString sid, QString username, QString avatar_url, QString email, bool isOnline);
-    void newFriendState(bool isEmpty);
+
+    // void newFriendState(bool isEmpty);
+
+    //更新好友的状态信息
     void FriendStatus(QString uid, bool isOnline);
+    void FriendUsername(QString uid, QString username);
+    void FriendAvatar(QString uid, QString avatar);
+
+    void sendMessageStatus(bool isSuccess, QString tempMsgID, QString receiverUID, QString messageID = "", int64_t timeStamp = 0, int64_t convSeq = 0);
+    void pushMessage(bool isMyself, QString senderUID, QString content, QString messageID, int64_t timeStamp, int64_t convSeq);
     void cleanNewFriendRequestsList();
-    void cleanFriendList();
+    // void cleanFriendList();
     void refreshExpiredExit();
     void exitAccount();
 
@@ -77,6 +90,9 @@ private:
     void handlePushNewFriendRequests(QJsonObject obj);
     void handlePushNewFriend(QJsonObject obj);
     void handlePushFriendStatus(QJsonObject obj);
+    void handlePushNewMessage(QJsonObject obj);
+    void handlePushFriendUsername(QJsonObject obj);
+    void handlePushFriendAvatar(QJsonObject obj);
     void handleSendMessageResp(QJsonObject obj);
     void handleUnLoginResp(QJsonObject obj);
 
@@ -95,9 +111,6 @@ private:
     bool isTryToLoginAgain = false;
     bool isTryToAccessTokenLogin = false;
 
-    QString uid_handleAddNewFriendWaitingRefresh;
-    std::optional<bool> isAgree_handleAddNewFriendWaitingRefresh;
-
     //幂等变量
     enum OperationName
     {
@@ -115,7 +128,15 @@ private:
         QVariantMap params;
         QVariantMap tokenParams;
     };
-    QMap<QString, PendingRequest> map_idempotentCache;
+    struct MessageRequest
+    {
+        QString requestID;
+        QString content;
+        QString receiverUID;
+        uint64_t reqCount = 0;
+    };
+    QMap<QString, PendingRequest> map_idempotentCache;//QString是RequestID
+    QMap<QString, MessageRequest> map_messageCache;//QString是tempMsgID
 
 };
 

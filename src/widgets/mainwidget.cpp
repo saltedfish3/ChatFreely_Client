@@ -286,8 +286,8 @@ void MainWidget::initPage()
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::mainState, this, &MainWidget::handleMainState);
     connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::mainState, this, &MainWidget::handleMainState);
 
-    connect(this->widget_contacts, &ContactsWidget::openConversation, [this](const QString &uid, const QString &username, const QPixmap &avatar, bool isOnline){
-        this->widget_chat->openConversation(uid, username, avatar, isOnline);
+    connect(this->widget_contacts, &ContactsWidget::openConversation, [this](const QString &uid){
+        this->widget_chat->openConversation(uid);
         changeToChat();
     });
 }

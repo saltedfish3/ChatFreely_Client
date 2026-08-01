@@ -19,6 +19,7 @@
 #include "../network/httpshortconnection.h"
 #include "conversationlistdelegate.h"
 #include "conversationwidget.h"
+#include "../utils/friendmanage.h"
 
 
 class ChatWidget : public QWidget
@@ -26,7 +27,7 @@ class ChatWidget : public QWidget
     Q_OBJECT
 public:
     explicit ChatWidget(int width, int height, QWidget *parent = nullptr);
-    void openConversation(const QString &uid, const QString &username, const QPixmap &avatar, bool isOnline);
+    void openConversation(const QString &uid);
     void addListItem(QString uid, QString username, QPixmap avatar, bool isOnline);
 
 signals:

@@ -21,6 +21,11 @@ QString UserInfo::getUsername()
     return this->username;
 }
 
+QPixmap UserInfo::getAvatar()
+{
+    return this->avatar;
+}
+
 QString UserInfo::getAccessToken()
 {
     return this->accessToken;

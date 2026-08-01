@@ -26,7 +26,8 @@ public:
         ContentRole,
         AvatarRole,
         TimeStamp,
-        TempMsgIDRole,
+        MessageIDRole,
+        ConvSeqRole,
         MessageStatusRole
     };
     enum Status

@@ -1,7 +1,7 @@
 #include "conversationwidget.h"
 
-ConversationWidget::ConversationWidget(int width, int height, const QString &username, bool isOnline, const QString &uid, const QPixmap &avatar, QWidget *parent)
-    : QWidget{parent}, uid(uid), avatar(avatar)
+ConversationWidget::ConversationWidget(int width, int height, const QString &username, bool isOnline, const QString &friendUID, const QPixmap &friendAvatar, QWidget *parent)
+    : QWidget{parent}, friendUID(friendUID), friendAvatar(friendAvatar)
 {
     this->setObjectName("widget_conversation");
     this->resize(width, height);
@@ -97,6 +97,11 @@ ConversationWidget::ConversationWidget(int width, int height, const QString &use
     this->listView_messages->setUniformItemSizes(false);
     this->listView_messages->setResizeMode(QListView::Adjust);
 
+    this->sortModel = new QSortFilterProxyModel(this);
+    this->sortModel->setSourceModel(this->model);
+    this->sortModel->setSortRole(ConversationDelegate::ConvSeqRole);
+    this->sortModel->sort(0, Qt::AscendingOrder);
+
     //初始化 编辑框 区域
     this->widget_editRegion = new QWidget(this);
     this->widget_editRegion->setObjectName("widget_editRegion");
@@ -140,6 +145,7 @@ ConversationWidget::ConversationWidget(int width, int height, const QString &use
     int send_h = this->edit_message->pos().y() + this->edit_message->height();
     this->btn_send->move(this->widget_editRegion->width() * 0.99 - this->btn_send->width(),
                          send_h + (this->widget_editRegion->height() - send_h - this->btn_send->height())/2);
+
     connect(this->btn_send,&QPushButton::clicked,this,[this](){
         QString content = this->edit_message->toPlainText().trimmed();
         if(content.isEmpty())
@@ -152,7 +158,7 @@ ConversationWidget::ConversationWidget(int width, int height, const QString &use
         this->loadingCount++;
         if(!this->timer_loading->isActive())
             this->timer_loading->start(30);
-        // TcpLongConnection::getTcpClient().sendMessageTo(this->uid, content);
+        TcpLongConnection::getTcpClient().sendMessageTo(this->friendUID, content, tempMsgID);
         this->edit_message->clear();
     });
 
@@ -183,7 +189,7 @@ ConversationWidget::ConversationWidget(int width, int height, const QString &use
     startReFlashTimeStamp();
 }
 
-void ConversationWidget::addMessageItem(bool isMyself, const QString &content, int64_t timestamp, QString tempMsgID)
+void ConversationWidget::addMessageItem(bool isMyself, const QString &content, int64_t timestamp, QString messageID, int64_t convSeq)
 {
     QDateTime msgTime = QDateTime::fromSecsSinceEpoch(timestamp);
     int64_t lastTimeStamp = 0;
@@ -250,10 +256,22 @@ void ConversationWidget::addMessageItem(bool isMyself, const QString &content, i
     }
     QStandardItem* item = new QStandardItem();
     item->setData(isMyself, ConversationDelegate::IsMyselfRole);
+    if(isMyself)
+        item->setData(UserInfo::getUserInfo().getAvatar(), ConversationDelegate::AvatarRole);
+    else
+        item->setData(this->friendAvatar, ConversationDelegate::AvatarRole);
     item->setData(content, ConversationDelegate::ContentRole);
     item->setData(ConversationDelegate::Sending, ConversationDelegate::MessageStatusRole);
-    item->setData(tempMsgID, ConversationDelegate::TempMsgIDRole);
+    item->setData(messageID, ConversationDelegate::MessageIDRole);
     item->setData(timestamp, ConversationDelegate::TimeStamp);
+    if(isMyself)
+        item->setData(this->theBestConvSeq + 1, ConversationDelegate::ConvSeqRole);
+    else
+    {
+        item->setData(convSeq, ConversationDelegate::ConvSeqRole);
+        this->theBestConvSeq = convSeq;
+    }
+
     this->model->appendRow(item);
 
     QStandardItem* item_bottomSpace = new QStandardItem();
@@ -292,6 +310,73 @@ QString ConversationWidget::getLastMessageTime()
             return index.data(ConversationDelegate::ContentRole).toString();
     }
     return QString();
+}
+
+void ConversationWidget::updateResp(bool isSuccess, QString tempMsgID, int64_t timestamp, QString messageID, int64_t convSeq)
+{
+    for(int i = this->model->rowCount() - 1; i >= 0; i--)
+    {
+        QModelIndex index = this->model->index(i, 0);
+        if(index.data(ConversationDelegate::MessageIDRole).toString() == tempMsgID)
+        {
+            QStandardItem* item = this->model->itemFromIndex(index);
+            if(isSuccess)
+            {
+                item->setData(ConversationDelegate::Success, ConversationDelegate::MessageStatusRole);
+                item->setData(timestamp, ConversationDelegate::TimeStamp);
+                item->setData(messageID, ConversationDelegate::MessageIDRole);
+                item->setData(convSeq, ConversationDelegate::ConvSeqRole);
+                if(convSeq == -1)
+                    convSeq = this->theBestConvSeq;
+                if(convSeq > this->theBestConvSeq)
+                {
+                    if(convSeq - this->theBestConvSeq != 1)
+                    {
+                        //获取消息
+                        qDebug()<<"缺少消息，获取";
+                    }
+                    this->theBestConvSeq = convSeq;
+                }
+
+            }
+            else
+            {
+                item->setData(ConversationDelegate::Failed, ConversationDelegate::MessageStatusRole);
+            }
+        }
+    }
+}
+
+void ConversationWidget::updateFriendAvatar(const QPixmap &avatar)
+{
+    this->friendAvatar = avatar;
+    // this->update();
+    this->listView_messages->viewport()->update();
+}
+
+void ConversationWidget::updateFriendUsername(const QString &username)
+{
+    this->label_name->setText(username);
+    this->update();
+}
+
+void ConversationWidget::updateFriendStatus(bool isOnline)
+{
+    QString status_text;
+    if(isOnline)
+    {
+        this->label_statusIcon->setProperty("status", "online");
+        status_text = "在线";
+    }
+    else
+    {
+        this->label_statusIcon->setProperty("status", "offline");
+        status_text = "离线";
+    }
+    this->label_statusText->setText(status_text);
+    this->label_statusIcon->style()->unpolish(this->label_statusIcon);
+    this->label_statusIcon->style()->polish(this->label_statusIcon);
+    this->update();
 }
 
 void ConversationWidget::initStyle()

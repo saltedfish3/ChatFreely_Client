@@ -19,31 +19,25 @@
 #include "contactsinfowidget.h"
 #include "frienddelegate.h"
 #include "loadinglabel.h"
+#include "../utils/friendmanage.h"
 
 class ContactsWidget : public QWidget
 {
     Q_OBJECT
 public:
     explicit ContactsWidget(int width, int height, QWidget *parent = nullptr);
-    void addFriendItem(QString uid, QString sid, QString username, QString avatar_url, QString email, bool isOnline);
+    void addFriendItem(QString uid, QString sid, QString username, QPixmap avatar, QString email, bool isOnline);
+
 
 signals:
-    void openConversation(const QString &uid, const QString &username, const QPixmap &avatar, bool isOnline);
+    void openConversation(const QString &uid);
+
 private:
     enum Status
     {
         Loading = 0,
         Empty,
         Hide
-    };
-    struct FriendInfo
-    {
-        QString uid;
-        QString sid;
-        QString username;
-        QString avatar_url;
-        QString email;
-        bool isOnline;
     };
 
     void initSideBar();
@@ -85,7 +79,7 @@ private:
     LoadingLabel* label_loadingIcon;
     QPropertyAnimation* animation_loading;
 
-    QList<FriendInfo> list_friend;
+    //操作好友列表
     QString selectedUID;
 
     QStackedWidget* stackedWidget;
