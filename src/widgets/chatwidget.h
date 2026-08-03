@@ -20,6 +20,8 @@
 #include "conversationlistdelegate.h"
 #include "conversationwidget.h"
 #include "../utils/friendmanage.h"
+#include "../chat/conversationmanager.h"
+#include "../chat/conversationitem.h"
 
 
 class ChatWidget : public QWidget
@@ -28,7 +30,6 @@ class ChatWidget : public QWidget
 public:
     explicit ChatWidget(int width, int height, QWidget *parent = nullptr);
     void openConversation(const QString &uid);
-    void addListItem(QString uid, QString username, QPixmap avatar, bool isOnline);
 
 signals:
 
@@ -42,7 +43,9 @@ private:
     void initListStyle();
 
     void initStackedConversation();
-    // void initStackedConversationStyle();
+
+    ConversationWidget* createConversation(ConversationItem* item);
+
     //--------------------------------
     QAction* searchIcon;
     QLineEdit* edit_search;

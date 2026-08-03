@@ -66,7 +66,7 @@ signals:
     void FriendAvatar(QString uid, QString avatar);
 
     void sendMessageStatus(bool isSuccess, QString tempMsgID, QString receiverUID, QString messageID = "", int64_t timeStamp = 0, int64_t convSeq = 0);
-    void pushMessage(bool isMyself, QString senderUID, QString content, QString messageID, int64_t timeStamp, int64_t convSeq);
+    void pushMessage(QString senderUID, QString content, QString messageID, int64_t timeStamp, int64_t convSeq);
     void cleanNewFriendRequestsList();
     // void cleanFriendList();
     void refreshExpiredExit();

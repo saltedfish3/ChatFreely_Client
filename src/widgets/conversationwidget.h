@@ -7,8 +7,6 @@
 #include <QListView>
 #include <QPlainTextEdit>
 #include <QMenu>
-#include <QStandardItemModel>
-#include <QSortFilterProxyModel>
 #include <QScrollBar>
 #include <QDateTime>
 #include <QTimer>
@@ -18,19 +16,15 @@
 #include "../network/tcplongconnection.h"
 #include "toastmanager.h"
 #include "../utils/userinfo.h"
+#include "../chat/conversationitem.h"
+#include "messagemodel.h"
 
 class ConversationWidget : public QWidget
 {
     Q_OBJECT
 public:
-    explicit ConversationWidget(int width, int height,
-                                const QString& username, bool isOnline,
-                                const QString& friendUID, const QPixmap& friendAvatar, QWidget *parent = nullptr);
-    void addMessageItem(bool isMyself, const QString& content, int64_t timestamp, QString messageID, int64_t convSeq = 0);
-    QString getLastMessage();
-    QString getLastMessageTime();
-    void updateResp(bool isSuccess, QString tempMsgID, int64_t timestamp = 0, QString messageID = "", int64_t convSeq = 0);
-    void updateFriendAvatar(const QPixmap& avatar);
+    explicit ConversationWidget(int width, int height, ConversationItem* item, QWidget *parent = nullptr);
+
     void updateFriendUsername(const QString& username);
     void updateFriendStatus(bool isOnline);
 
@@ -55,12 +49,10 @@ private:
     int loadingCount = 0;
     int loadingAngle = 0;
 
-    QStandardItemModel* model;
-    QSortFilterProxyModel* sortModel;
+    MessageModel* model;
     ConversationDelegate* delegate;
 
-    QString friendUID;
-    QPixmap friendAvatar;
+    ConversationItem* item;
     int64_t theBestConvSeq = 0;
 };
 

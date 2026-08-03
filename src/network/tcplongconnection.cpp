@@ -1389,7 +1389,7 @@ void TcpLongConnection::handlePushNewMessage(QJsonObject obj)
         int64_t timeStamp = static_cast<int64_t>(obj.value("TimeStamp").toDouble());
         int64_t convSeq = static_cast<int64_t>(obj.value("ConvSeq").toDouble());
         //发送信号
-        emit pushMessage(false, obj.value("SenderUID").toString(),
+        emit pushMessage(obj.value("SenderUID").toString(),
                          obj.value("Content").toString(),
                          obj.value("MessageID").toString(), timeStamp, convSeq);
     }

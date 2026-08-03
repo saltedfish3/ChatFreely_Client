@@ -1,7 +1,7 @@
 #include "conversationwidget.h"
 
-ConversationWidget::ConversationWidget(int width, int height, const QString &username, bool isOnline, const QString &friendUID, const QPixmap &friendAvatar, QWidget *parent)
-    : QWidget{parent}, friendUID(friendUID), friendAvatar(friendAvatar)
+ConversationWidget::ConversationWidget(int width, int height, ConversationItem* item, QWidget *parent)
+    : QWidget{parent}, item(item)
 {
     this->setObjectName("widget_conversation");
     this->resize(width, height);
@@ -10,6 +10,20 @@ ConversationWidget::ConversationWidget(int width, int height, const QString &use
     this->widget_header->setObjectName("widget_header");
     this->widget_header->resize(this->width(), 56);
     this->widget_header->move(0,0);
+
+    FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(item->getConversationID());
+    QString username;
+    bool isOnline = false;
+
+    if(info.uid.isEmpty())
+    {
+        username = "未知用户";
+    }
+    else
+    {
+        username = info.username;
+        isOnline = info.isOnline;
+    }
 
     QString show_username;
     if(username.length() >= 30)
@@ -72,10 +86,15 @@ ConversationWidget::ConversationWidget(int width, int height, const QString &use
     connect(this->timer_loading, &QTimer::timeout, this, [this](){
         this->loadingAngle = (this->loadingAngle + 5) % 360;
         this->listView_messages->viewport()->update();
-        if(loadingCount != 0)
-            this->timer_loading->start(30);
-        else
+        if(loadingCount == 0)
             this->timer_loading->stop();
+    });
+
+    connect(item, &ConversationItem::messageStatusChange, this, [this](){
+        if(this->loadingCount > 0)
+        {
+            this->loadingCount--;
+        }
     });
 
     //初始化 消息显示 部分
@@ -84,7 +103,7 @@ ConversationWidget::ConversationWidget(int width, int height, const QString &use
     this->listView_messages->resize(this->width(),(this->height() - this->widget_header->height()) * 0.75);
     this->listView_messages->move(0, this->widget_header->height());
 
-    this->model = new QStandardItemModel(this);
+    this->model = new MessageModel(item, this);
     this->listView_messages->setModel(this->model);
 
     this->delegate = new ConversationDelegate(&this->loadingAngle, this);
@@ -93,14 +112,9 @@ ConversationWidget::ConversationWidget(int width, int height, const QString &use
     this->listView_messages->setEditTriggers(QAbstractItemView::NoEditTriggers);
     this->listView_messages->setSelectionMode(QAbstractItemView::NoSelection);
     this->listView_messages->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-    this->listView_messages->verticalScrollBar()->setSingleStep(8);
+    this->listView_messages->verticalScrollBar()->setSingleStep(10);
     this->listView_messages->setUniformItemSizes(false);
     this->listView_messages->setResizeMode(QListView::Adjust);
-
-    this->sortModel = new QSortFilterProxyModel(this);
-    this->sortModel->setSourceModel(this->model);
-    this->sortModel->setSortRole(ConversationDelegate::ConvSeqRole);
-    this->sortModel->sort(0, Qt::AscendingOrder);
 
     //初始化 编辑框 区域
     this->widget_editRegion = new QWidget(this);
@@ -152,13 +166,20 @@ ConversationWidget::ConversationWidget(int width, int height, const QString &use
             return;
         QString tempMsgID = QUuid::createUuid().toString();
 
-        addMessageItem(true, content, QDateTime::currentSecsSinceEpoch(), tempMsgID);
+        Message msg;
+        msg.tempMsgID = tempMsgID;
+        msg.content = content;
+        msg.timeStamp = QDateTime::currentSecsSinceEpoch();
+        msg.senderUID = UserInfo::getUserInfo().getUID();
+        msg.status = Sending;
+        msg.convSeq = this->item->getMessagesManager().getLastMessage().convSeq + 1;
 
-        this->listView_messages->scrollToBottom();
+        this->item->addNewMessage(msg);
         this->loadingCount++;
         if(!this->timer_loading->isActive())
             this->timer_loading->start(30);
-        TcpLongConnection::getTcpClient().sendMessageTo(this->friendUID, content, tempMsgID);
+
+        TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), content, tempMsgID);
         this->edit_message->clear();
     });
 
@@ -187,171 +208,6 @@ ConversationWidget::ConversationWidget(int width, int height, const QString &use
 
     initStyle();
     startReFlashTimeStamp();
-}
-
-void ConversationWidget::addMessageItem(bool isMyself, const QString &content, int64_t timestamp, QString messageID, int64_t convSeq)
-{
-    QDateTime msgTime = QDateTime::fromSecsSinceEpoch(timestamp);
-    int64_t lastTimeStamp = 0;
-    for(int i = this->model->rowCount() - 1; i >= 0; i--)
-    {
-        QModelIndex index = this->model->index(i, 0);
-        QVariant vi_isTimeStamp = index.data(ConversationDelegate::IsTimestampRole);
-        QVariant vi_isBottomSpace = index.data(ConversationDelegate::IsBottomSpaceRole);
-        bool isTimeStamp = vi_isTimeStamp.isValid() ? vi_isTimeStamp.toBool() : false;
-        bool isBottomSpace = vi_isBottomSpace.isValid() ? vi_isBottomSpace.toBool() : false;
-        if(isTimeStamp || isBottomSpace)
-        {
-            if(isBottomSpace)
-                this->model->removeRow(i);
-            continue;
-        }
-        lastTimeStamp = index.data(ConversationDelegate::TimeStamp).toLongLong();
-        break;
-    }
-    if(lastTimeStamp == 0 || (timestamp - lastTimeStamp) > 300)
-    {
-        //插入时间戳
-        QDateTime now = QDateTime::currentDateTime();
-        QString timeStr;
-        //非本年
-        if(msgTime.date().year() != now.date().year())
-        {
-            timeStr = msgTime.toString("yyyy年M月d日 hh:mm");
-        }
-        else if(msgTime.date() == now.date())
-        {
-            //今天
-            timeStr = msgTime.toString("hh:mm");
-        }
-        else if(msgTime.date() == now.date().addDays(-1))
-        {
-            //昨天
-            timeStr = QString("昨天 %1").arg(msgTime.toString("hh:mm"));
-        }
-        else if(msgTime.date() == now.date().addDays(-2))
-        {
-            //前天
-            timeStr = QString("前天 %1").arg(msgTime.toString("hh:mm"));
-        }
-        else
-        {
-            int mondayOfTime = now.date().dayOfWeek() - 1;
-            QDate thisMonday = now.date().addDays(-mondayOfTime);
-            QDate thisSunday = thisMonday.addDays(6);
-            if(msgTime.date() >= thisMonday && msgTime.date() <= thisSunday)
-            {
-                QStringList weekDays = {"","星期一","星期二","星期三","星期四","星期五","星期六","星期日"};
-                timeStr = QString("%1 %2").arg(weekDays.at(msgTime.date().dayOfWeek()), "hh:mm");
-            }
-            else
-            {
-                timeStr = msgTime.toString("M月d日 hh:mm");
-            }
-        }
-        QStandardItem* item = new QStandardItem();
-        item->setData(true, ConversationDelegate::IsTimestampRole);
-        item->setData(timeStr, ConversationDelegate::ContentRole);
-        this->model->appendRow(item);
-    }
-    QStandardItem* item = new QStandardItem();
-    item->setData(isMyself, ConversationDelegate::IsMyselfRole);
-    if(isMyself)
-        item->setData(UserInfo::getUserInfo().getAvatar(), ConversationDelegate::AvatarRole);
-    else
-        item->setData(this->friendAvatar, ConversationDelegate::AvatarRole);
-    item->setData(content, ConversationDelegate::ContentRole);
-    item->setData(ConversationDelegate::Sending, ConversationDelegate::MessageStatusRole);
-    item->setData(messageID, ConversationDelegate::MessageIDRole);
-    item->setData(timestamp, ConversationDelegate::TimeStamp);
-    if(isMyself)
-        item->setData(this->theBestConvSeq + 1, ConversationDelegate::ConvSeqRole);
-    else
-    {
-        item->setData(convSeq, ConversationDelegate::ConvSeqRole);
-        this->theBestConvSeq = convSeq;
-    }
-
-    this->model->appendRow(item);
-
-    QStandardItem* item_bottomSpace = new QStandardItem();
-    item_bottomSpace->setData(true, ConversationDelegate::IsBottomSpaceRole);
-    this->model->appendRow(item_bottomSpace);
-}
-
-QString ConversationWidget::getLastMessage()
-{
-    for(int i = this->model->rowCount() - 1; i >= 0; i--)
-    {
-        QModelIndex index = this->model->index(i, 0);
-        QVariant vi_isTimeStamp = index.data(ConversationDelegate::IsTimestampRole);
-        QVariant vi_isBottomSpace = index.data(ConversationDelegate::IsBottomSpaceRole);
-        bool isTimeStamp = vi_isTimeStamp.isValid() ? vi_isTimeStamp.toBool() : false;
-        bool isBottomSpace = vi_isBottomSpace.isValid() ? vi_isBottomSpace.toBool() : false;
-        if(isTimeStamp || isBottomSpace)
-            continue;
-        return index.data(ConversationDelegate::ContentRole).toString();
-    }
-    return QString();
-}
-
-QString ConversationWidget::getLastMessageTime()
-{
-    for(int i = this->model->rowCount() - 1; i >= 0; i--)
-    {
-        QModelIndex index = this->model->index(i, 0);
-        QVariant vi_isTimeStamp = index.data(ConversationDelegate::IsTimestampRole);
-        QVariant vi_isBottomSpace = index.data(ConversationDelegate::IsBottomSpaceRole);
-        bool isTimeStamp = vi_isTimeStamp.isValid() ? vi_isTimeStamp.toBool() : false;
-        bool isBottomSpace = vi_isBottomSpace.isValid() ? vi_isBottomSpace.toBool() : false;
-        if(isBottomSpace)
-            continue;
-        if(isTimeStamp)
-            return index.data(ConversationDelegate::ContentRole).toString();
-    }
-    return QString();
-}
-
-void ConversationWidget::updateResp(bool isSuccess, QString tempMsgID, int64_t timestamp, QString messageID, int64_t convSeq)
-{
-    for(int i = this->model->rowCount() - 1; i >= 0; i--)
-    {
-        QModelIndex index = this->model->index(i, 0);
-        if(index.data(ConversationDelegate::MessageIDRole).toString() == tempMsgID)
-        {
-            QStandardItem* item = this->model->itemFromIndex(index);
-            if(isSuccess)
-            {
-                item->setData(ConversationDelegate::Success, ConversationDelegate::MessageStatusRole);
-                item->setData(timestamp, ConversationDelegate::TimeStamp);
-                item->setData(messageID, ConversationDelegate::MessageIDRole);
-                item->setData(convSeq, ConversationDelegate::ConvSeqRole);
-                if(convSeq == -1)
-                    convSeq = this->theBestConvSeq;
-                if(convSeq > this->theBestConvSeq)
-                {
-                    if(convSeq - this->theBestConvSeq != 1)
-                    {
-                        //获取消息
-                        qDebug()<<"缺少消息，获取";
-                    }
-                    this->theBestConvSeq = convSeq;
-                }
-
-            }
-            else
-            {
-                item->setData(ConversationDelegate::Failed, ConversationDelegate::MessageStatusRole);
-            }
-        }
-    }
-}
-
-void ConversationWidget::updateFriendAvatar(const QPixmap &avatar)
-{
-    this->friendAvatar = avatar;
-    // this->update();
-    this->listView_messages->viewport()->update();
 }
 
 void ConversationWidget::updateFriendUsername(const QString &username)

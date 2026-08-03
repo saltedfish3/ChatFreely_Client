@@ -11,29 +11,26 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
     painter->setRenderHint(QPainter::SmoothPixmapTransform, true);
-    QRect contain = option.rect.adjusted(0, 0, 0, 0);
-    QVariant vi = index.data(IsBottomSpaceRole);
-    bool isBottomSpace = vi.isValid() ? vi.toBool() : false;
-    if(isBottomSpace)
-    {
-        painter->restore();
-        return;
-    }
 
-    QVariant vi1 = index.data(IsTimestampRole);
+    QRect total = option.rect;
+    QVariant vi1 = index.data(IsNeedShowTime);
     bool isTimeStamp = vi1.isValid() ? vi1.toBool() : false;
+    QRect TimeStamp;
     if(isTimeStamp)
     {
+        TimeStamp = QRect(total.topLeft(), QSize(total.width(), 40));
         painter->setPen(Qt::gray);
         QFont font = option.font;
         font.setPointSize(8);
         painter->setFont(font);
-        QString timeStr = index.data(ContentRole).toString();
-        painter->drawText(contain, Qt::AlignCenter, timeStr);
-
-        painter->restore();
-        return;
+        QString timeStr = formatTimestamp(index.data(Role::TimeStamp).toLongLong());
+        painter->drawText(TimeStamp, Qt::AlignCenter, timeStr);
     }
+
+    int topOffset = isTimeStamp ? 40 : 0;
+    QRect contain = option.rect.adjusted(0, topOffset, 0, 0);
+
+
     bool isSelf = index.data(IsMyselfRole).toBool();
     QSize avatarSize(40, 40);
     QRect avatarRect;
@@ -166,14 +163,19 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
 
 QSize ConversationDelegate::sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
-    QVariant vi = index.data(IsBottomSpaceRole);
-    bool isBottomSpace = vi.isValid() ? vi.toBool() : false;
-    if(isBottomSpace)
-        return QSize(-1, 30);
-    QVariant vi1 = index.data(IsTimestampRole);
-    bool isTimeStamp = vi1.isValid() ? vi1.toBool() : false;
-    if(isTimeStamp)
-        return QSize(-1, 40);
+    //Bottom预留30
+    int bottomPadding = 0;
+    if(index.row() == index.model()->rowCount() - 1)
+        bottomPadding = 30;
+
+    //timestamp预留40
+    int topTimeStampPadding = 0;
+    QVariant vi = index.data(IsNeedShowTime);
+    bool isShowTime = vi.isValid() ? vi.toBool() : false;
+    if(isShowTime)
+        topTimeStampPadding = 40;
+
+
     QString message = index.data(ContentRole).toString();
     QFont font = option.font;
     font.setPointSizeF(10.2);
@@ -203,12 +205,57 @@ QSize ConversationDelegate::sizeHint(const QStyleOptionViewItem &option, const Q
 
     int textHeight = qCeil(height) + 20;
     int totalHeight = qMax(textHeight, 40) + 16;
+    totalHeight += topTimeStampPadding + bottomPadding;
     return QSize(-1, totalHeight);
 }
 
 bool ConversationDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, const QStyleOptionViewItem &option, const QModelIndex &index)
 {
     return QStyledItemDelegate::editorEvent(event, model, option, index);
+}
+
+QString ConversationDelegate::formatTimestamp(int64_t timestamp) const
+{
+    //插入时间戳
+    QDateTime now = QDateTime::currentDateTime();
+    QDateTime msgTime = QDateTime::fromSecsSinceEpoch(timestamp);
+    QString timeStr;
+    //非本年
+    if(msgTime.date().year() != now.date().year())
+    {
+        timeStr = msgTime.toString("yyyy年M月d日 hh:mm");
+    }
+    else if(msgTime.date() == now.date())
+    {
+        //今天
+        timeStr = msgTime.toString("hh:mm");
+    }
+    else if(msgTime.date() == now.date().addDays(-1))
+    {
+        //昨天
+        timeStr = QString("昨天 %1").arg(msgTime.toString("hh:mm"));
+    }
+    else if(msgTime.date() == now.date().addDays(-2))
+    {
+        //前天
+        timeStr = QString("前天 %1").arg(msgTime.toString("hh:mm"));
+    }
+    else
+    {
+        int mondayOfTime = now.date().dayOfWeek() - 1;
+        QDate thisMonday = now.date().addDays(-mondayOfTime);
+        QDate thisSunday = thisMonday.addDays(6);
+        if(msgTime.date() >= thisMonday && msgTime.date() <= thisSunday)
+        {
+            QStringList weekDays = {"","星期一","星期二","星期三","星期四","星期五","星期六","星期日"};
+            timeStr = QString("%1 %2").arg(weekDays.at(msgTime.date().dayOfWeek()), "hh:mm");
+        }
+        else
+        {
+            timeStr = msgTime.toString("M月d日 hh:mm");
+        }
+    }
+    return timeStr;
 }
 
 QPixmap ConversationDelegate::setRadius(const QPixmap& pixmap, int hei_wid) const

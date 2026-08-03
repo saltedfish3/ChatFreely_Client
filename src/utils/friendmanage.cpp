@@ -143,7 +143,6 @@ FriendManage::FriendManage(QObject *parent)
                 info.email = var.value("Email").toString();
                 info.avatar = QPixmap(":/default/images/defaultAvatar.png");
                 info.avatarUrl = var.value("AvatarUrl").toString();
-                qDebug()<<info.avatarUrl;
                 info.isOnline = var.value("IsOnline").toBool();
                 this->map_friend[info.uid] = info;
 

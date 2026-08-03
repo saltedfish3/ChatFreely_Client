@@ -15,6 +15,19 @@ ChatWidget::ChatWidget(int width, int height,QWidget *parent)
 
 void ChatWidget::openConversation(const QString &uid)
 {
+    FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
+    if(info.uid.isEmpty())
+        return;
+
+    ConversationItem *item = ConversationManager::getConversationManager().getConversationItem(uid);
+    if(!item)
+        return;
+
+    if(!this->map_conversation.contains(uid))
+    {
+        createConversation(item);
+    }
+
     auto it = map_conversation.find(uid);
     if(it != map_conversation.end())
     {
@@ -29,26 +42,6 @@ void ChatWidget::openConversation(const QString &uid)
             }
         }
         return;
-    }
-
-    FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
-
-    ConversationWidget* item = new ConversationWidget(this->stackedWidget_Conversation->width(),
-                                                      this->stackedWidget_Conversation->height(),
-                                                      info.username, info.isOnline, uid, info.avatar, this->stackedWidget_Conversation);
-    map_conversation.insert(uid, item);
-    this->stackedWidget_Conversation->addWidget(item);
-    this->stackedWidget_Conversation->setCurrentWidget(item);
-    addListItem(uid, info.username, info.avatar, info.isOnline);
-
-    for(int i = 0; i < this->model->rowCount(); i++)
-    {
-        QModelIndex index = this->model->index(i, 0);
-        if(uid == index.data(ConversationListDelegate::UIDRole).toString())
-        {
-            this->listView_conversationList->setCurrentIndex(index);
-            this->listView_conversationList->selectionModel()->select(index, QItemSelectionModel::ClearAndSelect);
-        }
     }
 }
 
@@ -120,49 +113,10 @@ void ChatWidget::initListWidget()
 
     connect(this->delegate, &ConversationListDelegate::itemClicked, this, [this](const QModelIndex& index){
         QString uid = index.data(ConversationListDelegate::UIDRole).toString();
-        auto it = this->map_conversation.find(uid);
-        this->stackedWidget_Conversation->setCurrentWidget(it.value());
-    });
-
-    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::sendMessageStatus, this, [this](bool isSuccess,
-                                                                                                    QString tempMsgID,
-                                                                                                    QString receiverUID,
-                                                                                                    QString messageID,
-                                                                                                    int64_t timeStamp,
-                                                                                                    int64_t convSeq){
-        auto it = this->map_conversation.find(receiverUID);
-        if(it != this->map_conversation.end())
-        {
-            ConversationWidget* widget = it.value();
-            if(isSuccess)
-            {
-                widget->updateResp(true, tempMsgID, timeStamp, messageID);
-            }
-            else
-            {
-                widget->updateResp(false, tempMsgID);
-            }
-        }
-    });
-
-    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::pushMessage, this, [this](bool isMyself, QString senderUID,
-                                                                                                    QString content,
-                                                                                                    QString messageID,
-                                                                                                    int64_t timeStamp, int64_t convSeq){
-        openConversation(senderUID);
-        auto it = this->map_conversation.find(senderUID);
-        if(it != this->map_conversation.end())
-        {
-            ConversationWidget* widget = it.value();
-            widget->addMessageItem(isMyself, content, timeStamp, messageID, convSeq);
-        }
+        openConversation(uid);
     });
 
     connect(&FriendManage::getFriendManage(), &FriendManage::friendAvatarUpdate, this, [this](const QString& uid, const QPixmap& avatar){
-        auto it = this->map_conversation.find(uid);
-        if(it != this->map_conversation.end())
-            it.value()->updateFriendAvatar(avatar);
-
         for(int i = 0; i < this->model->rowCount(); i++)
         {
             QModelIndex index = this->model->index(i, 0);
@@ -170,22 +124,6 @@ void ChatWidget::initListWidget()
             {
                 QStandardItem* item = this->model->itemFromIndex(index);
                 item->setData(avatar, ConversationDelegate::AvatarRole);
-            }
-        }
-    });
-
-    connect(&FriendManage::getFriendManage(), &FriendManage::friendUsernameUpdate, this, [this](const QString& uid, const QString& username){
-        auto it = this->map_conversation.find(uid);
-        if(it != this->map_conversation.end())
-            it.value()->updateFriendAvatar(username);
-
-        for(int i = 0; i < this->model->rowCount(); i++)
-        {
-            QModelIndex index = this->model->index(i, 0);
-            if(uid == index.data(ConversationListDelegate::UIDRole).toString())
-            {
-                QStandardItem* item = this->model->itemFromIndex(index);
-                item->setData(username, ConversationListDelegate::UsernameRole);
             }
         }
     });
@@ -205,6 +143,11 @@ void ChatWidget::initListWidget()
             }
         }
     });
+
+    connect(&ConversationManager::getConversationManager(), &ConversationManager::conversationCreated, this, [this](ConversationItem* item){
+        createConversation(item);
+    });
+
 }
 
 void ChatWidget::initListStyle()
@@ -237,49 +180,49 @@ void ChatWidget::initStackedConversation()
 
     this->stackedWidget_Conversation->addWidget(this->widget_noSelect);
     this->stackedWidget_Conversation->setCurrentWidget(this->widget_noSelect);
-
-    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::FriendStatus, this, [this](QString uid, bool isOnline){
-        auto it = map_conversation.find(uid);
-        if(it != map_conversation.end())
-        {
-            QWidget* conversation = it.value();
-            QLabel* statusColor = conversation->findChild<QLabel*>("status_color");
-            QLabel* statusText = conversation->findChild<QLabel*>("status");
-            if(statusColor && statusText)
-            {
-                if(isOnline)
-                {
-                    statusColor->setProperty("status", "online");
-                    statusText->setText("在线");
-                }
-                else
-                {
-                    statusColor->setProperty("status", "offline");
-                    statusText->setText("离线");
-                }
-                statusColor->style()->unpolish(statusColor);
-                statusColor->style()->polish(statusColor);
-                for(int i = 0; i < this->model->rowCount(); i++)
-                {
-                    QModelIndex index = this->model->index(i, 0);
-                    if(uid == index.data(ConversationListDelegate::UIDRole).toString())
-                    {
-                        QStandardItem* item = this->model->itemFromIndex(index);
-                        item->setData(isOnline, ConversationListDelegate::IsOnlineRole);
-                    }
-                }
-            }
-        }
-    });
 }
 
-void ChatWidget::addListItem(QString uid, QString username, QPixmap avatar, bool isOnline)
+ConversationWidget* ChatWidget::createConversation(ConversationItem* item)
 {
-    //添加项目
-    QStandardItem* item = new QStandardItem();
-    item->setData(uid, ConversationListDelegate::UIDRole);
-    item->setData(username, ConversationListDelegate::UsernameRole);
-    item->setData(avatar, ConversationListDelegate::AvatarRole);
-    item->setData(isOnline, ConversationListDelegate::IsOnlineRole);
-    this->model->appendRow(item);
+    if(this->map_conversation.contains(item->getConversationID()))
+        return this->map_conversation[item->getConversationID()];
+
+    ConversationWidget* cw = new ConversationWidget(this->stackedWidget_Conversation->width(),
+                                                    this->stackedWidget_Conversation->height(),
+                                                    item, this->stackedWidget_Conversation);
+
+    if(!cw)
+        return nullptr;
+
+    this->stackedWidget_Conversation->addWidget(cw);
+    this->map_conversation[item->getConversationID()] = cw;
+
+    FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(item->getConversationID());
+
+    QStandardItem* item_standard = new QStandardItem();
+    if(info.uid.isEmpty())
+    {
+        item_standard->setData(item->getConversationID(), ConversationListDelegate::UIDRole);
+        item_standard->setData("群聊", ConversationListDelegate::UsernameRole);
+        item_standard->setData(QPixmap(":/default/images/defaultAvatar.png"), ConversationListDelegate::AvatarRole);
+        item_standard->setData(true, ConversationListDelegate::IsOnlineRole);
+    }
+    else
+    {
+        item_standard->setData(info.uid, ConversationListDelegate::UIDRole);
+        item_standard->setData(info.username, ConversationListDelegate::UsernameRole);
+        item_standard->setData(info.avatar, ConversationListDelegate::AvatarRole);
+        item_standard->setData(info.isOnline, ConversationListDelegate::IsOnlineRole);
+    }
+    this->model->appendRow(item_standard);
+
+    connect(item, &ConversationItem::LastMessageChange, this, [this](const Message& msg){
+        //
+    });
+
+    connect(item, &ConversationItem::UnReadCountChange, this, [this](int num){
+        //
+    });
+
+    return cw;
 }

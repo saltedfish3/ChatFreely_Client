@@ -12,6 +12,7 @@
 #include <QListView>
 #include <QPointer>
 #include <QTextLayout>
+#include <QDateTime>
 
 class ConversationDelegate : public QStyledItemDelegate
 {
@@ -21,8 +22,7 @@ public:
     enum Role
     {
         IsMyselfRole = Qt::UserRole + 1,
-        IsTimestampRole,
-        IsBottomSpaceRole,
+        IsNeedShowTime,
         ContentRole,
         AvatarRole,
         TimeStamp,
@@ -30,10 +30,11 @@ public:
         ConvSeqRole,
         MessageStatusRole
     };
+
     enum Status
     {
-        Success = 0,
-        Sending,
+        Sending = 0,
+        Success,
         Failed
     };
 
@@ -43,6 +44,7 @@ protected:
     bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem& option, const QModelIndex& index) override;
 
 private:
+    QString formatTimestamp(int64_t timestamp) const;
     QPixmap setRadius(const QPixmap& pixmap, int hei_wid) const;
     int* loadingAngle = nullptr;
 
