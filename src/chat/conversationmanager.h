@@ -17,6 +17,9 @@ public:
 signals:
     void conversationCreated(ConversationItem* item);
 
+private slots:
+    void cleanAll();
+
 private:
     explicit ConversationManager(QObject *parent = nullptr);
 

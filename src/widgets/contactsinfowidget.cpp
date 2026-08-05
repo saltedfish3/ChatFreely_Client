@@ -14,9 +14,12 @@ void ContactsInfoWidget::changeInfo(QPixmap avatar, QString username, QString ui
     this->uid = uid;
 
     setRadius(avatar,this->label_avatar,128);
-    this->label_username->setText(username);
+    QFontMetrics fm(this->label_username->font());
+    QString showUsername = fm.elidedText(username, Qt::ElideRight, this->label_username->width() - 20);
+    this->label_username->setText(showUsername);
     this->label_userID->setText("ID:" + sid);
-    this->label_email->setText(email);
+    QString showEmail = fm.elidedText(email, Qt::ElideRight, this->label_email->width());
+    this->label_email->setText(showEmail);
     if(isOnline)
     {
         this->label_status->setText("在线");
@@ -38,7 +41,9 @@ void ContactsInfoWidget::changeInfo(QPixmap avatar, QString username, QString ui
 
 void ContactsInfoWidget::changeSelectedUsername(QString username)
 {
-    this->label_username->setText(username);
+    QFontMetrics fm(font());
+    QString showUsername = fm.elidedText(username, Qt::ElideRight, this->label_username->width() - 20);
+    this->label_username->setText(showUsername);
 }
 
 void ContactsInfoWidget::changeSelectedAvatar(QPixmap avatar)

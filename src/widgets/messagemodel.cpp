@@ -5,6 +5,7 @@ MessageModel::MessageModel(ConversationItem* item, QObject *parent)
 {
     connect(item, &ConversationItem::PushNewMessage, this, &MessageModel::onNewMessage);
     connect(item, &ConversationItem::messageStatusChange, this, &MessageModel::onMessageStatusChanged);
+    connect(item, &ConversationItem::senderAvatarUpdate, this, &MessageModel::onSenderAvatarUpdate);
 }
 
 int MessageModel::rowCount(const QModelIndex &parent) const
@@ -33,12 +34,7 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
     case MessageStatusRole:
         return msg.status;
     case IsNeedShowTime:
-    {
-        if(index.row() == 0)
-            return true;
-        const Message& pre_msg = this->item->getMessagesManager().getMessages().at(index.row() - 1);
-        return (msg.timeStamp - pre_msg.timeStamp) > 300;
-    }
+        return msg.showTimestamp;
     case ConvSeqRole:
         return msg.convSeq;
     case MessageIDRole:
@@ -62,7 +58,17 @@ void MessageModel::onMessageStatusChanged(const QString &tempMsgID, Status statu
     if(row >= 0)
     {
         QModelIndex idx = index(row);
-        emit dataChanged(idx, idx, {MessageStatusRole});
+        emit dataChanged(idx, idx, {MessageStatusRole, IsNeedShowTime, TimeStamp});
+    }
+}
+
+void MessageModel::onSenderAvatarUpdate(const QString &senderUID)
+{
+    auto& msgs = this->item->getMessagesManager().getMessages();
+    for(int i = 0; i < msgs.size(); i++)
+    {
+        if(msgs.at(i).senderUID == senderUID)
+            emit dataChanged(index(i), index(i), {AvatarRole});
     }
 }
 

@@ -12,6 +12,7 @@ public:
     bool updateStatus(const QString& tempMsgID, const QString& newServerMsgID, Status status, int64_t newTimeStamp, int64_t newConvSeq);
     Message getLastMessage() const;
     const QList<Message>& getMessages() const;
+    QList<Message>& getMessages();
     int indexOfMsg(const QString& msgID) const;
 
 private:

@@ -45,6 +45,9 @@ signals:
     void friendStatusUpdate(const QString& uid, bool isOnline);
     void friendUsernameUpdate(const QString& uid, const QString& username);
 
+private slots:
+    void cleanAll();
+
 private:
     explicit FriendManage(QObject *parent = nullptr);
     QMap<QString, FriendInfo> map_friend;

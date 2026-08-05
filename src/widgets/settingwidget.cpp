@@ -452,6 +452,7 @@ void SettingWidget::initPersonalDataWidget()
     this->edit_username = new QLineEdit(this->widget_personalData);
     this->edit_username->setObjectName("edit_username");
     this->edit_username->setText("用户昵称");
+    this->edit_username->setMaxLength(64);
     this->edit_username->resize(240,40);
     this->edit_username->move(24,this->label_username->pos().y()+this->label_username->height()+8);
 

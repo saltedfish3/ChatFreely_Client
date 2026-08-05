@@ -29,6 +29,7 @@ public:
 public slots:
     void onNewMessage(const Message& msg);
     void onMessageStatusChanged(const QString& tempMsgID, Status status);
+    void onSenderAvatarUpdate(const QString& senderUID);
     void loadHistoryMessages(const QList<Message>& msgs);
 
 signals:

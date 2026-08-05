@@ -19,6 +19,13 @@ ConversationItem *ConversationManager::getConversationItem(const QString &conver
     return it.value();
 }
 
+void ConversationManager::cleanAll()
+{
+    for(auto it = this->conversations.cbegin(); it != this->conversations.cend(); it++)
+        it.value()->deleteLater();
+    this->conversations.clear();
+}
+
 ConversationManager::ConversationManager(QObject *parent)
     : QObject{parent}
 {
@@ -41,4 +48,12 @@ ConversationManager::ConversationManager(QObject *parent)
                 ConversationItem* item = getConversationItem(senderUID);
                 item->addNewMessage(msg);
     });
+
+    connect(&UserInfo::getUserInfo(), &UserInfo::updateAvatar, this, [this](QPixmap avatar){
+        for(auto it = this->conversations.begin(); it != this->conversations.end(); it++)
+            it.value()->updateSenderAvatar(UserInfo::getUserInfo().getUID(), avatar);
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &ConversationManager::cleanAll);
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, &ConversationManager::cleanAll);
 }

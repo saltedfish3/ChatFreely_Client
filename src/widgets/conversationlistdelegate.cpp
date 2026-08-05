@@ -34,7 +34,24 @@ void ConversationListDelegate::paint(QPainter *painter, const QStyleOptionViewIt
         avatarIcon = setRadius(index.data(AvatarRole).value<QPixmap>(), avatarSize.width());
     painter->drawPixmap(avatar, avatarIcon);
 
+    QSize unReadSize(14, 14);
+    QRect unReadRect(avatar.topRight() - QPoint(10, 0), unReadSize);
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(QColor(247, 76, 48));
+
     QFont font = option.font;
+    font.setPointSize(7);
+    painter->setFont(font);
+
+    int unReadCount = index.data(UnReadRole).toInt();
+    if(unReadCount > 0)
+    {
+        painter->drawRoundedRect(unReadRect, unReadSize.width()/2, unReadSize.height()/2);
+        painter->setPen(QPen(QColor(Qt::white), 1));
+        QString unReadText = QString::number(unReadCount > 99 ? 99 : unReadCount);
+        painter->drawText(unReadRect, Qt::AlignCenter, unReadText);
+    }
+
     font.setPointSize(10);
     font.setBold(true);
 
@@ -42,13 +59,34 @@ void ConversationListDelegate::paint(QPainter *painter, const QStyleOptionViewIt
 
     QString text = index.data(UsernameRole).toString();
     QFontMetrics fm = painter->fontMetrics();
-    int textWidth = fm.horizontalAdvance(text) + 4;
-    int textHeight = fm.height();
-    QRect username(avatar.topLeft() + QPoint(avatarSize.width() + 8, 0), QSize(textWidth, textHeight));
 
+    int textHeight = fm.height();
+    QRect username(avatar.topLeft() + QPoint(avatarSize.width() + 8, 0), QSize(85, textHeight));
+
+    QString drawText = fm.elidedText(text, Qt::ElideRight, username.width());
     painter->setPen(Qt::black);
-    painter->setBrush(Qt::NoBrush);
-    painter->drawText(username, Qt::AlignVCenter, text);
+    painter->drawText(username, Qt::AlignVCenter, drawText);
+
+    QColor lastColor = isClicked ? QColor(85, 85, 85) : QColor(128, 128, 128);
+
+    QString lastMsg = index.data(LastMsgRole).toString();
+    font.setPointSize(8);
+    font.setBold(false);
+    painter->setFont(font);
+    painter->setPen(lastColor);
+    fm = painter->fontMetrics();
+    int lastMsgHeight = fm.height();
+
+    QRect lastMsgRect(username.bottomLeft() + QPoint(0, 5), QSize(140, lastMsgHeight));
+    QString drawLastMsg = fm.elidedText(lastMsg, Qt::ElideRight, lastMsgRect.width());
+    painter->drawText(lastMsgRect, Qt::AlignVCenter, drawLastMsg);
+
+    font.setPointSizeF(7.5);
+    painter->setFont(font);
+    fm = painter->fontMetrics();
+    QRect timestampRect(username.topRight(), QSize(contain.topRight().x() - username.topRight().x() - 5, fm.height()));
+    QString drawTime = formatTimestamp(index.data(LastTimestampRole).toLongLong());
+    painter->drawText(timestampRect, Qt::AlignVCenter | Qt::AlignRight, drawTime);
 
     QSize onlineSize(contain.height() * 0.15, contain.height() * 0.15);
     QRect onlineIcon(avatar.bottomRight() - QPoint(9, 9), onlineSize);
@@ -113,5 +151,52 @@ QPixmap ConversationListDelegate::setRadius(const QPixmap& pixmap, int hei_wid) 
     painter.drawPixmap(0,0,scaled);
     painter.end();
     return roundedPix;
+}
+
+QString ConversationListDelegate::formatTimestamp(int64_t timestamp) const
+{
+    if(timestamp <= 0)
+        return {};
+
+    //插入时间戳
+    QDateTime now = QDateTime::currentDateTime();
+    QDateTime msgTime = QDateTime::fromSecsSinceEpoch(timestamp);
+    QString timeStr;
+    //非本年
+    if(msgTime.date().year() != now.date().year())
+    {
+        timeStr = msgTime.toString("yyyy/M/d");
+    }
+    else if(msgTime.date() == now.date())
+    {
+        //今天
+        timeStr = msgTime.toString("hh:mm");
+    }
+    else if(msgTime.date() == now.date().addDays(-1))
+    {
+        //昨天
+        timeStr = QString("昨天 %1").arg(msgTime.toString("hh:mm"));
+    }
+    else if(msgTime.date() == now.date().addDays(-2))
+    {
+        //前天
+        timeStr = QString("前天 %1").arg(msgTime.toString("hh:mm"));
+    }
+    else
+    {
+        int mondayOfTime = now.date().dayOfWeek() - 1;
+        QDate thisMonday = now.date().addDays(-mondayOfTime);
+        QDate thisSunday = thisMonday.addDays(6);
+        if(msgTime.date() >= thisMonday && msgTime.date() <= thisSunday)
+        {
+            QStringList weekDays = {"","星期一","星期二","星期三","星期四","星期五","星期六","星期日"};
+            timeStr = QString("%1").arg(weekDays.at(msgTime.date().dayOfWeek()));
+        }
+        else
+        {
+            timeStr = msgTime.toString("M/d");
+        }
+    }
+    return timeStr;
 }
 

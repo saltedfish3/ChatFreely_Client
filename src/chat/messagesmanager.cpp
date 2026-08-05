@@ -11,7 +11,7 @@ void MessagesManager::append(const Message &msg)
 bool MessagesManager::updateStatus(const QString &tempMsgID, const QString &newServerMsgID, Status status, int64_t newTimeStamp, int64_t newConvSeq)
 {
     auto it = this->index_message.find(tempMsgID);
-    if(it == this->index_message.end() || newServerMsgID.isEmpty() || newTimeStamp == 0 || newConvSeq == 0)
+    if(it == this->index_message.end() || newServerMsgID.isEmpty() || newTimeStamp <= 0 || newConvSeq <= 0)
         return false;
 
     int row = it.value();
@@ -33,6 +33,11 @@ Message MessagesManager::getLastMessage() const
 }
 
 const QList<Message> &MessagesManager::getMessages() const
+{
+    return this->messages;
+}
+
+QList<Message> &MessagesManager::getMessages()
 {
     return this->messages;
 }

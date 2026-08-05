@@ -176,11 +176,14 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
 
         this->item->addNewMessage(msg);
         this->loadingCount++;
-        if(!this->timer_loading->isActive())
-            this->timer_loading->start(30);
+        QTimer::singleShot(0, this, [this](){
+            if(this->loadingCount > 0 && !this->timer_loading->isActive())
+                this->timer_loading->start(30);
+        });
 
         TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), content, tempMsgID);
         this->edit_message->clear();
+        this->listView_messages->scrollToBottom();
     });
 
     //初始化更多弹窗
@@ -208,6 +211,35 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
 
     initStyle();
     startReFlashTimeStamp();
+
+    connect(this->item, &ConversationItem::PushNewMessage, this, [this](const Message &msg){
+        this->listView_messages->doItemsLayout();
+        QScrollBar* scrollBar = this->listView_messages->verticalScrollBar();
+        int height = this->listView_messages->viewport()->height();
+        if(scrollBar->maximum() - scrollBar->value() < (height / 2))
+        {
+            this->listView_messages->scrollToBottom();
+            if(this->item->isActive())
+                this->item->clearUnRead();
+            else
+                this->item->addUnReadCount();
+        }
+        else
+        {
+            this->item->addUnReadCount();
+        }
+    });
+
+    connect(this->item, &ConversationItem::messageStatusChange, this, [this](const QString&, Status){
+        this->listView_messages->doItemsLayout();
+    });
+
+    installEventFilter(this);
+    this->listView_messages->installEventFilter(this);
+    this->listView_messages->viewport()->installEventFilter(this);
+    this->edit_message->installEventFilter(this);
+    this->widget_header->installEventFilter(this);
+    this->widget_editRegion->installEventFilter(this);
 }
 
 void ConversationWidget::updateFriendUsername(const QString &username)
@@ -233,6 +265,27 @@ void ConversationWidget::updateFriendStatus(bool isOnline)
     this->label_statusIcon->style()->unpolish(this->label_statusIcon);
     this->label_statusIcon->style()->polish(this->label_statusIcon);
     this->update();
+}
+
+void ConversationWidget::updateFriendAvatar(const QPixmap &avatar)
+{
+    this->item->updateSenderAvatar(item->getConversationID(), avatar);
+}
+
+void ConversationWidget::setActive(bool isActive)
+{
+    this->item->setActive(isActive);
+    if(isActive)
+        this->item->clearUnRead();
+}
+
+bool ConversationWidget::eventFilter(QObject *obj, QEvent *event)
+{
+    if(event->type() == QEvent::MouseButtonPress)
+    {
+        this->item->clearUnRead();
+    }
+    return QWidget::eventFilter(obj, event);
 }
 
 void ConversationWidget::initStyle()

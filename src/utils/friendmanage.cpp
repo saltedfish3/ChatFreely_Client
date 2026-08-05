@@ -28,6 +28,12 @@ QList<FriendManage::FriendInfo> FriendManage::getAllFriend() const
     return this->map_friend.values();
 }
 
+void FriendManage::cleanAll()
+{
+    QWriteLocker locker(&(this->lock));
+    this->map_friend.clear();
+}
+
 FriendManage::FriendManage(QObject *parent)
     : QObject{parent}
 {
@@ -169,4 +175,7 @@ FriendManage::FriendManage(QObject *parent)
             }, false);
         }
     });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &FriendManage::cleanAll);
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, &FriendManage::cleanAll);
 }

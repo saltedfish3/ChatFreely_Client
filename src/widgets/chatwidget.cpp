@@ -31,7 +31,12 @@ void ChatWidget::openConversation(const QString &uid)
     auto it = map_conversation.find(uid);
     if(it != map_conversation.end())
     {
+        ConversationWidget* widget = qobject_cast<ConversationWidget*>(this->stackedWidget_Conversation->currentWidget());
+        if(widget)
+            widget->setActive(false);
         this->stackedWidget_Conversation->setCurrentWidget(it.value());
+        it.value()->setActive(true);
+
         for(int i = 0; i < this->model->rowCount(); i++)
         {
             QModelIndex index = this->model->index(i, 0);
@@ -43,6 +48,18 @@ void ChatWidget::openConversation(const QString &uid)
         }
         return;
     }
+}
+
+void ChatWidget::cleanAll()
+{
+    this->model->clear();
+    for(auto it = this->map_conversation.cbegin(); it != this->map_conversation.cend(); it++)
+    {
+        this->stackedWidget_Conversation->removeWidget(it.value());
+        it.value()->deleteLater();
+    }
+    this->map_conversation.clear();
+    this->stackedWidget_Conversation->setCurrentWidget(this->widget_noSelect);
 }
 
 void ChatWidget::initSearchWidget()
@@ -117,13 +134,17 @@ void ChatWidget::initListWidget()
     });
 
     connect(&FriendManage::getFriendManage(), &FriendManage::friendAvatarUpdate, this, [this](const QString& uid, const QPixmap& avatar){
+        auto it = this->map_conversation.find(uid);
+        if(it != this->map_conversation.end())
+            it.value()->updateFriendAvatar(avatar);
+
         for(int i = 0; i < this->model->rowCount(); i++)
         {
             QModelIndex index = this->model->index(i, 0);
             if(uid == index.data(ConversationListDelegate::UIDRole).toString())
             {
                 QStandardItem* item = this->model->itemFromIndex(index);
-                item->setData(avatar, ConversationDelegate::AvatarRole);
+                item->setData(avatar, ConversationListDelegate::AvatarRole);
             }
         }
     });
@@ -144,10 +165,28 @@ void ChatWidget::initListWidget()
         }
     });
 
+    connect(&FriendManage::getFriendManage(), &FriendManage::friendUsernameUpdate, this, [this](const QString& uid, const QString& username){
+        auto it = this->map_conversation.find(uid);
+        if(it != this->map_conversation.end())
+            it.value()->updateFriendUsername(username);
+
+        for(int i = 0; i < this->model->rowCount(); i++)
+        {
+            QModelIndex index = this->model->index(i, 0);
+            if(uid == index.data(ConversationListDelegate::UIDRole).toString())
+            {
+                QStandardItem* item = this->model->itemFromIndex(index);
+                item->setData(username, ConversationListDelegate::UsernameRole);
+            }
+        }
+    });
+
     connect(&ConversationManager::getConversationManager(), &ConversationManager::conversationCreated, this, [this](ConversationItem* item){
         createConversation(item);
     });
 
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &ChatWidget::cleanAll);
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, &ChatWidget::cleanAll);
 }
 
 void ChatWidget::initListStyle()
@@ -182,6 +221,28 @@ void ChatWidget::initStackedConversation()
     this->stackedWidget_Conversation->setCurrentWidget(this->widget_noSelect);
 }
 
+void ChatWidget::moveConversationToTop(const QString &conversationID)
+{
+    for(int i = 0; i < this->model->rowCount(); i++)
+    {
+        if(this->model->item(i)->data(ConversationListDelegate::UIDRole).toString() == conversationID)
+        {
+            if(i == 0)
+                return;
+            QStandardItem* item = this->model->takeItem(i);
+            this->model->removeRow(i);
+            this->model->insertRow(0, item);
+            break;
+        }
+    }
+    if(this->listView_conversationList->currentIndex().isValid())
+    {
+        QString selected = this->listView_conversationList->currentIndex().data(ConversationListDelegate::UIDRole).toString();
+        if(selected == conversationID)
+            this->listView_conversationList->setCurrentIndex(this->model->index(0, 0));
+    }
+}
+
 ConversationWidget* ChatWidget::createConversation(ConversationItem* item)
 {
     if(this->map_conversation.contains(item->getConversationID()))
@@ -214,14 +275,38 @@ ConversationWidget* ChatWidget::createConversation(ConversationItem* item)
         item_standard->setData(info.avatar, ConversationListDelegate::AvatarRole);
         item_standard->setData(info.isOnline, ConversationListDelegate::IsOnlineRole);
     }
+    item_standard->setData(item->getLastMessage().content, ConversationListDelegate::LastMsgRole);
+    item_standard->setData(item->getLastMessage().timeStamp, ConversationListDelegate::LastTimestampRole);
+    item_standard->setData(item->getUnReadCount(), ConversationListDelegate::UnReadRole);
     this->model->appendRow(item_standard);
 
-    connect(item, &ConversationItem::LastMessageChange, this, [this](const Message& msg){
-        //
+    connect(item, &ConversationItem::LastMessageChange, this, [this, item](const Message& msg){
+        QString conversationID = item->getConversationID();
+        for(int i = 0; i < this->model->rowCount(); i++)
+        {
+            auto index = this->model->index(i, 0);
+            if(conversationID == index.data(ConversationListDelegate::UIDRole).toString())
+            {
+                QStandardItem* item = this->model->itemFromIndex(index);
+                item->setData(msg.content, ConversationListDelegate::LastMsgRole);
+                item->setData(msg.timeStamp, ConversationListDelegate::LastTimestampRole);
+            }
+        }
+        moveConversationToTop(conversationID);
     });
 
-    connect(item, &ConversationItem::UnReadCountChange, this, [this](int num){
-        //
+    connect(item, &ConversationItem::UnReadCountChange, this, [this, item](int num){
+        QString conversationID = item->getConversationID();
+        for(int i = 0; i < this->model->rowCount(); i++)
+        {
+            auto index = this->model->index(i, 0);
+            if(conversationID == index.data(ConversationListDelegate::UIDRole).toString())
+            {
+                QStandardItem* item = this->model->itemFromIndex(index);
+                item->setData(num, ConversationListDelegate::UnReadRole);
+            }
+        }
+        moveConversationToTop(conversationID);
     });
 
     return cw;

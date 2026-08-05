@@ -16,14 +16,21 @@ public:
     QString getConversationID();
     const MessagesManager& getMessagesManager() const;
     Message getLastMessage() const;
+    int getUnReadCount() const;
     void addNewMessage(const Message& msg);
     void updateMessageInfo(bool isSuccess, QString tempMsgID, QString receiverUID, QString messageID, int64_t timeStamp, int64_t convSeq);
+    void updateSenderAvatar(const QString& senderUID, const QPixmap& avatar);
+    bool isActive() const;
+    void clearUnRead();
+    void addUnReadCount();
+    void setActive(bool isActive);
 
 signals:
     void LastMessageChange(const Message& msg);
     void PushNewMessage(const Message& msg);
-    void messageStatusChange(const QString &tempMsgID, Status status);
+    void messageStatusChange(const QString& tempMsgID, Status status);
     void UnReadCountChange(int num);
+    void senderAvatarUpdate(const QString& senderUID);
 
 private:
     void setSenderInfo(Message& msg);
@@ -31,7 +38,7 @@ private:
     QString conversationID;
     MessagesManager msgManager;
     int unRead = 0;
-
+    bool active = false;
 };
 
 #endif // CONVERSATIONITEM_H

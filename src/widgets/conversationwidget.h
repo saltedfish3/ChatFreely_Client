@@ -2,6 +2,7 @@
 #define CONVERSATIONWIDGET_H
 
 #include <QWidget>
+#include <QApplication>
 #include <QLabel>
 #include <QPushButton>
 #include <QListView>
@@ -27,8 +28,13 @@ public:
 
     void updateFriendUsername(const QString& username);
     void updateFriendStatus(bool isOnline);
+    void updateFriendAvatar(const QPixmap& avatar);
+    void setActive(bool isActive);
 
 signals:
+
+protected:
+    bool eventFilter(QObject* obj, QEvent* event) override;
 
 private:
     void initStyle();

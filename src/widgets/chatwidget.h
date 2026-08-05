@@ -34,6 +34,7 @@ public:
 signals:
 
 private slots:
+    void cleanAll();
 
 private:
     void initSearchWidget();
@@ -43,6 +44,7 @@ private:
     void initListStyle();
 
     void initStackedConversation();
+    void moveConversationToTop(const QString& conversationID);
 
     ConversationWidget* createConversation(ConversationItem* item);
 

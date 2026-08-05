@@ -57,9 +57,9 @@ void FriendDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
 
     QString text = index.data(UsernameRole).toString();
     QFontMetrics fm = painter->fontMetrics();
-    int textWidth = fm.horizontalAdvance(text) + 4;
     int textHeight = fm.height();
-    QRect username(avatar.topLeft() + QPoint(avatarSize.width() + 8, 3), QSize(textWidth, textHeight));
+    QRect username(avatar.topLeft() + QPoint(avatarSize.width() + 8, 3), QSize(contain.topRight().x() - avatar.topRight().x() - 15, textHeight));
+    QString showText = fm.elidedText(text, Qt::ElideRight, username.width());
 
     QFont font = option.font;
     font.setPointSize(9);
@@ -68,7 +68,7 @@ void FriendDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
     painter->setFont(font);
     painter->setPen(Qt::black);
     painter->setBrush(Qt::NoBrush);
-    painter->drawText(username, Qt::AlignVCenter, text);
+    painter->drawText(username, Qt::AlignVCenter, showText);
 
     QSize onlineSize(contain.height() * 0.13, contain.height() * 0.13);
     QRect onlineIcon(avatar.topLeft() + QPoint(10 + avatarSize.width(), (contain.height() - onlineSize.height())/2), onlineSize);

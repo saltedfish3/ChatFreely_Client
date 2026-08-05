@@ -8,6 +8,7 @@
 #include <QEvent>
 #include <QMouseEvent>
 #include <QPainterPath>
+#include <QDateTime>
 
 class ConversationListDelegate : public QStyledItemDelegate
 {
@@ -20,7 +21,10 @@ public:
         SIDRole,
         EmailRole,
         AvatarRole,
-        IsOnlineRole
+        IsOnlineRole,
+        LastMsgRole,
+        LastTimestampRole,
+        UnReadRole
     };
     explicit ConversationListDelegate(QObject *parent = nullptr);
 
@@ -31,6 +35,7 @@ protected:
 
 private:
     QPixmap setRadius(const QPixmap& pixmap, int hei_wid) const;
+    QString formatTimestamp(int64_t timestamp) const;
 
 signals:
     void itemClicked(const QModelIndex& index);

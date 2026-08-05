@@ -18,6 +18,7 @@ struct Message
 
     int64_t timeStamp = 0;
     int64_t convSeq = 0;
+    bool showTimestamp = false;
 
     QString senderUID;
     QString content;
