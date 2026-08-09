@@ -227,6 +227,16 @@ void LoginWidget::getLoginState(bool isSuccess, QString from, QString info, bool
     this->label_loading->hide();
     if(isSuccess)
     {
+        if(!DatabaseManager::getDatabaseManager().changeToCurrentUser())
+        {
+            showToast("本地存储初始化失败，请检查内存是否充足", false);
+            TcpLongConnection::getTcpClient().sendUnLogin();
+            this->setDisabled(false);
+            return;
+        }
+
+        // ConversationManager::getConversationManager().sendLoadAllConversationList();
+
         showToast(info + " 将在2秒后为您跳转...",isSuccess);
         this->timer_jump->start();
         return;

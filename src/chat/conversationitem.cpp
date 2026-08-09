@@ -1,13 +1,18 @@
 #include "conversationitem.h"
 
 ConversationItem::ConversationItem(const QString& conversationID, QObject *parent)
-    : conversationID(conversationID), QObject{parent}
+    : conversationID(conversationID), QObject{parent}, msgManager(conversationID, this)
 {
 }
 
-QString ConversationItem::getConversationID()
+QString ConversationItem::getConversationID() const
 {
     return this->conversationID;
+}
+
+MessagesManager &ConversationItem::getMessagesManager()
+{
+    return this->msgManager;
 }
 
 const MessagesManager &ConversationItem::getMessagesManager() const
@@ -25,49 +30,29 @@ int ConversationItem::getUnReadCount() const
     return this->unRead;
 }
 
-void ConversationItem::addNewMessage(const Message &msg)
+void ConversationItem::addNewMessage(Message msg)
 {
-    Message changeableMsg = msg;
-    setSenderInfo(changeableMsg);
-
     const auto& msgs = this->msgManager.getMessages();
     if(msgs.isEmpty())
-        changeableMsg.showTimestamp = true;
+        msg.showTimestamp = true;
     else
     {
         const Message& lastMsg = msgs.last();
         if(lastMsg.timeStamp <= 0)
-            changeableMsg.showTimestamp = false;
+            msg.showTimestamp = false;
         else
-            changeableMsg.showTimestamp = (changeableMsg.timeStamp - lastMsg.timeStamp) > 300;
+            msg.showTimestamp = (msg.timeStamp - lastMsg.timeStamp) > 300;
     }
 
-    this->msgManager.append(changeableMsg);
+    this->msgManager.addMessageBack(msg);
 
-    emit LastMessageChange(changeableMsg);
-    emit PushNewMessage(changeableMsg);
+    emit PushNewMessage(msg);
+    emit LastMessageChange(msg);
 }
 
-void ConversationItem::updateMessageInfo(bool isSuccess, QString tempMsgID, QString receiverUID, QString messageID, int64_t timeStamp, int64_t convSeq)
+void ConversationItem::updateMessageStatus(bool isSuccess, const QString& tempMsgID, const QString& messageID, int64_t timeStamp, int64_t convSeq)
 {
-    this->msgManager.updateStatus(tempMsgID, messageID, isSuccess ? Success : Failed, timeStamp, convSeq);
-    emit messageStatusChange(tempMsgID, isSuccess ? Success : Failed);
-}
-
-void ConversationItem::updateSenderAvatar(const QString &senderUID, const QPixmap &avatar)
-{
-    bool isChanged = false;
-    QList<Message>& msgs = this->msgManager.getMessages();
-    for(auto& msg : msgs)
-    {
-        if(msg.senderUID == senderUID)
-        {
-            msg.avatar = avatar;
-            isChanged = true;
-        }
-    }
-    if(isChanged)
-        emit senderAvatarUpdate(senderUID);
+    this->msgManager.updateMessageStatus(tempMsgID, messageID, isSuccess ? Success : Failed, timeStamp, convSeq);
 }
 
 bool ConversationItem::isActive() const
@@ -80,7 +65,9 @@ void ConversationItem::clearUnRead()
     if(this->unRead != 0)
     {
         this->unRead = 0;
+
         emit UnReadCountChange(0);
+        DatabaseManager::getDatabaseManager().addUpdateUnreadTask(this->conversationID, this->unRead);
     }
 }
 
@@ -88,32 +75,22 @@ void ConversationItem::addUnReadCount()
 {
     this->unRead++;
     emit UnReadCountChange(this->unRead);
+    DatabaseManager::getDatabaseManager().addUpdateUnreadTask(this->conversationID, this->unRead);
+}
+
+void ConversationItem::setUnReadCount(int count)
+{
+    if(count < 0)
+        count = 0;
+
+    if(this->unRead == count)
+        return;
+
+    this->unRead = count;
+    emit UnReadCountChange(this->unRead);
 }
 
 void ConversationItem::setActive(bool isActive)
 {
     this->active = isActive;
-}
-
-void ConversationItem::setSenderInfo(Message &msg)
-{
-    if(UserInfo::getUserInfo().getUID() == msg.senderUID)
-    {
-        msg.username = UserInfo::getUserInfo().getUsername();
-        msg.avatar = UserInfo::getUserInfo().getAvatar();
-    }
-    else
-    {
-        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(msg.senderUID);
-        if(info.uid.isEmpty())
-        {
-            msg.username = "群聊成员";
-            msg.avatar = QPixmap(":/default/images/defaultAvatar.png");
-        }
-        else
-        {
-            msg.username = info.username;
-            msg.avatar = info.avatar;
-        }
-    }
 }

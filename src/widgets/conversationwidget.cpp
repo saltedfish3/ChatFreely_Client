@@ -90,20 +90,13 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
             this->timer_loading->stop();
     });
 
-    connect(item, &ConversationItem::messageStatusChange, this, [this](){
-        if(this->loadingCount > 0)
-        {
-            this->loadingCount--;
-        }
-    });
-
     //初始化 消息显示 部分
     this->listView_messages = new QListView(this);
     this->listView_messages->setObjectName("listView_messages");
     this->listView_messages->resize(this->width(),(this->height() - this->widget_header->height()) * 0.75);
     this->listView_messages->move(0, this->widget_header->height());
 
-    this->model = new MessageModel(item, this);
+    this->model = new MessageModel(&(item->getMessagesManager()), this);
     this->listView_messages->setModel(this->model);
 
     this->delegate = new ConversationDelegate(&this->loadingAngle, this);
@@ -216,22 +209,62 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         this->listView_messages->doItemsLayout();
         QScrollBar* scrollBar = this->listView_messages->verticalScrollBar();
         int height = this->listView_messages->viewport()->height();
-        if(scrollBar->maximum() - scrollBar->value() < (height / 2))
+        if(this->isVisible() && scrollBar->maximum() - scrollBar->value() < (height / 2))
         {
             this->listView_messages->scrollToBottom();
-            if(this->item->isActive())
-                this->item->clearUnRead();
-            else
-                this->item->addUnReadCount();
-        }
-        else
-        {
-            this->item->addUnReadCount();
+            setActive(true);
         }
     });
 
-    connect(this->item, &ConversationItem::messageStatusChange, this, [this](const QString&, Status){
+    connect(this->item, &ConversationItem::messageStatusChange, this, [this](){
         this->listView_messages->doItemsLayout();
+        if(this->loadingCount > 0)
+        {
+            this->loadingCount--;
+        }
+    });
+
+    connect(this->delegate, &ConversationDelegate::ReSendClicked, this, [this](const QString& tempMsgID){
+        int index = this->item->getMessagesManager().indexOfMsg(tempMsgID);
+        if(index < 0)
+            return;
+
+        Message oldMsg = this->item->getMessagesManager().getMessages().at(index);
+        QString content = oldMsg.content;
+        QString senderUID = oldMsg.senderUID;
+
+        this->item->getMessagesManager().removeOfIndex(index);
+
+        Message newMsg;
+        newMsg.tempMsgID = QUuid::createUuid().toString();
+        newMsg.content = content;
+        newMsg.timeStamp = QDateTime::currentSecsSinceEpoch();
+        newMsg.senderUID = senderUID;
+        newMsg.status = Sending;
+        newMsg.convSeq = this->item->getMessagesManager().getLastMessage().convSeq + 1;
+        this->item->addNewMessage(newMsg);
+
+        this->loadingCount++;
+        QTimer::singleShot(0, this, [this](){
+            if(this->loadingCount > 0 && !this->timer_loading->isActive())
+                this->timer_loading->start(30);
+        });
+
+        TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), content, newMsg.tempMsgID);
+        this->listView_messages->scrollToBottom();
+    });
+
+    connect(this->listView_messages->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](int value){
+        if(value <= (this->listView_messages->verticalScrollBar()->minimum() + this->listView_messages->height()*0.2))
+        {
+            const auto& msgs = this->item->getMessagesManager().getMessages();
+            if(!msgs.isEmpty())
+            {
+                qint64 oldConvSeq = msgs.first().convSeq;
+                // if(oldConvSeq > 1)
+                    /*his->item->loadHistoryMessages();*/
+            }
+        }
     });
 
     installEventFilter(this);
@@ -267,11 +300,6 @@ void ConversationWidget::updateFriendStatus(bool isOnline)
     this->update();
 }
 
-void ConversationWidget::updateFriendAvatar(const QPixmap &avatar)
-{
-    this->item->updateSenderAvatar(item->getConversationID(), avatar);
-}
-
 void ConversationWidget::setActive(bool isActive)
 {
     this->item->setActive(isActive);
@@ -286,6 +314,18 @@ bool ConversationWidget::eventFilter(QObject *obj, QEvent *event)
         this->item->clearUnRead();
     }
     return QWidget::eventFilter(obj, event);
+}
+
+void ConversationWidget::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    setActive(true);
+}
+
+void ConversationWidget::hideEvent(QHideEvent *event)
+{
+    QWidget::hideEvent(event);
+    setActive(false);
 }
 
 void ConversationWidget::initStyle()

@@ -23,9 +23,6 @@ struct Message
     QString senderUID;
     QString content;
     Status status = Success;
-
-    QString username;
-    QPixmap avatar;
 };
 
 #endif // MESSAGE_H

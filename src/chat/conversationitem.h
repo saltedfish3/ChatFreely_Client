@@ -4,37 +4,38 @@
 #include <QObject>
 #include "message.h"
 #include "messagesmanager.h"
-#include "../network/tcplongconnection.h"
-#include "../utils/userinfo.h"
-#include "../utils/friendmanage.h"
+#include "../database/databasemanager.h"
 
 class ConversationItem : public QObject
 {
     Q_OBJECT
 public:
     explicit ConversationItem(const QString& conversationID, QObject *parent = nullptr);
-    QString getConversationID();
+
     const MessagesManager& getMessagesManager() const;
+    MessagesManager& getMessagesManager();
     Message getLastMessage() const;
+    QString getConversationID() const;
     int getUnReadCount() const;
-    void addNewMessage(const Message& msg);
-    void updateMessageInfo(bool isSuccess, QString tempMsgID, QString receiverUID, QString messageID, int64_t timeStamp, int64_t convSeq);
-    void updateSenderAvatar(const QString& senderUID, const QPixmap& avatar);
+
+    void addNewMessage(Message msg);
+
+    void updateMessageStatus(bool isSuccess, const QString& tempMsgID, const QString& messageID, int64_t timeStamp, int64_t convSeq);
+
     bool isActive() const;
     void clearUnRead();
     void addUnReadCount();
+    void setUnReadCount(int count);
     void setActive(bool isActive);
 
 signals:
-    void LastMessageChange(const Message& msg);
     void PushNewMessage(const Message& msg);
-    void messageStatusChange(const QString& tempMsgID, Status status);
+    void LastMessageChange(const Message& msg);
     void UnReadCountChange(int num);
-    void senderAvatarUpdate(const QString& senderUID);
+    //用于会话窗口减少loadingcount
+    void messageStatusChange();
 
 private:
-    void setSenderInfo(Message& msg);
-
     QString conversationID;
     MessagesManager msgManager;
     int unRead = 0;

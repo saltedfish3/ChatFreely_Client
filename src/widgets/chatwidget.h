@@ -46,7 +46,8 @@ private:
     void initStackedConversation();
     void moveConversationToTop(const QString& conversationID);
 
-    ConversationWidget* createConversation(ConversationItem* item);
+    ConversationWidget* createConversation(const QString& conversationID);
+    void createConversationListItem(ConversationItem* item, const DatabaseManager::ConversationInfo& info = {});
 
     //--------------------------------
     QAction* searchIcon;

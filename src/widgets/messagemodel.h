@@ -3,7 +3,9 @@
 
 #include <QObject>
 #include <QAbstractListModel>
-#include "../chat/conversationitem.h"
+#include "../chat/messagesmanager.h"
+#include "../utils/userinfo.h"
+#include "../utils/friendmanage.h"
 
 class MessageModel : public QAbstractListModel
 {
@@ -21,21 +23,24 @@ public:
         MessageStatusRole
     };
 
-    explicit MessageModel(ConversationItem* item, QObject *parent = nullptr);
+    explicit MessageModel(MessagesManager* manager, QObject *parent = nullptr);
 
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role) const override;
 
 public slots:
-    void onNewMessage(const Message& msg);
-    void onMessageStatusChanged(const QString& tempMsgID, Status status);
-    void onSenderAvatarUpdate(const QString& senderUID);
-    void loadHistoryMessages(const QList<Message>& msgs);
+    void onMessageAdd(int row);
+    void onMessageUpdate(int row);
+    void onMessagesUpdate(int first, int end);
+    void onMessagePrepend(int count);
+    void onMessageRemove(int row);
+    void onMessageFriendAvatarUpdate(const QString& uid, const QPixmap& avatar);
+    void onMessageMyselfAvatarUpdate(const QPixmap& avatar);
 
 signals:
 
 private:
-    ConversationItem* item;
+    MessagesManager* manager;
 
 };
 

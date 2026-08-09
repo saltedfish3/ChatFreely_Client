@@ -554,7 +554,6 @@ void TcpLongConnection::sendMessageTo(QString uid, QString message, QString temp
     }
     if(this->socket->state() != QAbstractSocket::ConnectedState)
     {
-        emit mainState(false, "无法连接服务器，请稍后再试");
         emit sendMessageStatus(false, tempMsgID, uid);
         return;
     }
@@ -921,7 +920,6 @@ void TcpLongConnection::handleUnLoginResp(QJsonObject obj)
                 {
                     UserInfo::getUserInfo().setLogin(false);
                     emit exitAccount();
-                    UserInfo::getUserInfo().cleanALL();
                     this->isTryToUnLoginRefresh = false;
                 }
                 this->map_idempotentCache.remove(requestsID);
@@ -939,7 +937,6 @@ void TcpLongConnection::handleUnLoginResp(QJsonObject obj)
     UserInfo::getUserInfo().setLogin(false);
     emit exitAccount();
     this->isTryToUnLoginRefresh = false;
-    UserInfo::getUserInfo().cleanALL();
 }
 
 void TcpLongConnection::handleRefreshTokenResp(QJsonObject obj)

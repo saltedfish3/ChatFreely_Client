@@ -31,6 +31,7 @@ public:
     void setRefreshToken(const QString& refreshToken);
 
     QString getUID();
+    QString getSID();
     QString getUsername();
     QPixmap getAvatar();
     QString getAccessToken();

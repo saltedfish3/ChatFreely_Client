@@ -19,19 +19,18 @@ void ChatWidget::openConversation(const QString &uid)
     if(info.uid.isEmpty())
         return;
 
-    ConversationItem *item = ConversationManager::getConversationManager().getConversationItem(uid);
-    if(!item)
-        return;
-
     if(!this->map_conversation.contains(uid))
-    {
-        createConversation(item);
-    }
+        createConversation(uid);
 
     auto it = map_conversation.find(uid);
     if(it != map_conversation.end())
     {
         ConversationWidget* widget = qobject_cast<ConversationWidget*>(this->stackedWidget_Conversation->currentWidget());
+        // ConversationItem* item = ConversationManager::getConversationManager().getConversationItem(uid);
+
+        // if(item && item->getMessagesManager().getMessages().isEmpty())
+        //     item->loadHistoryMessages();
+
         if(widget)
             widget->setActive(false);
         this->stackedWidget_Conversation->setCurrentWidget(it.value());
@@ -44,6 +43,7 @@ void ChatWidget::openConversation(const QString &uid)
             {
                 this->listView_conversationList->setCurrentIndex(index);
                 this->listView_conversationList->selectionModel()->select(index, QItemSelectionModel::ClearAndSelect);
+                break;
             }
         }
         return;
@@ -134,10 +134,6 @@ void ChatWidget::initListWidget()
     });
 
     connect(&FriendManage::getFriendManage(), &FriendManage::friendAvatarUpdate, this, [this](const QString& uid, const QPixmap& avatar){
-        auto it = this->map_conversation.find(uid);
-        if(it != this->map_conversation.end())
-            it.value()->updateFriendAvatar(avatar);
-
         for(int i = 0; i < this->model->rowCount(); i++)
         {
             QModelIndex index = this->model->index(i, 0);
@@ -182,11 +178,44 @@ void ChatWidget::initListWidget()
     });
 
     connect(&ConversationManager::getConversationManager(), &ConversationManager::conversationCreated, this, [this](ConversationItem* item){
-        createConversation(item);
+        createConversationListItem(item);
+    });
+
+    connect(&FriendManage::getFriendManage(), &FriendManage::loadFirstAllFriendList, this, [this](){
+        DatabaseManager::getDatabaseManager().loadAllConversationsList([this](const QList<DatabaseManager::ConversationInfo>& list){
+            for(const auto& info : list)
+            {
+                ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(info.conversationID);
+                if(!item)
+                    continue;
+                createConversationListItem(item, info);
+            }
+            this->model->setSortRole(ConversationListDelegate::LastTimestampRole);
+            this->model->sort(0, Qt::DescendingOrder);
+        });
+    });
+
+    connect(&FriendManage::getFriendManage(), &FriendManage::allFriendList, this, [this](){
+        for(int i = 0; i < this->model->rowCount(); i++)
+        {
+            QModelIndex index = this->model->index(i, 0);
+            QString uid = index.data(ConversationListDelegate::UIDRole).toString();
+            FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
+            if(!info.uid.isEmpty())
+            {
+                QStandardItem* item = this->model->itemFromIndex(index);
+                item->setData(info.username, ConversationListDelegate::UsernameRole);
+                item->setData(info.avatar, ConversationListDelegate::AvatarRole);
+                item->setData(info.isOnline, ConversationListDelegate::IsOnlineRole);
+            }
+        }
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &ChatWidget::cleanAll);
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, &ChatWidget::cleanAll);
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::refreshExpiredExit, this, &ChatWidget::cleanAll);
+
+
 }
 
 void ChatWidget::initListStyle()
@@ -243,8 +272,9 @@ void ChatWidget::moveConversationToTop(const QString &conversationID)
     }
 }
 
-ConversationWidget* ChatWidget::createConversation(ConversationItem* item)
+ConversationWidget* ChatWidget::createConversation(const QString& conversationID)
 {
+    ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(conversationID);
     if(this->map_conversation.contains(item->getConversationID()))
         return this->map_conversation[item->getConversationID()];
 
@@ -258,26 +288,57 @@ ConversationWidget* ChatWidget::createConversation(ConversationItem* item)
     this->stackedWidget_Conversation->addWidget(cw);
     this->map_conversation[item->getConversationID()] = cw;
 
-    FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(item->getConversationID());
+    return cw;
+}
+
+void ChatWidget::createConversationListItem(ConversationItem *item, const DatabaseManager::ConversationInfo& info)
+{
+    const QString conversationID = item->getConversationID();
+    for(int i = 0; i < this->model->rowCount(); i++)
+    {
+        if(this->model->item(i)->data(ConversationListDelegate::UIDRole).toString() == conversationID)
+        {
+            if(!info.conversationID.isEmpty())
+            {
+                QStandardItem* temp_item = this->model->item(i);
+                temp_item->setData(info.lastMsg, ConversationListDelegate::LastMsgRole);
+                temp_item->setData(info.lastTimestamp, ConversationListDelegate::LastTimestampRole);
+                temp_item->setData(info.unReadCount, ConversationListDelegate::UnReadRole);
+            }
+            return;
+        }
+    }
+
+    FriendManage::FriendInfo friend_info = FriendManage::getFriendManage().getFriendInfo(conversationID);
 
     QStandardItem* item_standard = new QStandardItem();
-    if(info.uid.isEmpty())
+    if(friend_info.uid.isEmpty())
     {
         item_standard->setData(item->getConversationID(), ConversationListDelegate::UIDRole);
-        item_standard->setData("群聊", ConversationListDelegate::UsernameRole);
+        item_standard->setData("加载中...", ConversationListDelegate::UsernameRole);
         item_standard->setData(QPixmap(":/default/images/defaultAvatar.png"), ConversationListDelegate::AvatarRole);
         item_standard->setData(true, ConversationListDelegate::IsOnlineRole);
     }
     else
     {
-        item_standard->setData(info.uid, ConversationListDelegate::UIDRole);
-        item_standard->setData(info.username, ConversationListDelegate::UsernameRole);
-        item_standard->setData(info.avatar, ConversationListDelegate::AvatarRole);
-        item_standard->setData(info.isOnline, ConversationListDelegate::IsOnlineRole);
+        item_standard->setData(friend_info.uid, ConversationListDelegate::UIDRole);
+        item_standard->setData(friend_info.username, ConversationListDelegate::UsernameRole);
+        item_standard->setData(friend_info.avatar, ConversationListDelegate::AvatarRole);
+        item_standard->setData(friend_info.isOnline, ConversationListDelegate::IsOnlineRole);
     }
-    item_standard->setData(item->getLastMessage().content, ConversationListDelegate::LastMsgRole);
-    item_standard->setData(item->getLastMessage().timeStamp, ConversationListDelegate::LastTimestampRole);
-    item_standard->setData(item->getUnReadCount(), ConversationListDelegate::UnReadRole);
+
+    if(!info.conversationID.isEmpty())
+    {
+        item_standard->setData(info.lastMsg, ConversationListDelegate::LastMsgRole);
+        item_standard->setData(info.lastTimestamp, ConversationListDelegate::LastTimestampRole);
+        item_standard->setData(info.unReadCount, ConversationListDelegate::UnReadRole);
+    }
+    else
+    {
+        item_standard->setData(item->getLastMessage().content, ConversationListDelegate::LastMsgRole);
+        item_standard->setData(item->getLastMessage().timeStamp, ConversationListDelegate::LastTimestampRole);
+        item_standard->setData(item->getUnReadCount(), ConversationListDelegate::UnReadRole);
+    }
     this->model->appendRow(item_standard);
 
     connect(item, &ConversationItem::LastMessageChange, this, [this, item](const Message& msg){
@@ -309,5 +370,4 @@ ConversationWidget* ChatWidget::createConversation(ConversationItem* item)
         moveConversationToTop(conversationID);
     });
 
-    return cw;
 }

@@ -28,13 +28,14 @@ public:
 
     void updateFriendUsername(const QString& username);
     void updateFriendStatus(bool isOnline);
-    void updateFriendAvatar(const QPixmap& avatar);
     void setActive(bool isActive);
 
 signals:
 
 protected:
     bool eventFilter(QObject* obj, QEvent* event) override;
+    void showEvent(QShowEvent* event) override;
+    void hideEvent(QHideEvent* event) override;
 
 private:
     void initStyle();

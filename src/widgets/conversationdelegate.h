@@ -38,6 +38,9 @@ public:
         Failed
     };
 
+signals:
+    void ReSendClicked(const QString& tempMsgID);
+
 protected:
     void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
     QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
@@ -46,7 +49,10 @@ protected:
 private:
     QString formatTimestamp(int64_t timestamp) const;
     QPixmap setRadius(const QPixmap& pixmap, int hei_wid) const;
+    void getLayout(const QStyleOptionViewItem &option, const QModelIndex& index, QRect& timestamp, QRect& contain, QRect& avatarRect, QRect& textRegionRect, QRect& statusRect, int& textTotalHeight) const;
     int* loadingAngle = nullptr;
+
+
 
 signals:
 };

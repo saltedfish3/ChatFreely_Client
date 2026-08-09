@@ -32,6 +32,7 @@ void FriendManage::cleanAll()
 {
     QWriteLocker locker(&(this->lock));
     this->map_friend.clear();
+    this->isFirstLoad = false;
 }
 
 FriendManage::FriendManage(QObject *parent)
@@ -156,6 +157,11 @@ FriendManage::FriendManage(QObject *parent)
             }
         }
         emit allFriendList();
+        if(!this->isFirstLoad)
+        {
+            this->isFirstLoad = true;
+            emit loadFirstAllFriendList();
+        }
 
         for(auto it = avatarTasks.begin(); it != avatarTasks.end(); it++)
         {
@@ -178,4 +184,5 @@ FriendManage::FriendManage(QObject *parent)
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &FriendManage::cleanAll);
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, &FriendManage::cleanAll);
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::refreshExpiredExit, this, &FriendManage::cleanAll);
 }

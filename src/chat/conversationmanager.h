@@ -4,15 +4,19 @@
 #include <QObject>
 #include "conversationitem.h"
 #include "../network/tcplongconnection.h"
+#include "../network/httpshortconnection.h"
 #include "../utils/userinfo.h"
-#include "../utils/friendmanage.h"
+#include "../database/databasemanager.h"
 
 class ConversationManager : public QObject
 {
     Q_OBJECT
 public:
     static ConversationManager& getConversationManager();
-    ConversationItem* getConversationItem(const QString& conversationID);
+    ConversationItem* getOrCreateConversationItem(const QString& conversationID);
+
+    ConversationManager(const ConversationManager&) = delete;
+    ConversationManager& operator=(const ConversationManager&) = delete;
 
 signals:
     void conversationCreated(ConversationItem* item);

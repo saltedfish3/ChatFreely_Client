@@ -39,6 +39,8 @@ public:
 signals:
     //用于更新全部好友列表
     void allFriendList();
+    //用于登录后首次好友列表完成更新后
+    void loadFirstAllFriendList();
 
     //用于专门的更新
     void friendAvatarUpdate(const QString& uid, const QPixmap& avatar);
@@ -52,6 +54,8 @@ private:
     explicit FriendManage(QObject *parent = nullptr);
     QMap<QString, FriendInfo> map_friend;
     mutable QReadWriteLock lock;
+
+    bool isFirstLoad = false;
 };
 
 #endif // FRIENDMANAGE_H

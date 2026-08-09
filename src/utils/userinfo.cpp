@@ -105,6 +105,11 @@ QString UserInfo::getUID()
     return this->uid;
 }
 
+QString UserInfo::getSID()
+{
+    return this->sid;
+}
+
 void UserInfo::setAvatar(const QPixmap &avatar)
 {
     std::lock_guard<std::mutex> lock(this->mutex);
@@ -168,4 +173,15 @@ UserInfo::UserInfo(QObject *parent)
         emit updateAvatar(this->avatar);
     });
     this->is_login = false;
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, [this](){
+        cleanALL();
+    });
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, [this](){
+        cleanALL();
+    });
+
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::refreshExpiredExit, this, [this](){
+        cleanALL();
+    });
 }

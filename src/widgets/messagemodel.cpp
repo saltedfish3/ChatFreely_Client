@@ -1,16 +1,19 @@
 #include "messagemodel.h"
 
-MessageModel::MessageModel(ConversationItem* item, QObject *parent)
-    : QAbstractListModel(parent), item(item)
+MessageModel::MessageModel(MessagesManager* manager, QObject *parent)
+    : QAbstractListModel(parent), manager(manager)
 {
-    connect(item, &ConversationItem::PushNewMessage, this, &MessageModel::onNewMessage);
-    connect(item, &ConversationItem::messageStatusChange, this, &MessageModel::onMessageStatusChanged);
-    connect(item, &ConversationItem::senderAvatarUpdate, this, &MessageModel::onSenderAvatarUpdate);
+    connect(manager, &MessagesManager::messageAdd, this, &MessageModel::onMessageAdd);
+    connect(manager, &MessagesManager::messageUpdate, this, &MessageModel::onMessageUpdate);
+    connect(manager, &MessagesManager::messagePrepend, this, &MessageModel::onMessagePrepend);
+    connect(manager, &MessagesManager::messageRemove, this, &MessageModel::onMessageRemove);
+    connect(&FriendManage::getFriendManage(), &FriendManage::friendAvatarUpdate, this, &MessageModel::onMessageFriendAvatarUpdate);
+    connect(&UserInfo::getUserInfo(), &UserInfo::updateAvatar, this, &MessageModel::onMessageMyselfAvatarUpdate);
 }
 
 int MessageModel::rowCount(const QModelIndex &parent) const
 {
-    return parent.isValid() ? 0 : this->item->getMessagesManager().getMessages().count();
+    return parent.isValid() ? 0 : this->manager->getMessages().size();
 }
 
 QVariant MessageModel::data(const QModelIndex &index, int role) const
@@ -18,7 +21,7 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
     if(!index.isValid() || index.row() >= rowCount())
         return {};
     //获取指定行
-    const Message& msg = this->item->getMessagesManager().getMessages().at(index.row());
+    const Message& msg = this->manager->getMessages().at(index.row());
     switch(role)
     {
     case Qt::DisplayRole:
@@ -30,7 +33,7 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
     case IsMyselfRole:
         return msg.senderUID == UserInfo::getUserInfo().getUID();
     case AvatarRole:
-        return msg.avatar;
+        return msg.senderUID == UserInfo::getUserInfo().getUID() ? UserInfo::getUserInfo().getAvatar() : FriendManage::getFriendManage().getFriendInfo(msg.senderUID).avatar;
     case MessageStatusRole:
         return msg.status;
     case IsNeedShowTime:
@@ -45,37 +48,65 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
     return {};
 }
 
-void MessageModel::onNewMessage(const Message &msg)
+void MessageModel::onMessageAdd(int row)
 {
-    int pos = rowCount();
-    beginInsertRows(QModelIndex(), pos, pos);
+    if(row < 0 || row > rowCount())
+        return;
+    beginInsertRows(QModelIndex(), row, row);
     endInsertRows();
 }
 
-void MessageModel::onMessageStatusChanged(const QString &tempMsgID, Status status)
+void MessageModel::onMessageUpdate(int row)
 {
-    int row = this->item->getMessagesManager().indexOfMsg(tempMsgID);
-    if(row >= 0)
-    {
-        QModelIndex idx = index(row);
-        emit dataChanged(idx, idx, {MessageStatusRole, IsNeedShowTime, TimeStamp});
-    }
+    if(row < 0 || row >= rowCount())
+        return;
+    QModelIndex idx = index(row);
+
+    emit dataChanged(idx, idx, {MessageStatusRole, TimeStamp, ConvSeqRole, IsNeedShowTime, MessageIDRole, AvatarRole});
 }
 
-void MessageModel::onSenderAvatarUpdate(const QString &senderUID)
+void MessageModel::onMessagesUpdate(int first, int end)
 {
-    auto& msgs = this->item->getMessagesManager().getMessages();
-    for(int i = 0; i < msgs.size(); i++)
+    if(first < 0 || end < first || end >= rowCount())
+        return;
+
+    emit dataChanged(index(first), index(end), {AvatarRole});
+}
+
+void MessageModel::onMessagePrepend(int count)
+{
+    if(count <= 0)
+        return;
+
+    beginInsertRows(QModelIndex(), 0, count - 1);
+    endInsertRows();
+}
+
+void MessageModel::onMessageRemove(int row)
+{
+    if(row < 0 || row >= rowCount())
+        return;
+
+    beginRemoveRows(QModelIndex(), row, row);
+    endRemoveRows();
+}
+
+void MessageModel::onMessageMyselfAvatarUpdate(const QPixmap &avatar)
+{
+    for(int i = 0; i < this->manager->getMessages().size(); i++)
     {
-        if(msgs.at(i).senderUID == senderUID)
+        const Message& msg = this->manager->getMessages().at(i);
+        if(msg.senderUID == UserInfo::getUserInfo().getUID())
             emit dataChanged(index(i), index(i), {AvatarRole});
     }
 }
 
-void MessageModel::loadHistoryMessages(const QList<Message> &msgs)
+void MessageModel::onMessageFriendAvatarUpdate(const QString &uid, const QPixmap &avatar)
 {
-    if(msgs.isEmpty())
-        return;
-    beginInsertRows(QModelIndex(), 0, msgs.size() - 1);
-    endInsertRows();
+    for(int i = 0; i < this->manager->getMessages().size(); i++)
+    {
+        const Message& msg = this->manager->getMessages().at(i);
+        if(msg.senderUID == uid)
+            emit dataChanged(index(i), index(i), {AvatarRole});
+    }
 }

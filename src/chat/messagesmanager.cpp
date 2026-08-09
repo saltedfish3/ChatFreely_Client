@@ -1,29 +1,55 @@
 #include "messagesmanager.h"
 
-MessagesManager::MessagesManager() {}
-
-void MessagesManager::append(const Message &msg)
+MessagesManager::MessagesManager(const QString& conversationID, QObject* parent)
+    : QObject(parent), conversationID(conversationID)
 {
-    addIndex(msg, this->messages.size());
-    this->messages.append(msg);
 }
 
-bool MessagesManager::updateStatus(const QString &tempMsgID, const QString &newServerMsgID, Status status, int64_t newTimeStamp, int64_t newConvSeq)
+void MessagesManager::addMessageBack(const Message &msg)
+{
+    int row = this->messages.size();
+
+    this->messages.append(msg);
+    addIndex(msg, row);
+
+    emit messageAdd(row);
+    DatabaseManager::getDatabaseManager().addInsertMessageTask(this->conversationID, msg);
+}
+
+void MessagesManager::addMessageFront(const QList<Message>& msgs)
+{
+    if(msgs.isEmpty())
+        return;
+
+    this->messages = msgs + this->messages;
+
+    rebuildIndex();
+    emit messagePrepend(msgs.size());
+}
+
+bool MessagesManager::updateMessageStatus(const QString &tempMsgID, const QString &newServerMsgID, Status status, int64_t newTimeStamp, int64_t newConvSeq)
 {
     auto it = this->index_message.find(tempMsgID);
-    if(it == this->index_message.end() || newServerMsgID.isEmpty() || newTimeStamp <= 0 || newConvSeq <= 0)
+    if(it == this->index_message.end())
         return false;
 
     int row = it.value();
     Message& msg = this->messages[row];
     msg.status = status;
-    msg.serverMsgID = newServerMsgID;
-    msg.timeStamp = newTimeStamp;
-    msg.convSeq = newConvSeq;
 
-    this->index_message.remove(tempMsgID);
-    addIndex(msg, row);
+    if(!newServerMsgID.isEmpty())
+    {
+        this->index_message.remove(tempMsgID);
+        msg.serverMsgID = newServerMsgID;
+        addIndex(msg, row);
+    }
+    if(newTimeStamp > 0)
+        msg.timeStamp = newTimeStamp;
+    if(newConvSeq > 0)
+        msg.convSeq = newConvSeq;
 
+    emit messageUpdate(row);
+    DatabaseManager::getDatabaseManager().addUpdateMessageTask(this->conversationID, msg);
     return true;
 }
 
@@ -37,15 +63,23 @@ const QList<Message> &MessagesManager::getMessages() const
     return this->messages;
 }
 
-QList<Message> &MessagesManager::getMessages()
-{
-    return this->messages;
-}
-
 int MessagesManager::indexOfMsg(const QString &msgID) const
 {
     auto it = this->index_message.find(msgID);
-    return  (it != this->index_message.end()) ? it.value() : -1;
+    return (it != this->index_message.end()) ? it.value() : -1;
+}
+
+void MessagesManager::removeOfIndex(int index)
+{
+    if(index < 0 || index >= this->messages.size())
+        return;
+    const Message& msg = this->messages.at(index);
+    const QString& key = msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID;
+    this->index_message.remove(key);
+    this->messages.removeAt(index);
+
+    rebuildIndex();
+    emit messageRemove(index);
 }
 
 void MessagesManager::addIndex(const Message &msg, int index)

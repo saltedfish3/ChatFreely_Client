@@ -14,6 +14,8 @@
 #include "loadinglabel.h"
 #include "../utils/GlobalVariable.h"
 #include "toastmanager.h"
+#include "../database/databasemanager.h"
+#include "../chat/conversationmanager.h"
 
 class LoginWidget : public QWidget
 {

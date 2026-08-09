@@ -12,13 +12,21 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
     painter->setRenderHint(QPainter::Antialiasing, true);
     painter->setRenderHint(QPainter::SmoothPixmapTransform, true);
 
-    QRect total = option.rect;
+    QRect TimeStamp;
+    QRect contain;
+    QSize avatarSize(40, 40);
+    QRect avatarRect;
+    QRect textRegionRect;
+    QSize statusSize(15, 15);
+    QRect statusRect;
+    int textTotalHeight = 0;
+
+    getLayout(option, index, TimeStamp, contain, avatarRect, textRegionRect, statusRect, textTotalHeight);
+
     QVariant vi1 = index.data(IsNeedShowTime);
     bool isTimeStamp = vi1.isValid() ? vi1.toBool() : false;
-    QRect TimeStamp;
     if(isTimeStamp)
     {
-        TimeStamp = QRect(total.topLeft(), QSize(total.width(), 40));
         painter->setPen(Qt::gray);
         QFont font = option.font;
         font.setPointSize(8);
@@ -27,21 +35,6 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
         painter->drawText(TimeStamp, Qt::AlignCenter, timeStr);
     }
 
-    int topOffset = isTimeStamp ? 40 : 0;
-    QRect contain = option.rect.adjusted(0, topOffset, 0, 0);
-
-
-    bool isSelf = index.data(IsMyselfRole).toBool();
-    QSize avatarSize(40, 40);
-    QRect avatarRect;
-    if(isSelf)
-    {
-        avatarRect = QRect(contain.topRight() + QPoint(-10 - avatarSize.width(), 8), avatarSize);
-    }
-    else
-    {
-        avatarRect = QRect(contain.topLeft() + QPoint(10, 8), avatarSize);
-    }
     QPixmap avatar = index.data(AvatarRole).value<QPixmap>();
     if(avatar.isNull())
         avatar = QPixmap(":/default/images/defaultAvatar.png");
@@ -50,50 +43,7 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
     painter->setBrush(Qt::NoBrush);
     painter->drawPixmap(avatarRect, avatar);
 
-
-    QFont font = option.font;
-    font.setPointSizeF(10.2);
-    painter->setFont(font);
-
-    QString text = index.data(ContentRole).toString();
-
-    QTextOption textOption;
-    textOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
-    int textMaxWidth = (contain.width() - 20 - avatarSize.width()) * 0.7 - 30;
-    if(textMaxWidth < 20)
-        textMaxWidth = 20;
-
-    QTextLayout layout(text, font);
-    layout.setTextOption(textOption);
-    layout.beginLayout();
-    qreal textHeight = 0;
-    qreal textWidth = 0;
-    while(true)
-    {
-        QTextLine line = layout.createLine();
-        if(!line.isValid())
-            break;
-        line.setLineWidth(textMaxWidth);
-        line.setPosition(QPointF(0, textHeight));
-        textHeight += line.height();
-        textWidth = qMax(textWidth, line.naturalTextWidth());
-    }
-    layout.endLayout();
-    int textTotalHeight = qCeil(textHeight);
-
-    int bubbleWidth = qCeil(textWidth) + 30;
-    int bubbleHeight = textTotalHeight + 20;
-    bubbleHeight = qMax(bubbleHeight, 40);
-
-    QRect textRegionRect;
-    if(isSelf)
-    {
-        textRegionRect = QRect(avatarRect.topLeft() - QPoint(10 + bubbleWidth, 0), QSize(bubbleWidth, bubbleHeight));
-    }
-    else
-    {
-        textRegionRect = QRect(avatarRect.topRight() + QPoint(10, 0), QSize(bubbleWidth, bubbleHeight));
-    }
+    bool isSelf = index.data(IsMyselfRole).toBool();
 
     QPainterPath path;
     path.addRoundedRect(textRegionRect, 8, 8);
@@ -113,6 +63,16 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
     painter->setBrush(borderColor);
     painter->setPen(Qt::NoPen);
     painter->drawPath(path);
+
+    QFont font = option.font;
+    font.setPointSizeF(10.2);
+    painter->setFont(font);
+    QString text = index.data(ContentRole).toString();
+
+    QTextOption textOption;
+    textOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    QTextLayout layout(text, font);
+    layout.setTextOption(textOption);
 
     QRect textRect = textRegionRect.adjusted(15, 10, -15, -10);
     qreal drawY = textRect.top() + (textRect.height() - textTotalHeight) / 2.0;
@@ -137,8 +97,6 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
     if(isSelf)
     {
         painter->save();
-        QSize statusSize(15, 15);
-        QRect statusRect = QRect(textRegionRect.bottomLeft() - QPoint(10 + statusSize.width(), 10 + statusSize.height()), statusSize);
         if(index.data(MessageStatusRole).toInt() == Sending)
         {
             QPen pen(QColor(100, 100, 100), 1.5, Qt::SolidLine, Qt::RoundCap);
@@ -155,6 +113,12 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
             painter->setBrush(Qt::red);
             painter->setPen(Qt::NoPen);
             painter->drawRoundedRect(statusRect, statusSize.width()/2, statusSize.height()/2);
+
+            painter->setPen(Qt::white);
+            font.setPointSize(8);
+            font.setBold(true);
+            painter->setFont(font);
+            painter->drawText(statusRect, Qt::AlignCenter, "!");
         }
         painter->restore();
     }
@@ -211,6 +175,33 @@ QSize ConversationDelegate::sizeHint(const QStyleOptionViewItem &option, const Q
 
 bool ConversationDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, const QStyleOptionViewItem &option, const QModelIndex &index)
 {
+    QAbstractItemView* view = qobject_cast<QAbstractItemView*>(const_cast<QWidget*>(option.widget));
+    if(!view)
+        return false;
+    if(event->type() == QMouseEvent::MouseButtonRelease)
+    {
+        QMouseEvent* mouse = static_cast<QMouseEvent*>(event);
+        if(mouse->button() != Qt::LeftButton)
+            return false;
+
+        bool isSelf = index.data(IsMyselfRole).toBool();
+        if (!isSelf)
+            return false;
+
+        QRect TimeStamp;
+        QRect contain;
+        QRect avatarRect;
+        QRect textRegionRect;
+        QRect statusRect;
+        int textTotalHeight = 0;
+        getLayout(option, index, TimeStamp, contain, avatarRect, textRegionRect, statusRect, textTotalHeight);
+
+        if(statusRect.contains(mouse->pos()))
+        {
+            emit ReSendClicked(index.data(MessageIDRole).toString());
+            return true;
+        }
+    }
     return QStyledItemDelegate::editorEvent(event, model, option, index);
 }
 
@@ -283,4 +274,71 @@ QPixmap ConversationDelegate::setRadius(const QPixmap& pixmap, int hei_wid) cons
     painter.drawPixmap(0,0,scaled);
     painter.end();
     return roundedPix;
+}
+
+void ConversationDelegate::getLayout(const QStyleOptionViewItem &option, const QModelIndex& index, QRect &timestamp,
+                                     QRect &contain, QRect &avatarRect, QRect &textRegionRect, QRect& statusRect, int& textTotalHeight) const
+{
+    QRect total = option.rect;
+    QVariant vi1 = index.data(IsNeedShowTime);
+    bool isTimeStamp = vi1.isValid() ? vi1.toBool() : false;
+    if(isTimeStamp)
+        timestamp = QRect(total.topLeft(), QSize(total.width(), 40));
+
+    int topOffset = isTimeStamp ? 40 : 0;
+    contain = option.rect.adjusted(0, topOffset, 0, 0);
+
+    bool isSelf = index.data(IsMyselfRole).toBool();
+    QSize avatarSize(40, 40);
+    if(isSelf)
+    {
+        avatarRect = QRect(contain.topRight() + QPoint(-10 - avatarSize.width(), 8), avatarSize);
+    }
+    else
+    {
+        avatarRect = QRect(contain.topLeft() + QPoint(10, 8), avatarSize);
+    }
+
+    QFont font = option.font;
+    font.setPointSizeF(10.2);
+
+    QString text = index.data(ContentRole).toString();
+
+    QTextOption textOption;
+    textOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    int textMaxWidth = (contain.width() - 20 - avatarSize.width()) * 0.7 - 30;
+    if(textMaxWidth < 20)
+        textMaxWidth = 20;
+
+    QTextLayout layout(text, font);
+    layout.setTextOption(textOption);
+    layout.beginLayout();
+    qreal textHeight = 0;
+    qreal textWidth = 0;
+    while(true)
+    {
+        QTextLine line = layout.createLine();
+        if(!line.isValid())
+            break;
+        line.setLineWidth(textMaxWidth);
+        textHeight += line.height();
+        textWidth = qMax(textWidth, line.naturalTextWidth());
+    }
+    layout.endLayout();
+    textTotalHeight = qCeil(textHeight);
+
+    int bubbleWidth = qCeil(textWidth) + 30;
+    int bubbleHeight = textTotalHeight + 20;
+    bubbleHeight = qMax(bubbleHeight, 40);
+
+    if(isSelf)
+        textRegionRect = QRect(avatarRect.topLeft() - QPoint(10 + bubbleWidth, 0), QSize(bubbleWidth, bubbleHeight));
+    else
+        textRegionRect = QRect(avatarRect.topRight() + QPoint(10, 0), QSize(bubbleWidth, bubbleHeight));
+
+    if(isSelf)
+    {
+        QSize statusSize(15, 15);
+        statusRect = QRect(textRegionRect.bottomLeft() - QPoint(10 + statusSize.width(), 10 + statusSize.height()), statusSize);
+    }
 }
