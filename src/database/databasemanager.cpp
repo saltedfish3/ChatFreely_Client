@@ -173,6 +173,69 @@ void DatabaseManager::loadAllConversationsList(std::function<void (const QList<C
     });
 }
 
+void DatabaseManager::loadConversationMessages(const QString &conversationID, int limit, qint64 endConvSeq, std::function<void (const QList<Message>&)> callback)
+{
+    auto future = QtConcurrent::run([this, conversationID, limit, endConvSeq, callback](){
+        QString connName = QUuid::createUuid().toString(QUuid::Id128);
+        QList<Message> msgs;
+        {
+            QSqlDatabase db = openConnection(connName);
+            QSqlQuery q(db);
+            qint64 convID = toInt64(conversationID);
+            if(convID == 0)
+            {
+                qWarning() << "载入历史消息convID转int64失败";
+                return;
+            }
+            QString sql = "SELECT server_msg_id, temp_msg_id, sender_id, content, timestamp, conv_seq, status, show_timestamp "
+                          "FROM messages WHERE conversation_id = ?";
+            if(endConvSeq > 0)
+                sql += " AND conv_seq < ?";
+            sql += " ORDER BY conv_seq DESC LIMIT ?";
+            q.prepare(sql);
+
+            q.addBindValue(convID);
+            if(endConvSeq > 0)
+                q.addBindValue(endConvSeq);
+            q.addBindValue(limit);
+
+            if(q.exec())
+            {
+                while(q.next())
+                {
+                    Message msg;
+                    QVariant var_serverMsgID = q.value(0);
+                    if(!var_serverMsgID.isNull())
+                        msg.serverMsgID = QString::number(var_serverMsgID.toLongLong());
+
+                    msg.tempMsgID = q.value(1).toString();
+                    msg.senderUID = QString::number(q.value(2).toLongLong());
+                    msg.content = q.value(3).toString();
+                    msg.timeStamp = q.value(4).toLongLong();
+                    msg.convSeq = q.value(5).toLongLong();
+                    Status oldStatus = static_cast<Status>(q.value(6).toInt());
+                    msg.status = oldStatus == Sending ? Failed : oldStatus;
+                    msg.showTimestamp = q.value(7).toBool();
+                    msgs.prepend(msg);
+
+                    //防止Sending状态的消息永远处于sending
+                    if(oldStatus == Sending)
+                        addUpdateMessageTask(conversationID, msg);
+                }
+            }
+            else
+                qWarning() << "查询历史记录失败：" << q.lastError().text();
+
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(connName);
+        QMetaObject::invokeMethod(QCoreApplication::instance(), [callback, msgs](){
+            if(callback)
+                callback(msgs);
+        }, Qt::QueuedConnection);
+    });
+}
+
 DatabaseManager::DatabaseManager(QObject *parent)
     : QObject{parent}
 {
@@ -350,7 +413,8 @@ bool DatabaseManager::executeUpdateMessageTask(const QSqlDatabase &db, const DBT
               "server_msg_id = excluded.server_msg_id, "
               "timestamp = excluded.timestamp, "
               "conv_seq = excluded.conv_seq, "
-              "status = excluded.status");
+              "status = excluded.status, "
+              "show_timestamp = excluded.show_timestamp");
     q.addBindValue(toInt64(task.conversationID));
     q.addBindValue(task.msg.serverMsgID.isEmpty() ? QVariant() : QVariant(toInt64(task.msg.serverMsgID)));
     q.addBindValue(task.msg.tempMsgID);

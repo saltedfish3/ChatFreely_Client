@@ -7,6 +7,7 @@ MessageModel::MessageModel(MessagesManager* manager, QObject *parent)
     connect(manager, &MessagesManager::messageUpdate, this, &MessageModel::onMessageUpdate);
     connect(manager, &MessagesManager::messagePrepend, this, &MessageModel::onMessagePrepend);
     connect(manager, &MessagesManager::messageRemove, this, &MessageModel::onMessageRemove);
+    connect(manager, &MessagesManager::messageMove, this, &MessageModel::onMessageMove);
     connect(&FriendManage::getFriendManage(), &FriendManage::friendAvatarUpdate, this, &MessageModel::onMessageFriendAvatarUpdate);
     connect(&UserInfo::getUserInfo(), &UserInfo::updateAvatar, this, &MessageModel::onMessageMyselfAvatarUpdate);
 }
@@ -46,6 +47,12 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
         return {};
     }
     return {};
+}
+
+void MessageModel::resetModel()
+{
+    beginResetModel();
+    endResetModel();
 }
 
 void MessageModel::onMessageAdd(int row)
@@ -89,6 +96,15 @@ void MessageModel::onMessageRemove(int row)
 
     beginRemoveRows(QModelIndex(), row, row);
     endRemoveRows();
+}
+
+void MessageModel::onMessageMove(int oldRow)
+{
+    beginMoveRows(QModelIndex(), oldRow, oldRow, QModelIndex(), rowCount());
+    endMoveRows();
+
+    QModelIndex idx = index(rowCount() - 1);
+    emit dataChanged(idx, idx, {MessageStatusRole, MessageIDRole, ConvSeqRole, TimeStamp});
 }
 
 void MessageModel::onMessageMyselfAvatarUpdate(const QPixmap &avatar)

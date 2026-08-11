@@ -557,7 +557,6 @@ void TcpLongConnection::sendMessageTo(QString uid, QString message, QString temp
         emit sendMessageStatus(false, tempMsgID, uid);
         return;
     }
-
     QString requestsID;
     QString content;
     uint64_t thisCount = 0;
@@ -595,6 +594,7 @@ void TcpLongConnection::sendMessageTo(QString uid, QString message, QString temp
 
     this->socket->write(data);
     this->socket->flush();
+
     this->waiting_requestsID.insert(requestsID.toStdString());
     QTimer::singleShot(10000,[this,requestsID,tempMsgID, thisCount, uid](){
         auto it = this->map_messageCache.find(tempMsgID);

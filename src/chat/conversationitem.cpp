@@ -53,6 +53,25 @@ void ConversationItem::addNewMessage(Message msg)
 void ConversationItem::updateMessageStatus(bool isSuccess, const QString& tempMsgID, const QString& messageID, int64_t timeStamp, int64_t convSeq)
 {
     this->msgManager.updateMessageStatus(tempMsgID, messageID, isSuccess ? Success : Failed, timeStamp, convSeq);
+    emit messageStatusChange();
+}
+
+void ConversationItem::loadHistoryMessages(int limit)
+{
+    Message msg = this->getMessagesManager().getFrontMessage();
+    qint64 endConvSeq = -1;
+    if(!msg.senderUID.isEmpty())
+        endConvSeq = msg.convSeq;
+    DatabaseManager::getDatabaseManager().loadConversationMessages(this->conversationID, 20, endConvSeq, [this](const QList<Message>& msgs){
+        if(msgs.isEmpty())
+            return;
+        this->getMessagesManager().addMessageFront(msgs);
+        if(!this->isFirstLoad)
+        {
+            this->isFirstLoad = true;
+            emit firstLoadingMessages();
+        }
+    });
 }
 
 bool ConversationItem::isActive() const

@@ -304,6 +304,7 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
                 temp_item->setData(info.lastMsg, ConversationListDelegate::LastMsgRole);
                 temp_item->setData(info.lastTimestamp, ConversationListDelegate::LastTimestampRole);
                 temp_item->setData(info.unReadCount, ConversationListDelegate::UnReadRole);
+                item->setUnReadCount(info.unReadCount);
             }
             return;
         }
@@ -332,6 +333,7 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
         item_standard->setData(info.lastMsg, ConversationListDelegate::LastMsgRole);
         item_standard->setData(info.lastTimestamp, ConversationListDelegate::LastTimestampRole);
         item_standard->setData(info.unReadCount, ConversationListDelegate::UnReadRole);
+        item->setUnReadCount(info.unReadCount);
     }
     else
     {

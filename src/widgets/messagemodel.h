@@ -27,6 +27,7 @@ public:
 
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role) const override;
+    void resetModel();
 
 public slots:
     void onMessageAdd(int row);
@@ -34,6 +35,7 @@ public slots:
     void onMessagesUpdate(int first, int end);
     void onMessagePrepend(int count);
     void onMessageRemove(int row);
+    void onMessageMove(int oldRow);
     void onMessageFriendAvatarUpdate(const QString& uid, const QPixmap& avatar);
     void onMessageMyselfAvatarUpdate(const QPixmap& avatar);
 

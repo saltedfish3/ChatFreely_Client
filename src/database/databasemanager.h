@@ -54,6 +54,7 @@ public:
     void addUpdateUnreadTask(const QString& conversationID, int unreadCount);
 
     void loadAllConversationsList(std::function<void(const QList<ConversationInfo>&)> callback);
+    void loadConversationMessages(const QString& conversationID, int limit = 20, qint64 endConvSeq = -1, std::function<void(const QList<Message>&)> callback = nullptr);
 
 signals:
 

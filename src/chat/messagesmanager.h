@@ -17,16 +17,20 @@ public:
     bool updateMessageStatus(const QString& tempMsgID, const QString& newServerMsgID, Status status, int64_t newTimeStamp, int64_t newConvSeq);
 
     Message getLastMessage() const;
+    Message getFrontMessage() const;
     const QList<Message>& getMessages() const;
 
     int indexOfMsg(const QString& msgID) const;
     void removeOfIndex(int index);
+
+    void retryMessage(int index);
 
 signals:
     void messageAdd(int row);
     void messagePrepend(int count);
     void messageUpdate(int row);
     void messageRemove(int row);
+    void messageMove(int oldRow);
 
 private:
     QList<Message> messages;

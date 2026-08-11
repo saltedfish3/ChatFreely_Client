@@ -21,6 +21,7 @@ public:
     void addNewMessage(Message msg);
 
     void updateMessageStatus(bool isSuccess, const QString& tempMsgID, const QString& messageID, int64_t timeStamp, int64_t convSeq);
+    void loadHistoryMessages(int limit = 20);
 
     bool isActive() const;
     void clearUnRead();
@@ -34,12 +35,14 @@ signals:
     void UnReadCountChange(int num);
     //用于会话窗口减少loadingcount
     void messageStatusChange();
+    void firstLoadingMessages();
 
 private:
     QString conversationID;
     MessagesManager msgManager;
     int unRead = 0;
     bool active = false;
+    bool isFirstLoad = false;
 };
 
 #endif // CONVERSATIONITEM_H

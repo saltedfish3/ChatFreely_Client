@@ -214,6 +214,11 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
             this->listView_messages->scrollToBottom();
             setActive(true);
         }
+        else if(this->isVisible())
+        {
+            if(msg.senderUID != UserInfo::getUserInfo().getUID())
+                this->item->addUnReadCount();
+        }
     });
 
     connect(this->item, &ConversationItem::messageStatusChange, this, [this](){
@@ -229,20 +234,10 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         if(index < 0)
             return;
 
-        Message oldMsg = this->item->getMessagesManager().getMessages().at(index);
-        QString content = oldMsg.content;
-        QString senderUID = oldMsg.senderUID;
+        this->item->getMessagesManager().retryMessage(index);
+        this->listView_messages->doItemsLayout();
 
-        this->item->getMessagesManager().removeOfIndex(index);
-
-        Message newMsg;
-        newMsg.tempMsgID = QUuid::createUuid().toString();
-        newMsg.content = content;
-        newMsg.timeStamp = QDateTime::currentSecsSinceEpoch();
-        newMsg.senderUID = senderUID;
-        newMsg.status = Sending;
-        newMsg.convSeq = this->item->getMessagesManager().getLastMessage().convSeq + 1;
-        this->item->addNewMessage(newMsg);
+        const Message& msg = this->item->getMessagesManager().getLastMessage();
 
         this->loadingCount++;
         QTimer::singleShot(0, this, [this](){
@@ -250,21 +245,24 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
                 this->timer_loading->start(30);
         });
 
-        TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), content, newMsg.tempMsgID);
+        TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), msg.content, msg.tempMsgID);
         this->listView_messages->scrollToBottom();
     });
 
     connect(this->listView_messages->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](int value){
         if(value <= (this->listView_messages->verticalScrollBar()->minimum() + this->listView_messages->height()*0.2))
         {
-            const auto& msgs = this->item->getMessagesManager().getMessages();
-            if(!msgs.isEmpty())
+            Message msg = this->item->getMessagesManager().getFrontMessage();
+            if(!msg.senderUID.isEmpty())
             {
-                qint64 oldConvSeq = msgs.first().convSeq;
-                // if(oldConvSeq > 1)
-                    /*his->item->loadHistoryMessages();*/
+                if(msg.convSeq > 1)
+                    this->item->loadHistoryMessages();
             }
         }
+    });
+
+    connect(this->item, &ConversationItem::firstLoadingMessages, this, [this](){
+        this->listView_messages->scrollToBottom();
     });
 
     installEventFilter(this);
@@ -273,6 +271,8 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     this->edit_message->installEventFilter(this);
     this->widget_header->installEventFilter(this);
     this->widget_editRegion->installEventFilter(this);
+
+    this->item->loadHistoryMessages();
 }
 
 void ConversationWidget::updateFriendUsername(const QString &username)
@@ -314,18 +314,6 @@ bool ConversationWidget::eventFilter(QObject *obj, QEvent *event)
         this->item->clearUnRead();
     }
     return QWidget::eventFilter(obj, event);
-}
-
-void ConversationWidget::showEvent(QShowEvent *event)
-{
-    QWidget::showEvent(event);
-    setActive(true);
-}
-
-void ConversationWidget::hideEvent(QHideEvent *event)
-{
-    QWidget::hideEvent(event);
-    setActive(false);
 }
 
 void ConversationWidget::initStyle()

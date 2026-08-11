@@ -35,6 +35,10 @@ ConversationManager::ConversationManager(QObject *parent)
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::sendMessageStatus, this, [this]
             (bool isSuccess, QString tempMsgID, QString receiverUID, QString messageID, int64_t timeStamp, int64_t convSeq){
         ConversationItem* item = getOrCreateConversationItem(receiverUID);
+        if(!item)
+            return;
+        if(messageID.isEmpty() || messageID == "0")
+            messageID = QString();
         item->updateMessageStatus(isSuccess, tempMsgID, messageID, timeStamp, convSeq);
     });
 
