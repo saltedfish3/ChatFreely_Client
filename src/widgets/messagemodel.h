@@ -35,7 +35,7 @@ public slots:
     void onMessagesUpdate(int first, int end);
     void onMessagePrepend(int count);
     void onMessageRemove(int row);
-    void onMessageMove(int oldRow);
+    void onMessageMove(int oldRow, int newRow);
     void onMessageFriendAvatarUpdate(const QString& uid, const QPixmap& avatar);
     void onMessageMyselfAvatarUpdate(const QPixmap& avatar);
 

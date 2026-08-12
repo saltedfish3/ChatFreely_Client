@@ -32,19 +32,7 @@ int ConversationItem::getUnReadCount() const
 
 void ConversationItem::addNewMessage(Message msg)
 {
-    const auto& msgs = this->msgManager.getMessages();
-    if(msgs.isEmpty())
-        msg.showTimestamp = true;
-    else
-    {
-        const Message& lastMsg = msgs.last();
-        if(lastMsg.timeStamp <= 0)
-            msg.showTimestamp = false;
-        else
-            msg.showTimestamp = (msg.timeStamp - lastMsg.timeStamp) > 300;
-    }
-
-    this->msgManager.addMessageBack(msg);
+    this->msgManager.addMessage(msg);
 
     emit PushNewMessage(msg);
     emit LastMessageChange(msg);
@@ -65,7 +53,7 @@ void ConversationItem::loadHistoryMessages(int limit)
     DatabaseManager::getDatabaseManager().loadConversationMessages(this->conversationID, 20, endConvSeq, [this](const QList<Message>& msgs){
         if(msgs.isEmpty())
             return;
-        this->getMessagesManager().addMessageFront(msgs);
+        this->getMessagesManager().addMessages(msgs, false);
         if(!this->isFirstLoad)
         {
             this->isFirstLoad = true;

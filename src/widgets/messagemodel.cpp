@@ -98,13 +98,18 @@ void MessageModel::onMessageRemove(int row)
     endRemoveRows();
 }
 
-void MessageModel::onMessageMove(int oldRow)
+void MessageModel::onMessageMove(int oldRow, int newRow)
 {
-    beginMoveRows(QModelIndex(), oldRow, oldRow, QModelIndex(), rowCount());
+    if(oldRow < 0 || oldRow >= rowCount())
+        return;
+
+    if(newRow < 0 || newRow >= rowCount())
+        return;
+
+    beginMoveRows(QModelIndex(), oldRow, oldRow, QModelIndex(), oldRow < newRow ? newRow + 1 : newRow);
     endMoveRows();
 
-    QModelIndex idx = index(rowCount() - 1);
-    emit dataChanged(idx, idx, {MessageStatusRole, MessageIDRole, ConvSeqRole, TimeStamp});
+    emit dataChanged(index(qMin(oldRow, newRow)), index(qMax(oldRow, newRow)), {MessageStatusRole, MessageIDRole, ConvSeqRole, TimeStamp, IsNeedShowTime});
 }
 
 void MessageModel::onMessageMyselfAvatarUpdate(const QPixmap &avatar)

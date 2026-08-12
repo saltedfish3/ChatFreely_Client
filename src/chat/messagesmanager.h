@@ -12,8 +12,9 @@ class MessagesManager : public QObject
 public:
     explicit MessagesManager(const QString& conversationID, QObject* parent = nullptr);
 
-    void addMessageBack(const Message& msg);
-    void addMessageFront(const QList<Message>& msgs);
+    void addMessage(const Message& msg, bool isStoreDB = true);
+    void addMessages(const QList<Message>& msgs, bool isStoreDB = true);
+
     bool updateMessageStatus(const QString& tempMsgID, const QString& newServerMsgID, Status status, int64_t newTimeStamp, int64_t newConvSeq);
 
     Message getLastMessage() const;
@@ -24,20 +25,25 @@ public:
     void removeOfIndex(int index);
 
     void retryMessage(int index);
+    qint64 getNextConvSeq();
 
 signals:
     void messageAdd(int row);
     void messagePrepend(int count);
     void messageUpdate(int row);
     void messageRemove(int row);
-    void messageMove(int oldRow);
+    void messageMove(int oldRow, int newRow);
 
 private:
     QList<Message> messages;
     QHash<QString, int> index_message;//消息索引(消息ID，行号)
 
     QString conversationID;
+    qint64 lastConvSeq = 0;
 
+    int findInsertIndex(qint64 convSeq) const;
+    void saveMoveMessage(int row);
+    void calcShowTimestamp(int row);
     void addIndex(const Message& msg, int index);
     void rebuildIndex();
 };

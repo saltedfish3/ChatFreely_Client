@@ -165,7 +165,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         msg.timeStamp = QDateTime::currentSecsSinceEpoch();
         msg.senderUID = UserInfo::getUserInfo().getUID();
         msg.status = Sending;
-        msg.convSeq = this->item->getMessagesManager().getLastMessage().convSeq + 1;
+        msg.convSeq = this->item->getMessagesManager().getNextConvSeq();
 
         this->item->addNewMessage(msg);
         this->loadingCount++;
