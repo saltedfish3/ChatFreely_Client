@@ -24,7 +24,8 @@ public:
         IsOnlineRole,
         LastMsgRole,
         LastTimestampRole,
-        UnReadRole
+        UnReadRole,
+        IsSelectedRole
     };
     explicit ConversationListDelegate(QObject *parent = nullptr);
 

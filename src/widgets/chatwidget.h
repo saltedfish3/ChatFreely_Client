@@ -44,7 +44,8 @@ private:
     void initListStyle();
 
     void initStackedConversation();
-    void moveConversationToTop(const QString& conversationID);
+
+    void restoreSelection(const QString& conversationID);
 
     ConversationWidget* createConversation(const QString& conversationID);
     void createConversationListItem(ConversationItem* item, const DatabaseManager::ConversationInfo& info = {});
@@ -66,6 +67,8 @@ private:
     QStackedWidget* stackedWidget_Conversation;
 
     QMap<QString, ConversationWidget*> map_conversation;
+
+    QString currentConversation;
 };
 
 #endif // CHATWIDGET_H

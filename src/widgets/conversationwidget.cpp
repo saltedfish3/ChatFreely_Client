@@ -214,6 +214,8 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
             this->listView_messages->scrollToBottom();
             setActive(true);
         }
+        else if(scrollBar->maximum() - scrollBar->value() < (height / 2))
+            this->listView_messages->scrollToBottom();
     });
 
     connect(this->item, &ConversationItem::messageStatusChange, this, [this](){

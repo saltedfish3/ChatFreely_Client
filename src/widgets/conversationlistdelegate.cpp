@@ -11,7 +11,8 @@ void ConversationListDelegate::paint(QPainter *painter, const QStyleOptionViewIt
     QRect contain = option.rect.adjusted(-1, 0, 1, 0);
 
     bool isHovered = option.state & QStyle::State_MouseOver;
-    bool isClicked = option.state & QStyle::State_Selected;
+    bool isClicked = index.data(IsSelectedRole).toBool();
+
     painter->setBrush(Qt::NoBrush);
     if(isHovered && !isClicked)
         painter->setBrush(QColor(243, 244, 246));
