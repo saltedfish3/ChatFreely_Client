@@ -85,6 +85,11 @@ bool DatabaseManager::changeToCurrentUser()
             isSuccess &= sqlq.exec("CREATE TABLE IF NOT EXISTS conversation_checkpoint("
                                   "conversation_id INTEGER PRIMARY KEY,"
                                   "last_stored_seq INTEGER DEFAULT 0)");
+
+            isSuccess &= sqlq.exec("CREATE TABLE IF NOT EXISTS user_meta("
+                                   "key TEXT PRIMARY KEY, "
+                                   "value TEXT)");
+
             if(!isSuccess)
             {
                 qWarning() << "初始化数据表失败" << sqlq.lastError().text();
@@ -126,6 +131,125 @@ void DatabaseManager::addUpdateUnreadTask(const QString &conversationID, int unr
     task.conversationID = conversationID;
     task.unreadCount = unreadCount;
     addTask(conversationID, task);
+}
+
+bool DatabaseManager::setMeta(MetaType type, const QString &value)
+{
+    QString connName = QUuid::createUuid().toString(QUuid::Id128);
+    {
+        QSqlDatabase db = openConnection(connName);
+        if(db.isOpen())
+        {
+            QSqlQuery q(db);
+            QString sql = "INSERT OR REPLACE INTO user_meta(key, value) VALUES(?, ?)";
+            q.prepare(sql);
+            QString key;
+            switch(type)
+            {
+            case SyncConvSeq:
+                key = "SyncConvSeq";
+                break;
+            };
+            q.addBindValue(key);
+            q.addBindValue(value);
+            if(!q.exec())
+            {
+                qWarning() << "插入或更新user_meta失败：key:" << key << "value:" << value;
+                return false;
+            }
+        }
+        else
+        {
+            qWarning() << "打开数据库失败";
+            return false;
+        }
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(connName);
+    return true;
+}
+
+bool DatabaseManager::getMeta(MetaType type, QString &outValue)
+{
+    QString connName = QUuid::createUuid().toString(QUuid::Id128);
+    {
+        QSqlDatabase db = openConnection(connName);
+        if(db.isOpen())
+        {
+            QSqlQuery q(db);
+            QString sql = "SELECT value FROM user_meta WHERE key = ?";
+            q.prepare(sql);
+            QString key;
+            switch(type)
+            {
+            case SyncConvSeq:
+                key = "SyncConvSeq";
+                break;
+            default:
+                qWarning() << "未知的MetaType：" << type;
+                return false;
+            };
+            q.addBindValue(key);
+            if(!q.exec())
+            {
+                qWarning() << "查询user_meta失败：key:" << key;
+                return false;
+            }
+            if(q.next())
+            {
+                outValue = q.value(0).toString();
+            }
+            else
+            {
+                outValue = QString();
+            }
+        }
+        else
+        {
+            qWarning() << "打开数据库失败";
+            return false;
+        }
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(connName);
+    return true;
+}
+
+bool DatabaseManager::getConversationsLastConvSeq(const QString &conversationID, qint64& outValue)
+{
+    QString connName = QUuid::createUuid().toString(QUuid::Id128);
+    {
+        QSqlDatabase db = openConnection(connName);
+        if(db.isOpen())
+        {
+            QSqlQuery q(db);
+            QString sql = "SELECT last_stored_seq FROM conversation_checkpoint WHERE conversation_id = ?";
+            q.prepare(sql);
+
+            q.addBindValue(toInt64(conversationID));
+            if(!q.exec())
+            {
+                qWarning() << "查询conversation_checkpoint失败：conversation_id:" << conversationID;
+                return false;
+            }
+            if(q.next())
+            {
+                outValue = q.value(0).toLongLong();
+            }
+            else
+            {
+                outValue = 0;
+            }
+        }
+        else
+        {
+            qWarning() << "打开数据库失败";
+            return false;
+        }
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(connName);
+    return true;
 }
 
 void DatabaseManager::loadAllConversationsList(std::function<void (const QList<ConversationInfo>&)> callback)
@@ -393,7 +517,8 @@ bool DatabaseManager::executeInsertMessageTask(const QSqlDatabase& db, const DBT
     }
 
     QSqlQuery q_checkpoint(db);
-    q_checkpoint.prepare("INSERT OR REPLACE INTO conversation_checkpoint(conversation_id, last_stored_seq) VALUES(?, ?)");
+    q_checkpoint.prepare("INSERT INTO conversation_checkpoint(conversation_id, last_stored_seq) VALUES(?, ?) "
+                         "ON CONFLICT(conversation_id) DO UPDATE SET last_stored_seq = MAX(last_stored_seq, excluded.last_stored_seq)");
     q_checkpoint.addBindValue(toInt64(task.conversationID));
     q_checkpoint.addBindValue(task.msg.convSeq);
 

@@ -33,6 +33,11 @@ public:
         UpdateUnread
     };
 
+    enum MetaType
+    {
+        SyncConvSeq = 0
+    };
+
     struct DBTask
     {
         Type type;
@@ -52,6 +57,9 @@ public:
     void addInsertMessageTask(const QString& conversationID, const Message& msg);
     void addUpdateMessageTask(const QString& conversationID, const Message& msg);
     void addUpdateUnreadTask(const QString& conversationID, int unreadCount);
+    bool setMeta(MetaType type, const QString& value);
+    bool getMeta(MetaType type, QString& outValue);
+    bool getConversationsLastConvSeq(const QString& conversationsID, qint64& outValue);
 
     void loadAllConversationsList(std::function<void(const QList<ConversationInfo>&)> callback);
     void loadConversationMessages(const QString& conversationID, int limit = 20, qint64 endConvSeq = -1, std::function<void(const QList<Message>&)> callback = nullptr);

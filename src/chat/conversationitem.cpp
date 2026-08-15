@@ -34,6 +34,9 @@ void ConversationItem::addNewMessage(Message msg)
 {
     this->msgManager.addMessage(msg);
 
+    if(msg.senderUID != UserInfo::getUserInfo().getUID() && !this->isActive())
+        addUnReadCount();
+
     emit PushNewMessage(msg);
     emit LastMessageChange(msg);
 }

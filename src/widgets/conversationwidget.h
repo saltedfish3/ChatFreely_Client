@@ -34,6 +34,7 @@ signals:
 
 protected:
     bool eventFilter(QObject* obj, QEvent* event) override;
+    void showEvent(QShowEvent* event) override;
 
 private:
     void initStyle();
@@ -59,6 +60,8 @@ private:
 
     ConversationItem* item;
     int64_t theBestConvSeq = 0;
+
+    bool isFristTimeOpen = false;
 };
 
 #endif // CONVERSATIONWIDGET_H

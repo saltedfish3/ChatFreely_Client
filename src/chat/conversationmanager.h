@@ -14,6 +14,8 @@ class ConversationManager : public QObject
 public:
     static ConversationManager& getConversationManager();
     ConversationItem* getOrCreateConversationItem(const QString& conversationID);
+    //初始化使用
+    void startSyncMessage();
 
     ConversationManager(const ConversationManager&) = delete;
     ConversationManager& operator=(const ConversationManager&) = delete;

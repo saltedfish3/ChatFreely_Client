@@ -214,11 +214,6 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
             this->listView_messages->scrollToBottom();
             setActive(true);
         }
-        else if(this->isVisible())
-        {
-            if(msg.senderUID != UserInfo::getUserInfo().getUID())
-                this->item->addUnReadCount();
-        }
     });
 
     connect(this->item, &ConversationItem::messageStatusChange, this, [this](){
@@ -273,6 +268,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     this->widget_editRegion->installEventFilter(this);
 
     this->item->loadHistoryMessages();
+    // this->listView_messages->scrollToBottom();
 }
 
 void ConversationWidget::updateFriendUsername(const QString &username)
@@ -314,6 +310,15 @@ bool ConversationWidget::eventFilter(QObject *obj, QEvent *event)
         this->item->clearUnRead();
     }
     return QWidget::eventFilter(obj, event);
+}
+
+void ConversationWidget::showEvent(QShowEvent *event)
+{
+    if(!this->isFristTimeOpen)
+    {
+        this->isFristTimeOpen = true;
+        this->listView_messages->scrollToBottom();
+    }
 }
 
 void ConversationWidget::initStyle()

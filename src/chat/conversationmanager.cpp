@@ -19,6 +19,13 @@ ConversationItem *ConversationManager::getOrCreateConversationItem(const QString
     return it.value();
 }
 
+void ConversationManager::startSyncMessage()
+{
+    QString syncConvSeq;
+    DatabaseManager::getDatabaseManager().getMeta(DatabaseManager::SyncConvSeq, syncConvSeq);
+    TcpLongConnection::getTcpClient().getConversationsFriendUIDListAndSeq(syncConvSeq.isEmpty() ? 0 : syncConvSeq.toLongLong());
+}
+
 void ConversationManager::cleanAll()
 {
     DatabaseManager::getDatabaseManager().prepareToSwitchUser();
@@ -54,9 +61,69 @@ ConversationManager::ConversationManager(QObject *parent)
 
         ConversationItem* item = getOrCreateConversationItem(senderUID);
         item->addNewMessage(msg);
+    });
 
-        if(senderUID != UserInfo::getUserInfo().getUID() && !item->isActive())
-            item->addUnReadCount();
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newSyncConvStatus, this, [this]
+            (bool isSuccess, const QList<QString>& conversations, int64_t newSyncConvSeq){
+        if(!isSuccess)
+        {
+            startSyncMessage();
+            return;
+        }
+
+        if(conversations.isEmpty())
+        {
+            return;
+        }
+
+        DatabaseManager::getDatabaseManager().setMeta(DatabaseManager::SyncConvSeq, QString::number(newSyncConvSeq));
+        for(const QString& conversationID : conversations)
+        {
+            ConversationItem* item = getOrCreateConversationItem(conversationID);
+            if(!item)
+                continue;
+            qint64 maxConvSeq = -1;
+            if(DatabaseManager::getDatabaseManager().getConversationsLastConvSeq(conversationID, maxConvSeq))
+            {
+                TcpLongConnection::getTcpClient().sendSyncNewMessages(conversationID, maxConvSeq);
+            }
+            else
+            {
+                qWarning() << "ConversationManager接收Tcp newSyncConvStatus信号getConversationsLastConvSeq失败：进行全量获取";
+                TcpLongConnection::getTcpClient().sendSyncNewMessages(conversationID, 0);
+            }
+        }
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::syncMessagesStatus, this, [this](bool isSuccess,
+                                                                                    const QString& conversationID, const QList<Message>& msgs){
+        if(!isSuccess)
+        {
+            qint64 maxConvSeq = -1;
+            if(DatabaseManager::getDatabaseManager().getConversationsLastConvSeq(conversationID, maxConvSeq))
+                TcpLongConnection::getTcpClient().sendSyncNewMessages(conversationID, maxConvSeq);
+            else
+            {
+                qWarning() << "ConversationManager接收Tcp syncMessagesStatus信号getConversationsLastConvSeq失败：进行全量获取";
+                TcpLongConnection::getTcpClient().sendSyncNewMessages(conversationID, 0);
+            }
+        }
+        else
+        {
+            ConversationItem* item = getOrCreateConversationItem(conversationID);
+            if(!item)
+                return;
+
+            for(const auto& msg : msgs)
+            {
+                item->addNewMessage(msg);
+            }
+        }
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::reconnectSuccess, this, [this](){
+        if(UserInfo::getUserInfo().isLogin())
+            startSyncMessage();
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &ConversationManager::cleanAll);

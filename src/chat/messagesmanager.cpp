@@ -7,6 +7,19 @@ MessagesManager::MessagesManager(const QString& conversationID, QObject* parent)
 
 void MessagesManager::addMessage(const Message &msg, bool isStoreDB)
 {
+    if(msg.status == Success)
+    {
+        //消息去重
+        bool isExist = false;
+        if(!msg.serverMsgID.isEmpty())
+            isExist = indexOfMsg(msg.serverMsgID) == -1 ? false : true;
+        if(!isExist && !msg.tempMsgID.isEmpty())
+            isExist = indexOfMsg(msg.tempMsgID) == -1 ? false : true;
+
+        if(isExist)
+            return;
+    }
+
     int index = findInsertIndex(msg.convSeq);
 
     this->messages.insert(index, msg);

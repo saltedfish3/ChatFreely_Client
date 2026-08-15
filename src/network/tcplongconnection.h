@@ -14,6 +14,7 @@
 #include <atomic>
 #include <unordered_set>
 #include "../utils/GlobalVariable.h"
+#include "../chat/message.h"
 
 #define SADDR "127.0.0.1"
 #define SPORT 9000
@@ -42,10 +43,14 @@ public:
 
     void getNewFriendRequestsList();
     void getFriendList();
+    void getConversationsFriendUIDListAndSeq(int64_t syncConvSeq);
+    void sendSyncNewMessages(const QString& friendUID, qint64 startConvSeq, int limit = 30);
 
     bool isConnect();
 
 signals:
+    void reconnectSuccess();
+
     void LoginState(bool isSuccess ,QString from, QString info, bool reLogin = false);
     void RegisterState(bool isSuccess ,QString from, QString info);
     void mainState(bool isSuccess, QString info);
@@ -58,7 +63,9 @@ signals:
     //接收服务器的push
     void newFriend(QString uid, QString sid, QString username, QString avatar_url, QString email, bool isOnline);
 
-    // void newFriendState(bool isEmpty);
+    //用于通知业务层getConversationsListAndSeq是否成功
+    void newSyncConvStatus(bool isSuccess, const QList<QString>& conversations, int64_t newSyncConvSeq);
+    void syncMessagesStatus(bool isSuccess, const QString& conversationID, const QList<Message>& messages);
 
     //更新好友的状态信息
     void FriendStatus(QString uid, bool isOnline);
@@ -87,6 +94,10 @@ private:
     void handleHandleNewFriendRequestResp(QJsonObject obj);
     void handleGetNewFriendRequestsListResp(QJsonObject obj);
     void handleGetFriendListResp(QJsonObject obj);
+
+    void handleGetConversationsFriendUIDListAndSeqResp(QJsonObject obj);
+    void handleSyncNewMessagesResp(QJsonObject obj);
+
     void handlePushNewFriendRequests(QJsonObject obj);
     void handlePushNewFriend(QJsonObject obj);
     void handlePushFriendStatus(QJsonObject obj);
@@ -105,7 +116,12 @@ private:
     QTimer* clock_heartbeat;
 
     std::unordered_set<std::string> waiting_requestsID;
+    QHash<QString, QTimer*> hash_timeoutTimers;
+    QHash<QString, QString> hash_requestsToFriendUID;
     std::map<QString, std::function<void(bool, const QString&, bool)>> refreshCallBack;
+
+    //曾经是否连接成功过
+    bool hasConnected = false;
 
     bool isTryToUnLoginRefresh = false;
     bool isTryToLoginAgain = false;

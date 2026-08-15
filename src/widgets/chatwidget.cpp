@@ -192,6 +192,7 @@ void ChatWidget::initListWidget()
             }
             this->model->setSortRole(ConversationListDelegate::LastTimestampRole);
             this->model->sort(0, Qt::DescendingOrder);
+            ConversationManager::getConversationManager().startSyncMessage();
         });
     });
 
@@ -311,7 +312,6 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
     }
 
     FriendManage::FriendInfo friend_info = FriendManage::getFriendManage().getFriendInfo(conversationID);
-
     QStandardItem* item_standard = new QStandardItem();
     if(friend_info.uid.isEmpty())
     {
