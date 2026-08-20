@@ -36,6 +36,7 @@ signals:
     //用于会话窗口减少loadingcount
     void messageStatusChange();
     void firstLoadingMessages();
+    void historyMessagesload(int insertCount);
 
 private:
     QString conversationID;

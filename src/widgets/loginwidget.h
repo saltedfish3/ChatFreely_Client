@@ -16,6 +16,7 @@
 #include "toastmanager.h"
 #include "../database/databasemanager.h"
 #include "../chat/conversationmanager.h"
+#include "../utils/globalinitcontroller.h"
 
 class LoginWidget : public QWidget
 {

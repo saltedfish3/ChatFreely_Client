@@ -22,6 +22,7 @@
 #include "../utils/friendmanage.h"
 #include "../chat/conversationmanager.h"
 #include "../chat/conversationitem.h"
+#include "../utils/globalinitcontroller.h"
 
 
 class ChatWidget : public QWidget

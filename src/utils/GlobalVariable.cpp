@@ -12,7 +12,7 @@ GlobalVariable::GlobalVariable()
     QDir().mkpath(configDir);
     this->pos_ini = configDir + "/config.ini";
 
-    QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/Record";
     QDir().mkpath(dataDir);
     QString downloadDir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
     QDir().mkpath(downloadDir);
@@ -68,7 +68,8 @@ QString GlobalVariable::getPosOfChatRecord()
 void GlobalVariable::setPosOfChatRecord(const QString &dir)
 {
     QSettings settings(pos_ini,QSettings::IniFormat);
-    settings.setValue("pos_chatRecord",pos_chatRecord);
+    settings.setValue("pos_chatRecord", dir + "/Record");
+    pos_chatRecord = dir + "/Record";
 }
 
 QString GlobalVariable::getChatRecordSize()
@@ -100,4 +101,43 @@ void GlobalVariable::clearAllChatRecord()
     {
         dir.mkdir(".");
     }
+}
+
+void GlobalVariable::setMigrationState(bool isMigrating, const QString &oldPath, const QString &newPath)
+{
+    QSettings settings(pos_ini, QSettings::IniFormat);
+    settings.setValue("isMigrating", isMigrating);
+    if(isMigrating)
+    {
+        settings.setValue("migrating_old", oldPath);
+        settings.setValue("migrating_new", newPath);
+    }
+    else
+    {
+        settings.remove("migrating_old");
+        settings.remove("migrating_new");
+    }
+}
+
+bool GlobalVariable::isMigrating()
+{
+    QSettings settings(pos_ini, QSettings::IniFormat);
+    return settings.value("isMigrating", false).toBool();
+}
+
+QString GlobalVariable::getMigratingOldPath()
+{
+    QSettings settings(pos_ini, QSettings::IniFormat);
+    return settings.value("migrating_old", "").toString();
+}
+
+QString GlobalVariable::getMigratingNewPath()
+{
+    QSettings settings(pos_ini, QSettings::IniFormat);
+    return settings.value("migrating_new", "").toString();
+}
+
+void GlobalVariable::cleanMigratingTemp(const QString &tempPath)
+{
+    QDir(tempPath).removeRecursively();
 }

@@ -80,7 +80,6 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     this->btn_more->setIconSize(QSize(16,16));
     this->btn_more->setCheckable(true);
     this->btn_more->setChecked(false);
-    //initMoreMenu(this,more);
 
     this->timer_loading = new QTimer(this);
     connect(this->timer_loading, &QTimer::timeout, this, [this](){
@@ -93,7 +92,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     //初始化 消息显示 部分
     this->listView_messages = new QListView(this);
     this->listView_messages->setObjectName("listView_messages");
-    this->listView_messages->resize(this->width(),(this->height() - this->widget_header->height()) * 0.75);
+    this->listView_messages->resize(this->width(),(this->height() - this->widget_header->height()) * 0.65);
     this->listView_messages->move(0, this->widget_header->height());
 
     this->model = new MessageModel(&(item->getMessagesManager()), this);
@@ -118,14 +117,15 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
                      this->listView_messages->pos().y() + this->listView_messages->height() + (editRegion_mheight - this->widget_editRegion->height()) / 2);
 
     //初始化 编辑框
-    this->edit_message = new QPlainTextEdit(this->widget_editRegion);
+    this->edit_message = new ChatTextEdit(this->widget_editRegion);
     this->edit_message->setObjectName("edit_message");
     this->edit_message->setPlaceholderText("输入些什么...");
-    this->edit_message->resize(this->widget_editRegion->width() * 0.98, this->widget_editRegion->height() * 0.6);
+    this->edit_message->setAcceptRichText(true);
+    this->edit_message->resize(this->widget_editRegion->width() * 0.98, this->widget_editRegion->height() * 0.78);
     this->edit_message->move((this->widget_editRegion->width() - this->edit_message->width()) / 2,
-                             this->widget_editRegion->height() * 0.07);
+                             0);
 
-    connect(this->edit_message,&QPlainTextEdit::textChanged,this,[=](){
+    connect(this->edit_message,&QTextEdit::textChanged,this,[=](){
         QString text = this->edit_message->toPlainText();
         if(text.length() > 10000)
         {
@@ -247,19 +247,50 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     });
 
     connect(this->listView_messages->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](int value){
+
+        if(isAdjustNow)
+            return;
+
+        if(isInsertNow)
+            return;
+
         if(value <= (this->listView_messages->verticalScrollBar()->minimum() + this->listView_messages->height()*0.2))
         {
             Message msg = this->item->getMessagesManager().getFrontMessage();
             if(!msg.senderUID.isEmpty())
             {
                 if(msg.convSeq > 1)
+                {
+                    QModelIndex topIndex = this->listView_messages->indexAt(QPoint(1, 1));
+
+                    if(topIndex.isValid())
+                        this->topMsgID = topIndex.data(MessageModel::MessageIDRole).toString();
+                    else
+                        this->topMsgID.clear();
+
+                    this->isInsertNow = true;
                     this->item->loadHistoryMessages();
+                }
             }
         }
     });
 
     connect(this->item, &ConversationItem::firstLoadingMessages, this, [this](){
         this->listView_messages->scrollToBottom();
+    });
+
+    connect(this->item, &ConversationItem::historyMessagesload, this, [this](int insertCount){
+        this->isAdjustNow = true;
+
+        if(!this->topMsgID.isEmpty())
+        {
+            QModelIndex newIndex = this->model->index(insertCount, 0);
+            if(newIndex.isValid())
+                this->listView_messages->scrollTo(newIndex, QAbstractItemView::PositionAtTop);
+        }
+
+        this->isAdjustNow = false;
+        this->isInsertNow = false;
     });
 
     installEventFilter(this);
@@ -270,7 +301,6 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     this->widget_editRegion->installEventFilter(this);
 
     this->item->loadHistoryMessages();
-    // this->listView_messages->scrollToBottom();
 }
 
 void ConversationWidget::updateFriendUsername(const QString &username)
@@ -418,7 +448,7 @@ void ConversationWidget::initStyle()
                                 font-weight:bold;
                                 color: rgba(31, 41, 55, 255);
                                 background: transparent;
-                                padding: 0px;
+                                padding: 8px 6px;
                             }
                             #edit_message:focus
                             {

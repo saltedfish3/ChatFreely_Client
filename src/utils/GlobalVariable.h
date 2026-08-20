@@ -35,6 +35,12 @@ public:
     static QString getChatRecordSize();
     static void clearAllChatRecord();
 
+    static void setMigrationState(bool isMigrating, const QString& oldPath = QString(), const QString& newPath = QString());
+    static bool isMigrating();
+    static QString getMigratingOldPath();
+    static QString getMigratingNewPath();
+    static void cleanMigratingTemp(const QString& tempPath);
+
 private:
     GlobalVariable();
 

@@ -598,9 +598,20 @@ void SettingWidget::initSystemDataWidget()
         QString dir = QFileDialog::getExistingDirectory(this,"请选择聊天文件保存目录",GlobalVariable::getPosOfChatRecord());
         if(dir.isEmpty())
             return;
-        GlobalVariable::setPosOfChatRecord(dir);
-        this->edit_chatRecordSavePos->setText(dir);
+
         //文件转移
+        GlobalInitController::getController().startMigrateFile(dir);
+    });
+
+    connect(&GlobalInitController::getController(), &GlobalInitController::migrateFinished, this, [this](bool isSuccess){
+        if(isSuccess)
+            this->edit_chatRecordSavePos->setText(GlobalVariable::getPosOfChatRecord());
+        else
+            ToastManager::getToastManager(true).error("更改聊天文件存储位置失败，请稍后重试", this);
+    });
+
+    connect(&GlobalInitController::getController(), &GlobalInitController::chatRecordPathChanged, this, [this](){
+        this->edit_chatRecordSavePos->setText(GlobalVariable::getPosOfChatRecord());
     });
 
     this->label_saveSpaceManage = new QLabel("存储空间管理",this->widget_systemData);

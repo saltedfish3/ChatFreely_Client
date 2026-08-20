@@ -178,7 +178,7 @@ void LoginWidget::initWidget()
     this->label_version->resize(440,20);
     this->label_version->move(180,this->height() - this->label_version->height() - 30);
 
-    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::LoginState, this, &LoginWidget::getLoginState);
+    connect(&GlobalInitController::getController(), &GlobalInitController::loginResult, this, &LoginWidget::getLoginState);
 }
 
 //按钮 按下动画
@@ -187,9 +187,7 @@ void LoginWidget::onButtonPressed()
     QPushButton* send = qobject_cast<QPushButton*>(sender());
     if(!send)
         return;
-    // send->resize(send->width() - 8,send->height() - 2);
     this->animation_btn_loginNow->setDirection(QPropertyAnimation::Direction::Forward);
-    // send->move(send->pos().x() + 2,send->pos().y() + 1);
     this->animation_btn_loginNow->start();
 
 }
@@ -201,9 +199,7 @@ void LoginWidget::onButtonReleased()
     if(!send)
         return;
     this->animation_btn_loginNow->setDirection(QPropertyAnimation::Direction::Backward);
-    // send->move(send->pos().x() - 2,send->pos().y() - 1);
     this->animation_btn_loginNow->start();
-    //send->resize(send->width() + 8,send->height() + 2);
 
 }
 
@@ -215,6 +211,7 @@ void LoginWidget::sendSignalsChangeToRegister()
 
 void LoginWidget::getLoginState(bool isSuccess, QString from, QString info, bool reLogin)
 {
+    //连接协调器信号
     if(reLogin)
     {
         TcpLongConnection::getTcpClient().sendLogin(this->edit_loginEmail->text().trimmed(),
@@ -227,16 +224,6 @@ void LoginWidget::getLoginState(bool isSuccess, QString from, QString info, bool
     this->label_loading->hide();
     if(isSuccess)
     {
-        if(!DatabaseManager::getDatabaseManager().changeToCurrentUser())
-        {
-            showToast("本地存储初始化失败，请检查内存是否充足", false);
-            TcpLongConnection::getTcpClient().sendUnLogin();
-            this->setDisabled(false);
-            return;
-        }
-
-        // ConversationManager::getConversationManager().sendLoadAllConversationList();
-
         showToast(info + " 将在2秒后为您跳转...",isSuccess);
         this->timer_jump->start();
         return;

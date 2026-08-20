@@ -196,19 +196,18 @@ void ChatWidget::initListWidget()
         createConversationListItem(item);
     });
 
-    connect(&FriendManage::getFriendManage(), &FriendManage::loadFirstAllFriendList, this, [this](){
-        DatabaseManager::getDatabaseManager().loadAllConversationsList([this](const QList<DatabaseManager::ConversationInfo>& list){
-            for(const auto& info : list)
-            {
-                ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(info.conversationID);
-                if(!item)
-                    continue;
-                createConversationListItem(item, info);
-            }
-            this->model->setSortRole(ConversationListDelegate::LastTimestampRole);
-            this->model->sort(0, Qt::DescendingOrder);
-            ConversationManager::getConversationManager().startSyncMessage();
-        });
+    connect(&GlobalInitController::getController(), &GlobalInitController::allConversationsLoaded, this, [this]
+            (const QList<QPair<ConversationItem*, DatabaseManager::ConversationInfo>>& list){
+        for(const auto& pair : list)
+        {
+            ConversationItem* item = pair.first;
+            if(!item)
+                continue;
+            createConversationListItem(item, pair.second);
+        }
+        this->model->setSortRole(ConversationListDelegate::LastTimestampRole);
+        this->model->sort(0, Qt::DescendingOrder);
+        ConversationManager::getConversationManager().startSyncMessage();
     });
 
     connect(&FriendManage::getFriendManage(), &FriendManage::allFriendList, this, [this](){

@@ -7,13 +7,16 @@
 #include <QPushButton>
 #include <QListView>
 #include <QPlainTextEdit>
+#include <QTextEdit>
 #include <QMenu>
+#include <QEvent>
 #include <QScrollBar>
 #include <QDateTime>
 #include <QTimer>
 #include <QUuid>
 #include "morewidget.h"
 #include "conversationdelegate.h"
+#include "chattextedit.h"
 #include "../network/tcplongconnection.h"
 #include "toastmanager.h"
 #include "../utils/userinfo.h"
@@ -48,7 +51,7 @@ private:
     MoreWidget* widget_menu;
     QListView* listView_messages;
     QWidget* widget_editRegion;
-    QPlainTextEdit* edit_message;
+    ChatTextEdit* edit_message;
     QPushButton* btn_send;
 
     QTimer* timer_loading;
@@ -61,6 +64,9 @@ private:
     ConversationItem* item;
     int64_t theBestConvSeq = 0;
 
+    bool isInsertNow = false;
+    bool isAdjustNow = false;
+    QString topMsgID;
     bool isFristTimeOpen = false;
 };
 

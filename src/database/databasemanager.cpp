@@ -360,10 +360,53 @@ void DatabaseManager::loadConversationMessages(const QString &conversationID, in
     });
 }
 
+void DatabaseManager::startHandleTask()
+{
+    this->isStop = false;
+    if(!this->isRunning.exchange(true))
+    {
+        auto future = QtConcurrent::run([this](){
+            while(!this->isStop && !this->callConversation.isEmpty() && this->isRunning)
+            {
+                if(!executeTask())
+                    break;
+            }
+            this->isRunning = false;
+        });
+    }
+}
+
+void DatabaseManager::setNewDatabasePath(const QString &newDBPath)
+{
+    this->dbPath = newDBPath;
+    QDir().mkpath(this->dbPath);
+}
+
+void DatabaseManager::stopHandleTask()
+{
+    this->isStop = true;
+    while(this->isRunning.load())
+    {
+        QCoreApplication::processEvents();
+        QThread::msleep(5);
+    }
+
+    QList<QString> connNames = QSqlDatabase::connectionNames();
+    for(const auto& connName : std::as_const(connNames))
+    {
+        {
+            QSqlDatabase db = QSqlDatabase::database(connName, false);
+            if(db.isValid() && db.open())
+                db.close();
+        }
+        QSqlDatabase::removeDatabase(connName);
+    }
+}
+
 DatabaseManager::DatabaseManager(QObject *parent)
     : QObject{parent}
 {
-    this->dbPath = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/Record";
+    this->dbPath = GlobalVariable::getPosOfChatRecord();
     QDir().mkpath(this->dbPath);
 }
 
@@ -407,17 +450,8 @@ void DatabaseManager::addTask(const QString &conversationID, const DBTask &task)
     if(!this->callConversation.contains(conversationID))
         this->callConversation.enqueue(conversationID);
 
-    if(!this->isRunning.exchange(true))
-    {
-        auto future = QtConcurrent::run([this](){
-            while(!this->callConversation.isEmpty() && this->isRunning)
-            {
-                if(!executeTask())
-                    break;
-            }
-            this->isRunning = false;
-        });
-    }
+    if(!this->isStop.load())
+        startHandleTask();
 }
 
 void DatabaseManager::backTask(const QString &conversationID, const DBTask &task)
@@ -464,7 +498,7 @@ bool DatabaseManager::executeTask()
             return false;
         }
 
-        while(true)
+        while(!this->isStop)
         {
             if(getTask(task))
             {

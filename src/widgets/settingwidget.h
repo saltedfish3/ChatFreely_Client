@@ -21,6 +21,8 @@
 #include "../network/tcplongconnection.h"
 #include "../network/httpshortconnection.h"
 #include "avatarbutton.h"
+#include "../utils/globalinitcontroller.h"
+#include "toastmanager.h"
 
 class SettingWidget : public QWidget
 {

@@ -12,6 +12,7 @@
 #include <QMutexLocker>
 #include <atomic>
 #include "../utils/userinfo.h"
+#include "../utils/GlobalVariable.h"
 #include "../chat/message.h"
 
 class DatabaseManager : public QObject
@@ -64,6 +65,11 @@ public:
     void loadAllConversationsList(std::function<void(const QList<ConversationInfo>&)> callback);
     void loadConversationMessages(const QString& conversationID, int limit = 20, qint64 endConvSeq = -1, std::function<void(const QList<Message>&)> callback = nullptr);
 
+    void stopHandleTask();
+    void startHandleTask();
+
+    void setNewDatabasePath(const QString& newDBPath);
+
 signals:
 
 private:
@@ -90,6 +96,7 @@ private:
     QHash<QString, QQueue<DBTask>> taskQueues;
     QQueue<QString> callConversation;
     std::atomic<bool> isRunning = false;
+    std::atomic<bool> isStop = false;
 };
 
 #endif // DATABASEMANAGER_H

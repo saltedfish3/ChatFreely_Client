@@ -57,6 +57,7 @@ void ConversationItem::loadHistoryMessages(int limit)
         if(msgs.isEmpty())
             return;
         this->getMessagesManager().addMessages(msgs, false);
+        emit historyMessagesload(msgs.size());
         if(!this->isFirstLoad)
         {
             this->isFirstLoad = true;

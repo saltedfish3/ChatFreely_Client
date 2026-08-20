@@ -863,8 +863,7 @@ void TcpLongConnection::handleAccessTokenLoginResp(QJsonObject obj)
         return;
     }
     UserInfo::getUserInfo().setLogin(true);
-    getNewFriendRequestsList();
-    getFriendList();
+    emit accessTokenLoginSuccess();
 }
 
 void TcpLongConnection::handleRegisterResp(QJsonObject obj)

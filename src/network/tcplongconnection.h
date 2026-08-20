@@ -51,7 +51,8 @@ public:
 signals:
     void reconnectSuccess();
 
-    void LoginState(bool isSuccess ,QString from, QString info, bool reLogin = false);
+    void LoginState(bool isSuccess, const QString& from, const QString& info, bool reLogin = false);
+    void accessTokenLoginSuccess();
     void RegisterState(bool isSuccess ,QString from, QString info);
     void mainState(bool isSuccess, QString info);
     void newFriendRequestsState(bool isEmpty);
