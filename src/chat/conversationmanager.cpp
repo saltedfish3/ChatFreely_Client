@@ -63,6 +63,11 @@ ConversationManager::ConversationManager(QObject *parent)
         item->addNewMessage(msg);
     });
 
+    connect(&DatabaseManager::getDatabaseManager(), &DatabaseManager::allChatMessagesClean, this, [this](){
+        for(auto* it : std::as_const(this->conversations))
+            it->clearMessages();
+    });
+
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &ConversationManager::cleanAll);
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, &ConversationManager::cleanAll);
     connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::refreshExpiredExit, this, &ConversationManager::cleanAll);

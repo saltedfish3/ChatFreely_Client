@@ -16,6 +16,7 @@ public:
     void addMessages(const QList<Message>& msgs, bool isStoreDB = true);
 
     bool updateMessageStatus(const QString& tempMsgID, const QString& newServerMsgID, Status status, int64_t newTimeStamp, int64_t newConvSeq);
+    void clearMessages();
 
     Message getLastMessage() const;
     Message getFrontMessage() const;
@@ -33,6 +34,7 @@ signals:
     void messageUpdate(int row);
     void messageRemove(int row);
     void messageMove(int oldRow, int newRow);
+    void resetModel();
 
 private:
     QList<Message> messages;

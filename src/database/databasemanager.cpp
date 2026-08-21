@@ -360,6 +360,42 @@ void DatabaseManager::loadConversationMessages(const QString &conversationID, in
     });
 }
 
+void DatabaseManager::clearAllChatMessages()
+{
+    stopHandleTask();
+    {
+        QMutexLocker locker(&(this->mutex_task));
+        this->taskQueues.clear();
+        this->callConversation.clear();
+    }
+
+    QString connName = QUuid::createUuid().toString(QUuid::Id128);
+    {
+        QSqlDatabase db = openConnection(connName);
+        QSqlQuery q(db);
+        if(db.isOpen())
+        {
+            if(db.transaction())
+            {
+                bool isSuccess = true;
+                isSuccess &= q.exec("DELETE FROM messages");
+                isSuccess &= q.exec("DELETE FROM conversations");
+
+                if(isSuccess)
+                {
+                    db.commit();
+                    emit allChatMessagesClean();
+                }
+                else
+                    db.rollback();
+            }
+        }
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(connName);
+    startHandleTask();
+}
+
 void DatabaseManager::startHandleTask()
 {
     this->isStop = false;

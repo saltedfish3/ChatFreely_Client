@@ -25,6 +25,7 @@ public:
 
     bool isActive() const;
     void clearUnRead();
+    void clearMessages();
     void addUnReadCount();
     void setUnReadCount(int count);
     void setActive(bool isActive);

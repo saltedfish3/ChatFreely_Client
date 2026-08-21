@@ -560,6 +560,11 @@ void SettingWidget::initSystemDataWidget()
                                       this->edit_fileSavePos->pos().y());
 
     connect(this->btn_changeFileSavePos,&QPushButton::clicked,this,[this](){
+        if(GlobalInitController::getController().step() != GlobalInitController::Step::Free)
+        {
+            ToastManager::getToastManager(true).error("正在初始化中，请稍后重试", this);
+            return;
+        }
         QString dir = QFileDialog::getExistingDirectory(this,"请选择下载文件保存目录",GlobalVariable::getPosOfDownloadFile());
         if(dir.isEmpty())
             return;
@@ -595,6 +600,11 @@ void SettingWidget::initSystemDataWidget()
                                       this->edit_chatRecordSavePos->pos().y());
 
     connect(this->btn_changechatRecordSavePos,&QPushButton::clicked,this,[this](){
+        if(GlobalInitController::getController().step() != GlobalInitController::Step::Free)
+        {
+            ToastManager::getToastManager(true).error("正在初始化中，请稍后重试", this);
+            return;
+        }
         QString dir = QFileDialog::getExistingDirectory(this,"请选择聊天文件保存目录",GlobalVariable::getPosOfChatRecord());
         if(dir.isEmpty())
             return;
@@ -655,8 +665,10 @@ void SettingWidget::initSystemDataWidget()
         QMessageBox::StandardButton reply = QMessageBox::question(this,"确认清空？","确定要清空所有聊天记录吗？",QMessageBox::Yes|QMessageBox::Cancel);
         if(reply == QMessageBox::Yes)
         {
-            GlobalVariable::clearAllChatRecord();
-            this->label_occupyNumber->setText(GlobalVariable::getChatRecordSize());
+            DatabaseManager::getDatabaseManager().clearAllChatMessages();
+            QTimer::singleShot(200, [this](){
+                this->label_occupyNumber->setText(GlobalVariable::getChatRecordSize());
+            });
         }
     });
 }

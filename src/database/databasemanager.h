@@ -65,12 +65,15 @@ public:
     void loadAllConversationsList(std::function<void(const QList<ConversationInfo>&)> callback);
     void loadConversationMessages(const QString& conversationID, int limit = 20, qint64 endConvSeq = -1, std::function<void(const QList<Message>&)> callback = nullptr);
 
+    void clearAllChatMessages();
+
     void stopHandleTask();
     void startHandleTask();
 
     void setNewDatabasePath(const QString& newDBPath);
 
 signals:
+    void allChatMessagesClean();
 
 private:
     explicit DatabaseManager(QObject *parent = nullptr);

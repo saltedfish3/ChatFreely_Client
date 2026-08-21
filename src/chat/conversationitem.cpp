@@ -82,6 +82,14 @@ void ConversationItem::clearUnRead()
     }
 }
 
+void ConversationItem::clearMessages()
+{
+    this->msgManager.clearMessages();
+    this->unRead = 0;
+    emit UnReadCountChange(0);
+    emit LastMessageChange(Message());
+}
+
 void ConversationItem::addUnReadCount()
 {
     this->unRead++;

@@ -94,15 +94,6 @@ QString GlobalVariable::getChatRecordSize()
     return QString::number(totalSize) + "B";
 }
 
-void GlobalVariable::clearAllChatRecord()
-{
-    QDir dir(pos_chatRecord);
-    if(dir.removeRecursively())
-    {
-        dir.mkdir(".");
-    }
-}
-
 void GlobalVariable::setMigrationState(bool isMigrating, const QString &oldPath, const QString &newPath)
 {
     QSettings settings(pos_ini, QSettings::IniFormat);

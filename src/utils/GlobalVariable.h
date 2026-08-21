@@ -33,7 +33,6 @@ public:
     static void setPosOfChatRecord(const QString& dir);
 
     static QString getChatRecordSize();
-    static void clearAllChatRecord();
 
     static void setMigrationState(bool isMigrating, const QString& oldPath = QString(), const QString& newPath = QString());
     static bool isMigrating();

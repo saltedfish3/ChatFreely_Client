@@ -113,6 +113,13 @@ bool MessagesManager::updateMessageStatus(const QString &tempMsgID, const QStrin
     return true;
 }
 
+void MessagesManager::clearMessages()
+{
+    this->messages.clear();
+    this->index_message.clear();
+    emit resetModel();
+}
+
 Message MessagesManager::getLastMessage() const
 {
     return this->messages.isEmpty() ? Message() : this->messages.last();

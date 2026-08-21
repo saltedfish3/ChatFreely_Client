@@ -8,6 +8,7 @@ MessageModel::MessageModel(MessagesManager* manager, QObject *parent)
     connect(manager, &MessagesManager::messagePrepend, this, &MessageModel::onMessagePrepend);
     connect(manager, &MessagesManager::messageRemove, this, &MessageModel::onMessageRemove);
     connect(manager, &MessagesManager::messageMove, this, &MessageModel::onMessageMove);
+    connect(manager, &MessagesManager::resetModel, this, &MessageModel::onResetModel);
     connect(&FriendManage::getFriendManage(), &FriendManage::friendAvatarUpdate, this, &MessageModel::onMessageFriendAvatarUpdate);
     connect(&UserInfo::getUserInfo(), &UserInfo::updateAvatar, this, &MessageModel::onMessageMyselfAvatarUpdate);
 }
@@ -49,7 +50,7 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
     return {};
 }
 
-void MessageModel::resetModel()
+void MessageModel::onResetModel()
 {
     beginResetModel();
     endResetModel();
