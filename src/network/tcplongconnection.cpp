@@ -715,7 +715,10 @@ void TcpLongConnection::handleLoginResp(QJsonObject obj)
                     UserInfo::getUserInfo().setAvatar(QPixmap(":/default/images/defaultAvatar.png"));
                 else
                 {
-                    HttpShortConnection::getHttpClient().getAvatar(obj.value("Avatar_Url").toString(), 3);
+                    ImageCacheManager::getManager().loadImage(obj.value("Avatar_Url").toString(), [this](const QPixmap& pix){
+                        if(!pix.isNull())
+                            UserInfo::getUserInfo().setAvatar(pix);
+                    }, true);
                 }
                 if((!obj.contains("RefreshToken") || !obj.value("RefreshToken").isString() || obj.value("RefreshToken").toString().isEmpty()) &&
                     (!obj.contains("AccessToken") || !obj.value("AccessToken").isString() || obj.value("AccessToken").toString().isEmpty()))

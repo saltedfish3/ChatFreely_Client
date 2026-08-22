@@ -292,19 +292,19 @@ void SettingWidget::initThisStyle()
                                         font-weight:500;
                                         padding-left:20px;
                                     }
-                                    #label_fileSavePos,#label_chatRecordSavePos,#label_saveSpaceManage
+                                    #label_fileSavePos,#label_chatRecordSavePos,#label_saveSpaceManage,#label_cacheManage
                                     {
                                         color: rgba(75, 85, 99, 255);
                                         font-size: 13px;
                                         padding-left:20px;
                                     }
-                                    #label_occupyNow
+                                    #label_occupyNow,#label_cacheOccupyNow
                                     {
                                         color: rgba(75, 85, 99, 255);
                                         font-size: 12px;
                                         padding-left:20px;
                                     }
-                                    #label_occupyNumber
+                                    #label_occupyNumber,#label_cacheOccupyNumber
                                     {
                                         color: rgba(75, 85, 99, 255);
                                         font-size: 12px;
@@ -363,7 +363,7 @@ void SettingWidget::initThisStyle()
                                     {
                                         background-color: rgba(243, 244, 246, 255);
                                     }
-                                    #btn_clearOccupy
+                                    #btn_clearOccupy,#btn_cacheClearOccupy
                                     {
                                         background-color: rgba(254, 242, 242, 255);
                                         border: 1px solid rgba(252, 165, 165, 255);
@@ -371,13 +371,13 @@ void SettingWidget::initThisStyle()
                                         color: rgba(220, 38, 38, 255);
                                         font-size: 11px;
                                     }
-                                    #btn_clearOccupy:hover
+                                    #btn_clearOccupy:hover,#btn_cacheClearOccupy:hover
                                     {
                                         background-color: rgba(220, 38, 38, 255);
                                         border-color: rgba(220, 38, 38, 255);
                                         color: rgba(255, 255, 255, 255);
                                     }
-                                    #btn_clearOccupy:pressed
+                                    #btn_clearOccupy:pressed,#btn_cacheClearOccupy:pressed
                                     {
                                         background-color: rgba(185, 28, 28, 255);
                                         border-color: rgba(185, 28, 28, 255);
@@ -518,7 +518,7 @@ void SettingWidget::initSystemDataWidget()
 {
     this->widget_systemData = new QWidget(this->widget_holy);
     this->widget_systemData->setObjectName("widget_systemData");
-    this->widget_systemData->resize(this->widget_personalData->width(),400);
+    this->widget_systemData->resize(this->widget_personalData->width(),468);
     this->widget_systemData->move(this->widget_personalData->pos().x(),
                                     this->widget_personalData->pos().y()+this->widget_personalData->height()+20);
     this->widget_systemData->setAttribute(Qt::WA_StyledBackground);
@@ -640,11 +640,28 @@ void SettingWidget::initSystemDataWidget()
     this->label_occupyNumber->move(0,0);
     this->label_occupyNumber->setText(GlobalVariable::getChatRecordSize());
 
+    this->label_cacheManage = new QLabel("缓存空间管理",this->widget_systemData);
+    this->label_cacheManage->setObjectName("label_cacheManage");
+    this->label_cacheManage->resize(this->widget_systemData->width(),20);
+    this->label_cacheManage->move(0,this->label_occupyNow->pos().y() + this->label_occupyNow->height()+30);
+
+    this->label_cacheOccupyNow = new QLabel("当前占用:",this->widget_systemData);
+    this->label_cacheOccupyNow->setObjectName("label_cacheOccupyNow");
+    this->label_cacheOccupyNow->resize(this->widget_systemData->width(),18);
+    this->label_cacheOccupyNow->move(0,this->label_cacheManage->pos().y()+this->label_cacheManage->height()+4);
+
+    this->label_cacheOccupyNumber = new QLabel(this->label_cacheOccupyNow);
+    this->label_cacheOccupyNumber->setObjectName("label_cacheOccupyNumber");
+    this->label_cacheOccupyNumber->resize(this->label_cacheOccupyNow->width(),this->label_cacheOccupyNow->height());
+    this->label_cacheOccupyNumber->move(0,0);
+    this->label_cacheOccupyNumber->setText(GlobalVariable::getImageCacheSize());
+
     this->is_stop = false;
     this->occupy_worker = std::thread([this](){
         while(!this->is_stop)
         {
             this->label_occupyNumber->setText(GlobalVariable::getChatRecordSize());
+            this->label_cacheOccupyNumber->setText(GlobalVariable::getImageCacheSize());
             std::this_thread::sleep_for(std::chrono::seconds(10));
         }
     });
@@ -668,6 +685,24 @@ void SettingWidget::initSystemDataWidget()
             DatabaseManager::getDatabaseManager().clearAllChatMessages();
             QTimer::singleShot(200, [this](){
                 this->label_occupyNumber->setText(GlobalVariable::getChatRecordSize());
+            });
+        }
+    });
+
+    this->btn_cacheClearOccupy = new QPushButton("清空缓存",this->widget_systemData);
+    this->btn_cacheClearOccupy->setObjectName("btn_cacheClearOccupy");
+    this->btn_cacheClearOccupy->resize(80,this->label_cacheOccupyNow->pos().y()+this->label_cacheOccupyNow->height()-this->label_cacheManage->pos().y() - 8);
+    this->btn_cacheClearOccupy->move(this->btn_changechatRecordSavePos->pos().x()+this->btn_changechatRecordSavePos->width()-this->btn_cacheClearOccupy->width(),
+                                this->label_cacheManage->pos().y() + 4);
+
+    connect(this->btn_cacheClearOccupy,&QPushButton::clicked,this,[this](){
+        QMessageBox::StandardButton reply = QMessageBox::question(this,"确认清空？","确定要清空所有缓存吗？",QMessageBox::Yes|QMessageBox::Cancel);
+        if(reply == QMessageBox::Yes)
+        {
+            //清空文件夹
+            GlobalVariable::clearImageCache();
+            QTimer::singleShot(200, [this](){
+                this->label_cacheOccupyNumber->setText(GlobalVariable::getImageCacheSize());
             });
         }
     });

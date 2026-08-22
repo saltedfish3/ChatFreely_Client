@@ -9,6 +9,7 @@
 #include <QReadWriteLock>
 #include <QPointer>
 #include "../network/httpshortconnection.h"
+#include "../utils/imagecachemanager.h"
 
 class TcpLongConnection;
 

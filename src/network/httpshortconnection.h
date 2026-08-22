@@ -29,10 +29,9 @@ public:
     static HttpShortConnection& getHttpClient();
 
     void uploadAvatar(const QString& filePath);
-    void getAvatar(const QString& url, size_t retryTime, std::function<void(const QPixmap&)> onSuccess = nullptr, bool failed_notice = true);
+    void getImage(const QString& url, size_t retryTime, std::function<void(const QPixmap&)> onSuccess = nullptr, bool failed_notice = true);
 
 signals:
-    void AvatarReady(QPixmap pixmap);
     void mainState(bool isSuccess, QString info);
     void refreshExpiredExit();
 

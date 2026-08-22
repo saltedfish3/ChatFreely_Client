@@ -82,6 +82,11 @@ private:
     QLabel* label_occupyNumber;
     QPushButton* btn_clearOccupy;
 
+    QLabel* label_cacheManage;
+    QLabel* label_cacheOccupyNow;
+    QLabel* label_cacheOccupyNumber;
+    QPushButton* btn_cacheClearOccupy;
+
     QFrame* line;
 
     QPushButton* btn_UnLoginMyself;

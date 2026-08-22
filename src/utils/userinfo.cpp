@@ -168,10 +168,6 @@ void UserInfo::cleanALL()
 UserInfo::UserInfo(QObject *parent)
     : QObject{parent}
 {
-    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::AvatarReady, this, [this](QPixmap pixmap){
-        setAvatar(pixmap);
-        emit updateAvatar(this->avatar);
-    });
     this->is_login = false;
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, [this](){

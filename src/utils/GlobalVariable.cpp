@@ -3,6 +3,7 @@
 QString GlobalVariable::pos_ini;
 QString GlobalVariable::pos_downloadFile;
 QString GlobalVariable::pos_chatRecord;
+QString GlobalVariable::pos_imageCache;
 GlobalVariable GlobalVariable::myself;
 
 GlobalVariable::GlobalVariable()
@@ -12,18 +13,22 @@ GlobalVariable::GlobalVariable()
     QDir().mkpath(configDir);
     this->pos_ini = configDir + "/config.ini";
 
-    QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/Record";
+    QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/record";
     QDir().mkpath(dataDir);
     QString downloadDir = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
     QDir().mkpath(downloadDir);
+    QString imageCacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/images";
+    QDir().mkpath(imageCacheDir);
 
     if(!QFileInfo::exists(this->pos_ini))
     {
         QSettings settings(this->pos_ini,QSettings::IniFormat);
         settings.setValue("pos_downloadFile",downloadDir);
         settings.setValue("pos_chatRecord",dataDir);
+        settings.setValue("pos_imageCache",imageCacheDir);
         this->pos_downloadFile = downloadDir;
         this->pos_chatRecord = dataDir;
+        this->pos_imageCache = imageCacheDir;
     }
     else
     {
@@ -39,6 +44,12 @@ GlobalVariable::GlobalVariable()
         {
             settings.setValue("pos_chatRecord",dataDir);
             this->pos_chatRecord = dataDir;
+        }
+        this->pos_imageCache = settings.value("pos_imageCache").toString();
+        if(this->pos_imageCache.isEmpty())
+        {
+            settings.setValue("pos_imageCache",imageCacheDir);
+            this->pos_imageCache = imageCacheDir;
         }
     }
 }
@@ -68,8 +79,13 @@ QString GlobalVariable::getPosOfChatRecord()
 void GlobalVariable::setPosOfChatRecord(const QString &dir)
 {
     QSettings settings(pos_ini,QSettings::IniFormat);
-    settings.setValue("pos_chatRecord", dir + "/Record");
-    pos_chatRecord = dir + "/Record";
+    settings.setValue("pos_chatRecord", dir + "/record");
+    pos_chatRecord = dir + "/record";
+}
+
+QString GlobalVariable::getPosOfImageCache()
+{
+    return pos_imageCache;
 }
 
 QString GlobalVariable::getChatRecordSize()
@@ -92,6 +108,41 @@ QString GlobalVariable::getChatRecordSize()
     else if(totalSize >= KB)
         return QString::number(totalSize / (double)KB,'f',2) + "KB";
     return QString::number(totalSize) + "B";
+}
+
+QString GlobalVariable::getImageCacheSize()
+{
+    qint64 totalSize = 0;
+    QDirIterator it(pos_imageCache,QDir::Files|QDir::Hidden|QDir::NoSymLinks,QDirIterator::Subdirectories);
+    while(it.hasNext())
+    {
+        it.next();
+        totalSize += it.fileInfo().size();
+    }
+    const qint64 KB = 1024;
+    const qint64 MB = 1024*KB;
+    const qint64 GB = 1024*MB;
+
+    if(totalSize >= GB)
+        return QString::number(totalSize / (double)GB,'f',2) + "GB";
+    else if(totalSize >= MB)
+        return QString::number(totalSize / (double)MB,'f',2) + "MB";
+    else if(totalSize >= KB)
+        return QString::number(totalSize / (double)KB,'f',2) + "KB";
+    return QString::number(totalSize) + "B";
+}
+
+void GlobalVariable::clearImageCache()
+{
+    if(pos_imageCache.isEmpty())
+        return;
+
+    QDir dir(pos_imageCache);
+    if(dir.exists())
+    {
+        dir.removeRecursively();
+        dir.mkdir(".");
+    }
 }
 
 void GlobalVariable::setMigrationState(bool isMigrating, const QString &oldPath, const QString &newPath)

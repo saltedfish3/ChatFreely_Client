@@ -15,6 +15,7 @@
 #include <unordered_set>
 #include "../utils/GlobalVariable.h"
 #include "../chat/message.h"
+#include "../utils/imagecachemanager.h"
 
 #define SADDR "127.0.0.1"
 #define SPORT 9000

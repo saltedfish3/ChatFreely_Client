@@ -26,14 +26,13 @@ void NewFriendManageWidget::addRequestsItem(QString uid, QString sid, QString us
         //防止头像下载成功后item野指针
         QPersistentModelIndex index = this->model->indexFromItem(item);
         QPointer<QStandardItemModel> modelPtr(this->model);
-        HttpShortConnection::getHttpClient().getAvatar(avatar_url, 3, [index, modelPtr](const QPixmap& avatar){
-            QMetaObject::invokeMethod(qApp, [index, modelPtr, avatar](){
-                if(modelPtr && index.isValid())
-                {
-                    modelPtr->setData(index, avatar, FriendApplyDelegate::AvatarRole);
-                }
-            }, Qt::QueuedConnection);
-        }, false);
+
+        ImageCacheManager::getManager().loadImage(avatar_url, [this, modelPtr, index](const QPixmap& pix){
+            if(modelPtr && index.isValid())
+            {
+                modelPtr->setData(index, pix, FriendApplyDelegate::AvatarRole);
+            }
+        });
     }
     emit RequestsNumberChange(this->model->rowCount());
 }

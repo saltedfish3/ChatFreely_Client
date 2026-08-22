@@ -105,12 +105,12 @@ void HttpShortConnection::uploadAvatar(const QString &filePath)
             return;
         }
 
-        getAvatar(url, 3);
+        getImage(url, 3);
         TcpLongConnection::getTcpClient().sendUpadteAvatar(url);
     });
 }
 
-void HttpShortConnection::getAvatar(const QString &url, size_t retryTime, std::function<void(const QPixmap&)> onSuccess, bool failed_notice)
+void HttpShortConnection::getImage(const QString &url, size_t retryTime, std::function<void(const QPixmap&)> onSuccess, bool failed_notice)
 {
     QNetworkRequest request(url);
     request.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
@@ -127,7 +127,7 @@ void HttpShortConnection::getAvatar(const QString &url, size_t retryTime, std::f
                     if(!newAccessToken.isEmpty())
                     {
                         UserInfo::getUserInfo().setAccessToken(newAccessToken);
-                        getAvatar(url, retryTime, onSuccess, failed_notice);
+                        getImage(url, retryTime, onSuccess, failed_notice);
                     }
                     else
                     {
@@ -157,7 +157,7 @@ void HttpShortConnection::getAvatar(const QString &url, size_t retryTime, std::f
             if(retryTime > 1)
             {
                 QTimer::singleShot(2000, [url, retryTime, onSuccess, failed_notice](){
-                    HttpShortConnection::getHttpClient().getAvatar(url, retryTime - 1, onSuccess, failed_notice);
+                    HttpShortConnection::getHttpClient().getImage(url, retryTime - 1, onSuccess, failed_notice);
                 });
             }
             else
@@ -180,8 +180,6 @@ void HttpShortConnection::getAvatar(const QString &url, size_t retryTime, std::f
         {
             onSuccess(avatar);
         }
-        else
-            emit AvatarReady(avatar);
     });
 }
 

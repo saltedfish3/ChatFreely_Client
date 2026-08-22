@@ -154,7 +154,7 @@ void GlobalInitController::startMigrateFile(const QString &newDBPath)
 
     bool success = false;
     QString oldDBPath = GlobalVariable::getPosOfChatRecord();
-    QString fullyPath = newDBPath + "/Record";
+    QString fullyPath = newDBPath + "/record";
     QString tempNewPath = fullyPath + ".tmp";
 
     GlobalVariable::setMigrationState(true, oldDBPath, fullyPath);
@@ -417,7 +417,7 @@ void GlobalInitController::checkUnFinishMigrate()
     if(!newPath.isEmpty() && QDir(newPath).exists())
     {
         QString baseDir = newPath;
-        const QString suffix = "/Record";
+        const QString suffix = "/record";
         if(baseDir.endsWith(suffix))
         {
             baseDir.chop(suffix.length());

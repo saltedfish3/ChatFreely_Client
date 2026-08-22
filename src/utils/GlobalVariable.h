@@ -32,7 +32,11 @@ public:
     static QString getPosOfChatRecord();
     static void setPosOfChatRecord(const QString& dir);
 
+    static QString getPosOfImageCache();
+
     static QString getChatRecordSize();
+    static QString getImageCacheSize();
+    static void clearImageCache();
 
     static void setMigrationState(bool isMigrating, const QString& oldPath = QString(), const QString& newPath = QString());
     static bool isMigrating();
@@ -48,6 +52,7 @@ private:
     static QString pos_ini;
     static QString pos_downloadFile;
     static QString pos_chatRecord;
+    static QString pos_imageCache;
 };
 
 
