@@ -21,7 +21,10 @@ public:
     void addNewMessage(Message msg);
 
     void updateMessageStatus(bool isSuccess, const QString& tempMsgID, const QString& messageID, int64_t timeStamp, int64_t convSeq);
+    void updateMessageContent(const QString& tempMsgID, const QString& content);
     void loadHistoryMessages(int limit = 20);
+
+    void reloadImage(const QString& msgID);
 
     bool isActive() const;
     void clearUnRead();
@@ -38,6 +41,8 @@ signals:
     void messageStatusChange();
     void firstLoadingMessages();
     void historyMessagesload(int insertCount);
+    void startLoadingImage();
+    void finishLoadedImage();
 
 private:
     QString conversationID;

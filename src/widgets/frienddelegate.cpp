@@ -46,14 +46,19 @@ void FriendDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option
         painter->setBrush(QColor(70, 72, 212));
         painter->drawRect(clickedSide);
     }
-    QSize avatarSize(contain.height() * 0.7, contain.height() * 0.7);
+    QSize avatarSize(38, 38);
     QRect avatar(contain.topLeft() + QPoint(15, (contain.height() - avatarSize.height())/2), avatarSize);
     QPixmap avatarIcon = index.data(AvatarRole).value<QPixmap>();
+
     if(avatarIcon.isNull())
-        avatarIcon = setRadius(QPixmap(":/default/images/defaultAvatar.png"), avatarSize.width());
-    else
-        avatarIcon = setRadius(index.data(AvatarRole).value<QPixmap>(), avatarSize.width());
+        avatarIcon = QPixmap(":/default/images/defaultAvatar.png");
+
+    painter->save();
+    QPainterPath path;
+    path.addRoundedRect(avatar, avatarSize.width()/2, avatarSize.height()/2);
+    painter->setClipPath(path);
     painter->drawPixmap(avatar, avatarIcon);
+    painter->restore();
 
     QString text = index.data(UsernameRole).toString();
     QFontMetrics fm = painter->fontMetrics();
@@ -123,31 +128,4 @@ bool FriendDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, const
         }
     }
     return QStyledItemDelegate::editorEvent(event, model, option, index);
-}
-
-QPixmap FriendDelegate::setRadius(const QPixmap& pixmap, int hei_wid) const
-{
-    if(pixmap.isNull())
-        return {};
-
-    //适配高DPI
-    const qreal dpr = pixmap.devicePixelRatioF();
-    const int pixmapSize = qRound(hei_wid * dpr);
-    QPixmap scaled = pixmap.scaled(pixmapSize, pixmapSize, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
-    scaled.setDevicePixelRatio(dpr);
-
-    QPixmap roundedPix(pixmapSize, pixmapSize);
-    roundedPix.fill(Qt::transparent);
-    roundedPix.setDevicePixelRatio(pixmap.devicePixelRatioF());
-
-    QPainter painter(&roundedPix);
-    painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
-
-    QPainterPath path;
-    path.addEllipse(0,0,hei_wid,hei_wid);
-
-    painter.setClipPath(path);
-    painter.drawPixmap(0,0,scaled);
-    painter.end();
-    return roundedPix;
 }

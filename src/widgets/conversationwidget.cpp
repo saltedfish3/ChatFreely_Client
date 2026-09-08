@@ -5,7 +5,6 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
 {
     this->setObjectName("widget_conversation");
     this->resize(width, height);
-
     this->widget_header = new QWidget(this);
     this->widget_header->setObjectName("widget_header");
     this->widget_header->resize(this->width(), 56);
@@ -88,6 +87,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         if(loadingCount == 0)
             this->timer_loading->stop();
     });
+    // this->timer_loading->start(30);
 
     //初始化 消息显示 部分
     this->listView_messages = new QListView(this);
@@ -107,6 +107,11 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     this->listView_messages->verticalScrollBar()->setSingleStep(10);
     this->listView_messages->setUniformItemSizes(false);
     this->listView_messages->setResizeMode(QListView::Adjust);
+
+    connect(this->listView_messages->verticalScrollBar(), &QScrollBar::rangeChanged, this->listView_messages, [this](int, int){
+        //防止视图宽度变小导致缓存未更新
+        this->listView_messages->doItemsLayout();
+    });
 
     //初始化 编辑框 区域
     this->widget_editRegion = new QWidget(this);
@@ -154,27 +159,36 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
                          send_h + (this->widget_editRegion->height() - send_h - this->btn_send->height())/2);
 
     connect(this->btn_send,&QPushButton::clicked,this,[this](){
-        QString content = this->edit_message->toPlainText().trimmed();
-        if(content.isEmpty())
-            return;
-        QString tempMsgID = QUuid::createUuid().toString();
+        this->edit_message->saveBlocks();
+        QList<ChatTextEdit::MessageBlock>& blocks = this->edit_message->getAllBlocks();
 
-        Message msg;
-        msg.tempMsgID = tempMsgID;
-        msg.content = content;
-        msg.timeStamp = QDateTime::currentSecsSinceEpoch();
-        msg.senderUID = UserInfo::getUserInfo().getUID();
-        msg.status = Sending;
-        msg.convSeq = this->item->getMessagesManager().getNextConvSeq();
+        for(auto& block : blocks)
+        {
+            const QString& content = block.content.trimmed();
+            if(content.isEmpty() || (block.type != ContentType::Text && block.type != ContentType::Image))
+                continue;
 
-        this->item->addNewMessage(msg);
-        this->loadingCount++;
-        QTimer::singleShot(0, this, [this](){
-            if(this->loadingCount > 0 && !this->timer_loading->isActive())
-                this->timer_loading->start(30);
-        });
+            QString tempMsgID = QUuid::createUuid().toString();
+            block.tempID = tempMsgID;
 
-        TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), content, tempMsgID);
+            Message msg;
+            msg.tempMsgID = tempMsgID;
+            msg.timeStamp = QDateTime::currentSecsSinceEpoch();
+            msg.senderUID = UserInfo::getUserInfo().getUID();
+            msg.status = Sending;
+            msg.convSeq = this->item->getMessagesManager().getNextConvSeq();
+
+            msg.contentType = block.type;
+            msg.content = block.content;
+
+            this->item->addNewMessage(msg);
+            this->loadingCount++;
+            QTimer::singleShot(0, this, [this](){
+                if(this->loadingCount > 0 && !this->timer_loading->isActive())
+                    this->timer_loading->start(30);
+            });
+        }
+        handleNextBlock();
         this->edit_message->clear();
         this->listView_messages->scrollToBottom();
     });
@@ -242,12 +256,27 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
                 this->timer_loading->start(30);
         });
 
-        TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), msg.content, msg.tempMsgID);
+        TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), msg.content, msg.tempMsgID, msg.contentType);
         this->listView_messages->scrollToBottom();
     });
 
-    connect(this->listView_messages->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](int value){
+    connect(this->delegate, &ConversationDelegate::ReloadImageClicked, this, [this](const QString& msgID){
+        this->item->reloadImage(msgID);
+    });
 
+    connect(this->item, &ConversationItem::finishLoadedImage, this, [this](){
+        this->loadingCount--;
+    });
+
+    connect(this->item, &ConversationItem::startLoadingImage, this, [this](){
+        this->loadingCount++;
+        QTimer::singleShot(0, this, [this](){
+            if(this->loadingCount > 0 && !this->timer_loading->isActive())
+                this->timer_loading->start(30);
+        });
+    });
+
+    connect(this->listView_messages->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](int value){
         if(isAdjustNow)
             return;
 
@@ -406,6 +435,33 @@ void ConversationWidget::initStyle()
                                 background-color: #f9f9f9;
                                 border-bottom: 1px solid #e0e0e0;
                             }
+                                #listView_messages QScrollBar:vertical
+                                {
+                                    width: 4px;
+                                    background: transparent;
+                                    margin: 0px;
+                                    margin-top: 2px;
+                                }
+                                #listView_messages QScrollBar::handle:vertical
+                                {
+                                    background: rgba(0, 0, 0, 0.2);
+                                    border-radius: 2px;
+                                    min-height: 30px;
+                                }
+                                #listView_messages QScrollBar::handle:vertical:hover
+                                {
+                                    background: rgba(0, 0, 0, 0.35);
+                                }
+                                #listView_messages QScrollBar::add-line:vertical,
+                                #listView_messages QScrollBar::sub-line:vertical
+                                {
+                                    height: 0px;
+                                }
+                                #listView_messages QScrollBar::add-page:vertical,
+                                #listView_messages QScrollBar::sub-page:vertical
+                                {
+                                    background: none;
+                                }
                             #widget_editRegion
                             {
                                 background-color: #ffffff;
@@ -483,4 +539,59 @@ void ConversationWidget::startReFlashTimeStamp()
         this->listView_messages->viewport()->update();
         startReFlashTimeStamp();
     });
+}
+
+void ConversationWidget::handleNextBlock()
+{
+    ChatTextEdit::MessageBlock block;
+    bool isVaild = false;
+    while(this->edit_message->hasBlocks())
+    {
+        block = this->edit_message->nextBlock();
+        if(block.content.trimmed().isEmpty() || block.tempID.isEmpty())
+            continue;
+        else
+        {
+            isVaild = true;
+            break;
+        }
+    }
+
+    if(!isVaild)
+        return;
+
+    const QString content = block.content.trimmed();
+
+    if(block.type == ContentType::Text)
+    {
+        TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), content, block.tempID, ContentType::Text);
+        handleNextBlock();
+    }
+    else if(block.type == ContentType::Image)
+    {
+        if(!block.content.startsWith("local://"))
+        {
+            TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), content, block.tempID, ContentType::Image);
+            handleNextBlock();
+        }
+        else
+        {
+            QString filePath = ImageCacheManager::getManager().getCacheFilePath(content);
+            if(filePath.isEmpty())
+            {
+                this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
+                handleNextBlock();
+                return;
+            }
+            HttpShortConnection::getHttpClient().uploadImage(filePath, [this, block, content](const QString& url){
+                ImageCacheManager::getManager().migrateCache(content, url);
+                this->item->updateMessageContent(block.tempID, url);
+                TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), url, block.tempID, ContentType::Image);
+                handleNextBlock();
+            }, false, [this, block](const QString& info){
+                this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
+                handleNextBlock();
+            });
+        }
+    }
 }

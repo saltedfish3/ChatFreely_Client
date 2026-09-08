@@ -21,19 +21,19 @@ void NewFriendManageWidget::addRequestsItem(QString uid, QString sid, QString us
     item->setData(verMsg, FriendApplyDelegate::VerMsgRole);
     this->model->appendRow(item);
 
-    if(!avatar_url.isEmpty())
-    {
-        //防止头像下载成功后item野指针
-        QPersistentModelIndex index = this->model->indexFromItem(item);
-        QPointer<QStandardItemModel> modelPtr(this->model);
+    QString loadUrl = avatar_url.isEmpty() ? ":/default/images/defaultAvatar.png" : avatar_url;
 
-        ImageCacheManager::getManager().loadImage(avatar_url, [this, modelPtr, index](const QPixmap& pix){
-            if(modelPtr && index.isValid())
-            {
-                modelPtr->setData(index, pix, FriendApplyDelegate::AvatarRole);
-            }
-        });
-    }
+    //防止头像下载成功后item野指针
+    QPersistentModelIndex index = this->model->indexFromItem(item);
+    QPointer<QStandardItemModel> modelPtr(this->model);
+
+    ImageCacheManager::getManager().loadImage(loadUrl, [this, modelPtr, index](const QPixmap& pix){
+        if(modelPtr && index.isValid())
+        {
+            modelPtr->setData(index, pix, FriendApplyDelegate::AvatarRole);
+        }
+    }, false, -1, 0, 0, QSize(48, 48));
+
     emit RequestsNumberChange(this->model->rowCount());
 }
 

@@ -13,6 +13,7 @@
 #include <QPointer>
 #include <QTextLayout>
 #include <QDateTime>
+#include "../utils/imagecachemanager.h"
 
 class ConversationDelegate : public QStyledItemDelegate
 {
@@ -23,12 +24,21 @@ public:
     {
         IsMyselfRole = Qt::UserRole + 1,
         IsNeedShowTime,
+        ContentTypeRole,
         ContentRole,
         AvatarRole,
         TimeStamp,
         MessageIDRole,
         ConvSeqRole,
-        MessageStatusRole
+        MessageStatusRole,
+        ImageRole,
+        ImageStateRole
+    };
+
+    enum ContentType
+    {
+        Text = 0,
+        Image
     };
 
     enum Status
@@ -40,6 +50,7 @@ public:
 
 signals:
     void ReSendClicked(const QString& tempMsgID);
+    void ReloadImageClicked(const QString& msgID);
 
 protected:
     void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
@@ -48,7 +59,8 @@ protected:
 
 private:
     QString formatTimestamp(int64_t timestamp) const;
-    QPixmap setRadius(const QPixmap& pixmap, int hei_wid) const;
+    int getViewportWidth(const QStyleOptionViewItem& option) const;
+
     void getLayout(const QStyleOptionViewItem &option, const QModelIndex& index, QRect& timestamp, QRect& contain, QRect& avatarRect, QRect& textRegionRect, QRect& statusRect, int& textTotalHeight) const;
     int* loadingAngle = nullptr;
 

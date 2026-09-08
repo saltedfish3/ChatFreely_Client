@@ -11,6 +11,12 @@ enum Status
     Failed
 };
 
+enum ContentType
+{
+    Text = 0,
+    Image
+};
+
 struct Message
 {
     QString serverMsgID;
@@ -21,6 +27,7 @@ struct Message
     bool showTimestamp = false;
 
     QString senderUID;
+    ContentType contentType = Text;
     QString content;
     Status status = Success;
 };

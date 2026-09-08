@@ -14,8 +14,17 @@ SettingWidget::SettingWidget(int width, int height, QWidget *parent)
     });
 
     //头像更新
-    connect(&UserInfo::getUserInfo(), &UserInfo::updateAvatar, this, [this](QPixmap avatar){
-        setRadius(QIcon(avatar), this->btn_avatar, this->btn_avatar->height() - 1);
+    connect(&UserInfo::getUserInfo(), &UserInfo::updateAvatar, this, [this](const QPixmap& avatar, const QSize& size){
+        if(size != QSize(84, 84) && !size.isEmpty())
+            return;
+        QPixmap avatar_ = avatar;
+        if(!size.isEmpty())
+            setRadius(avatar_, this->btn_avatar, 42);
+        else
+        {
+            avatar_ = UserInfo::getUserInfo().getAvatar(QSize(84, 84));
+            setRadius(avatar_, this->btn_avatar, 42);
+        }
     });
 }
 
@@ -26,28 +35,26 @@ SettingWidget::~SettingWidget()
         this->occupy_worker.join();
 }
 
-void SettingWidget::setRadius(QIcon pic, QPushButton *btn, int hei_wid)
+void SettingWidget::setRadius(QPixmap& pix, QPushButton *btn, int radius)
 {
-    QPixmap pixmap = pic.pixmap(hei_wid);
-    //适配高DPI
-    pixmap.setDevicePixelRatio(pixmap.devicePixelRatioF());
+    if(pix.isNull())
+        return;
 
-    QPixmap roundedPix(pixmap.size());
-    roundedPix.fill(Qt::transparent);
-    roundedPix.setDevicePixelRatio(pixmap.devicePixelRatioF());
+    QPixmap rounded(btn->size() * pix.devicePixelRatioF());
+    rounded.fill(Qt::transparent);
+    rounded.setDevicePixelRatio(pix.devicePixelRatioF());
 
-    QPainter painter(&roundedPix);
+    QPainter painter(&rounded);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
 
     QPainterPath path;
-    path.addEllipse(0,0,hei_wid,hei_wid);
-
+    path.addRoundedRect(btn->rect(), radius, radius);
     painter.setClipPath(path);
-    painter.drawPixmap(0,0,pixmap);
+    painter.drawPixmap(btn->rect(), pix);
     painter.end();
 
-    btn->setIcon(roundedPix);
-    btn->setIconSize(QSize(hei_wid,hei_wid));
+    btn->setIcon(rounded);
+    btn->setIconSize(QSize(radius*2, radius*2));
 }
 
 void SettingWidget::initWidget()
@@ -412,7 +419,18 @@ void SettingWidget::initPersonalDataWidget()
     this->btn_avatar = new AvatarButton(this->widget_personalData);
     this->btn_avatar->setObjectName("btn_avatar");
     this->btn_avatar->resize(84,84);
-    setRadius(QIcon(":/default/images/defaultAvatar.png"),this->btn_avatar, this->btn_avatar->height() - 1);//80
+    QPixmap defaultAvatar = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", -1, 0, 0, QSize(84, 84));
+    if(defaultAvatar.isNull())
+    {
+        ImageCacheManager::getManager().loadImage(":/default/images/defaultAvatar.png", [this](const QPixmap& pix){
+            QPixmap p_ = pix;
+            setRadius(p_, this->btn_avatar, 42);
+        }, false, -1, 0, 0, QSize(84, 84));
+    }
+    else
+        setRadius(defaultAvatar, this->btn_avatar, 42);
+
+    // setRadius(QPixmap(":/default/images/defaultAvatar.png"),this->btn_avatar, this->btn_avatar->height() - 1);//80
     this->btn_avatar->move((this->widget_personalData->width() - this->btn_avatar->width())/2,
                            this->label_personalData->pos().y()+this->label_personalData->height()+20);
     this->btn_avatar->updateAnimation();
@@ -435,7 +453,7 @@ void SettingWidget::initPersonalDataWidget()
     connect(this->btn_avatar, &AvatarButton::sizeChanged, this, [this](){
         this->label_camera_icon->move(this->btn_avatar->width() - this->label_camera_icon->width() -5,
                                       this->btn_avatar->height()-this->label_camera_icon->height() -5);
-        this->btn_avatar->setIconSize(this->btn_avatar->size() - QSize(1,1));
+        this->btn_avatar->setIconSize(this->btn_avatar->size());
     });
 
     this->label_username = new QLabel("昵称",this->widget_personalData);

@@ -50,9 +50,10 @@ ConversationManager::ConversationManager(QObject *parent)
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::pushMessage, this, [this]
-            (QString senderUID, QString content, QString messageID, int64_t timeStamp, int64_t convSeq){
+            (QString senderUID, ContentType type, QString content, QString messageID, int64_t timeStamp, int64_t convSeq){
         Message msg;
         msg.senderUID = senderUID;
+        msg.contentType = type;
         msg.content = content;
         msg.convSeq = convSeq;
         msg.status = Status::Success;

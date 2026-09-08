@@ -32,7 +32,6 @@ protected:
     bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem& option, const QModelIndex& index) override;
 
 private:
-    QPixmap setRadius(const QPixmap& pixmap, int hei_wid) const;
 
 signals:
     void itemClicked(const QModelIndex& index);

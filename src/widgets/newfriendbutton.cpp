@@ -14,6 +14,27 @@ void NewFriendButton::setUnProcessedRequests(size_t num)
     this->update();
 }
 
+void NewFriendButton::setChecked(bool checked)
+{
+    QPushButton::setChecked(checked);
+    if(!checked)
+    {
+        this->label_Icon->setStyleSheet(R"(
+                                #label_Icon
+                                {
+                                    background:#EAE7FF;
+                                }
+                                    )");
+        this->label_newFriend->setStyleSheet(R"(
+                                #label_newFriend
+                                {
+                                    color: #1f2937;
+                                }
+                                    )");
+        this->label_arrow->setPixmap(QIcon(":/default/images/normal_rightArrow.png").pixmap(16,16));
+    }
+}
+
 void NewFriendButton::enterEvent(QEnterEvent *e)
 {
     QPushButton::enterEvent(e);

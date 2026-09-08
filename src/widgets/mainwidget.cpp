@@ -102,11 +102,34 @@ void MainWidget::initSideBar()
     this->label_avatar = new QLabel(this->widget_sideBar);
     this->label_avatar->setObjectName("label_avatar");
     this->label_avatar->resize(40,40);
-    setRadius(QIcon(":/default/images/defaultAvatar.png"),this->label_avatar,this->label_avatar->width());
+
+    QPixmap defaultAvatar = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", -1, 0, 0, QSize(128, 128));
+    if(defaultAvatar.isNull())
+    {
+        ImageCacheManager::getManager().loadImage(":/default/images/defaultAvatar.png", [this](const QPixmap& pix){
+            QPixmap p_ = pix;
+            setRadius(p_, this->label_avatar, 20);
+        }, false, -1, 0, 0, QSize(40, 40));
+    }
+    else
+        setRadius(defaultAvatar, this->label_avatar, 20);
+
+    // setRadius(QIcon(":/default/images/defaultAvatar.png"),this->label_avatar,this->label_avatar->width());
     this->label_avatar->move((this->widget_sideBar->width() - this->label_avatar->width()) / 2,16);
 
-    connect(&UserInfo::getUserInfo(), &UserInfo::updateAvatar, this, [this](QPixmap avatar){
-        setRadius(QIcon(avatar), this->label_avatar, this->label_avatar->width());
+    connect(&UserInfo::getUserInfo(), &UserInfo::updateAvatar, this, [this](const QPixmap& avatar, const QSize& size){
+        if(size != QSize(40, 40) && !size.isEmpty())
+            return;
+
+        QPixmap avatar_ = avatar;
+        if(!size.isEmpty())
+            setRadius(avatar_, this->label_avatar, 20);
+        else
+        {
+            avatar_ = UserInfo::getUserInfo().getAvatar(QSize(40, 40));
+            if(!avatar_.isNull())
+                setRadius(avatar_, this->label_avatar, 20);
+        }
     });
 
     this->sideBarGroup = new QButtonGroup(this->widget_sideBar);
@@ -292,27 +315,25 @@ void MainWidget::initPage()
     });
 }
 
-void MainWidget::setRadius(QIcon pic, QLabel *label, int hei_wid)
+void MainWidget::setRadius(QPixmap& pix, QLabel *label, int radius)
 {
-    QPixmap pixmap = pic.pixmap(hei_wid);
-    //适配高DPI
-    pixmap.setDevicePixelRatio(pixmap.devicePixelRatioF());
+    if(pix.isNull())
+        return;
 
-    QPixmap roundedPix(pixmap.size());
-    roundedPix.fill(Qt::transparent);
-    roundedPix.setDevicePixelRatio(pixmap.devicePixelRatioF());
+    QPixmap rounded(label->size() * pix.devicePixelRatioF());
+    rounded.fill(Qt::transparent);
+    rounded.setDevicePixelRatio(pix.devicePixelRatioF());
 
-    QPainter painter(&roundedPix);
+    QPainter painter(&rounded);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
 
     QPainterPath path;
-    path.addEllipse(0,0,hei_wid,hei_wid);
-
+    path.addRoundedRect(label->rect(), radius, radius);
     painter.setClipPath(path);
-    painter.drawPixmap(0,0,pixmap);
+    painter.drawPixmap(label->rect(), pix);
     painter.end();
 
-    label->setPixmap(roundedPix);
+    label->setPixmap(rounded);
 }
 
 

@@ -8,6 +8,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QStyle>
+#include "../utils/imagecachemanager.h"
 
 class ContactsInfoWidget : public QWidget
 {
@@ -25,7 +26,7 @@ private:
     void init();
     void initStyle();
 
-    void setRadius(QIcon pic, QLabel* label, int hei_wid);
+    void setRadius(QPixmap& pix, QLabel* label, int radius);
 
     QLabel* label_avatar;
     QLabel* label_username;

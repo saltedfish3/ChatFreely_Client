@@ -28,6 +28,15 @@ void MessagesManager::addMessage(const Message &msg, bool isStoreDB)
     if(msg.status == Success && msg.convSeq > this->lastConvSeq)
         this->lastConvSeq = msg.convSeq;
 
+    if(msg.contentType == Image)
+    {
+        emit startLoadingImage();
+        ImageCacheManager::getManager().loadImage(msg.content, [this, msg](const QPixmap&){
+            emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
+            emit finishLoadedImage();
+        });
+    }
+
     if(isStoreDB)
         calcShowTimestamp(index);
 
@@ -40,8 +49,77 @@ void MessagesManager::addMessages(const QList<Message> &msgs, bool isStoreDB)
 {
     if(msgs.isEmpty())
         return;
+
+    QSet<QString> existsID;
+    QList<Message> validMsgs;
     for(const auto& msg : msgs)
-        addMessage(msg, isStoreDB);
+    {
+        if(msg.status == Success)
+        {
+            //消息去重
+            bool isExist = false;
+            if(!msg.serverMsgID.isEmpty())
+                isExist = indexOfMsg(msg.serverMsgID) == -1 ? false : true || existsID.contains(msg.serverMsgID);
+            if(!isExist && !msg.tempMsgID.isEmpty())
+                isExist = indexOfMsg(msg.tempMsgID) == -1 ? false : true || existsID.contains(msg.tempMsgID);
+
+            if(isExist)
+                continue;
+        }
+        existsID.insert(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID);
+        validMsgs.append(msg);
+    }
+
+    if(validMsgs.isEmpty())
+        return;
+
+    for(const auto& msg : validMsgs)
+    {
+        int index = findInsertIndex(msg.convSeq);
+        this->messages.insert(index, msg);
+
+        if(msg.status == Success && msg.convSeq > this->lastConvSeq)
+            this->lastConvSeq = msg.convSeq;
+    }
+    rebuildIndex();
+
+    if(isStoreDB)
+    {
+        for(const auto& msg : validMsgs)
+        {
+            int index = indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID);
+            if(index != -1)
+            {
+                calcShowTimestamp(index);
+                DatabaseManager::getDatabaseManager().addInsertMessageTask(this->conversationID, this->messages.at(index));
+            }
+        }
+    }
+
+    int first = INT_MAX;
+    int end = -1;
+    for(const auto& msg : validMsgs)
+    {
+        int index = indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID);
+        first = qMin(index, first);
+        end = qMax(index, end);
+    }
+    if(first <= end)
+        emit messagesAdd(first, end);
+    else
+        emit resetModel();
+
+    for(const auto& msg : validMsgs)
+    {
+        if(msg.contentType == Image)
+        {
+            emit startLoadingImage();
+            ImageCacheManager::getManager().loadImage(msg.content, [this, msg](const QPixmap&){
+                emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
+                emit finishLoadedImage();
+            });
+        }
+    }
 }
 
 bool MessagesManager::updateMessageStatus(const QString &tempMsgID, const QString &newServerMsgID, Status status, int64_t newTimeStamp, int64_t newConvSeq)
@@ -107,6 +185,21 @@ bool MessagesManager::updateMessageStatus(const QString &tempMsgID, const QStrin
 
     if(newTimeStamp > 0)
         calcShowTimestamp(row);
+
+    emit messageUpdate(row);
+    DatabaseManager::getDatabaseManager().addUpdateMessageTask(this->conversationID, msg);
+    return true;
+}
+
+bool MessagesManager::updateMessageContent(const QString &tempMsgID, const QString &content)
+{
+    auto it = this->index_message.find(tempMsgID);
+    if(it == this->index_message.end())
+        return false;
+
+    int row = it.value();
+    Message& msg = this->messages[row];
+    msg.content = content;
 
     emit messageUpdate(row);
     DatabaseManager::getDatabaseManager().addUpdateMessageTask(this->conversationID, msg);
@@ -195,6 +288,19 @@ void MessagesManager::retryMessage(int index)
         DatabaseManager::getDatabaseManager().addUpdateMessageTask(this->conversationID, this->messages.at(oldRow));
         emit messageUpdate(oldRow);
     }
+}
+
+void MessagesManager::reLoadImage(int index)
+{
+    if(this->messages.isEmpty() || index < 0 || index >= this->messages.size())
+        return;
+
+    Message& msg = this->messages[index];
+    emit startLoadingImage();
+    ImageCacheManager::getManager().loadImage(msg.content, [this, msg](const QPixmap& pix){
+        emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
+        emit finishLoadedImage();
+    });
 }
 
 qint64 MessagesManager::getNextConvSeq()

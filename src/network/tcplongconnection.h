@@ -37,7 +37,7 @@ public:
     void sendUpdateUsername(QString username);
     void sendAddNewFriendRequest(QString sid = "", QString email = "", QString verMsg = "");
     void sendHandleNewFriendRequest(QString handle_uid, bool isAgree);
-    void sendMessageTo(QString uid, QString message, QString tempMsgID);
+    void sendMessageTo(QString uid, QString message, QString tempMsgID, ContentType type);
     void sendUnLogin();
     void sendRefreshToken(std::function<void(bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired)> callback);
     void sendAccessTokenLogin();
@@ -75,7 +75,7 @@ signals:
     void FriendAvatar(QString uid, QString avatar);
 
     void sendMessageStatus(bool isSuccess, QString tempMsgID, QString receiverUID, QString messageID = "", int64_t timeStamp = 0, int64_t convSeq = 0);
-    void pushMessage(QString senderUID, QString content, QString messageID, int64_t timeStamp, int64_t convSeq);
+    void pushMessage(QString senderUID, ContentType type, QString content, QString messageID, int64_t timeStamp, int64_t convSeq);
     void cleanNewFriendRequestsList();
     // void cleanFriendList();
     void refreshExpiredExit();
@@ -149,6 +149,7 @@ private:
     struct MessageRequest
     {
         QString requestID;
+        ContentType type;
         QString content;
         QString receiverUID;
         uint64_t reqCount = 0;

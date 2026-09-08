@@ -178,7 +178,7 @@ void ContactsWidget::initSideUn()
     connect(this->delegate, &FriendDelegate::itemClicked, this, [this](const QModelIndex& item){
         this->btn_newFriend->setChecked(false);
         this->selectedUID = item.data(FriendDelegate::UIDRole).toString();
-        this->widget_contactsInfo->changeInfo(item.data(FriendDelegate::AvatarRole).value<QPixmap>(),
+        this->widget_contactsInfo->changeInfo(FriendManage::getFriendManage().getFriendAvatar(item.data(FriendDelegate::UIDRole).toString(), QSize(128, 128)),
                                               item.data(FriendDelegate::UsernameRole).toString(),
                                               item.data(FriendDelegate::UIDRole).toString(),
                                               item.data(FriendDelegate::SIDRole).toString(),
@@ -221,19 +221,41 @@ void ContactsWidget::initSideUn()
             changeStatus(Hide);
     });
 
-    connect(&FriendManage::getFriendManage(), &FriendManage::friendAvatarUpdate, this, [this](const QString& uid, const QPixmap& avatar){
-        for(int i = 0; i < this->model->rowCount(); i++)
+    connect(&FriendManage::getFriendManage(), &FriendManage::friendAvatarUpdate, this, [this](const QString& uid, const QPixmap& avatar, const QSize& size){
+        if(size == QSize(38, 38) || size.isEmpty())
         {
-            QModelIndex index = this->model->index(i, 0);
-            if(index.data(FriendDelegate::UIDRole).toString() == uid)
+            for(int i = 0; i < this->model->rowCount(); i++)
             {
-                QStandardItem* item = this->model->itemFromIndex(index);
-                item->setData(avatar, FriendDelegate::AvatarRole);
-                break;
+                QModelIndex index = this->model->index(i, 0);
+                if(index.data(FriendDelegate::UIDRole).toString() == uid)
+                {
+                    QStandardItem* item = this->model->itemFromIndex(index);
+                    if(!size.isEmpty())
+                        item->setData(avatar, FriendDelegate::AvatarRole);
+                    else
+                    {
+                        QPixmap newAvatar = FriendManage::getFriendManage().getFriendAvatar(uid, QSize(38, 38));
+                        if(!newAvatar.isNull())
+                            item->setData(newAvatar, FriendDelegate::AvatarRole);
+                    }
+                    break;
+                }
             }
         }
-        if(uid == this->selectedUID)
-            this->widget_contactsInfo->changeSelectedAvatar(avatar);
+        if(size == QSize(128, 128))
+        {
+            if(uid == this->selectedUID)
+                this->widget_contactsInfo->changeSelectedAvatar(avatar);
+        }
+        else if(size.isEmpty())
+        {
+            if(uid == this->selectedUID)
+            {
+                QPixmap bigAvatar = FriendManage::getFriendManage().getFriendAvatar(uid, QSize(128, 128));
+                if(!bigAvatar.isNull())
+                    this->widget_contactsInfo->changeSelectedAvatar(bigAvatar);
+            }
+        }
     });
 
     connect(&FriendManage::getFriendManage(), &FriendManage::friendUsernameUpdate, this, [this](const QString& uid, const QString& username){
@@ -438,7 +460,7 @@ void ContactsWidget::sortedFriendList()
             this->model->appendRow(header);
             preGroup = thisGroup;
         }
-        addFriendItem(fi.uid, fi.sid, fi.username, fi.avatar, fi.email, fi.isOnline);
+        addFriendItem(fi.uid, fi.sid, fi.username, FriendManage::getFriendManage().getFriendAvatar(fi.uid, QSize(38, 38)), fi.email, fi.isOnline);
     }
     restoreSelect();
 }
@@ -449,7 +471,7 @@ void ContactsWidget::searchFriend(const QString& text)
     for(const FriendManage::FriendInfo& fi : std::as_const(list))
     {
         if(fi.username.contains(text, Qt::CaseInsensitive))
-            addFriendItem(fi.uid, fi.sid, fi.username, fi.avatar, fi.email, fi.isOnline);
+            addFriendItem(fi.uid, fi.sid, fi.username, FriendManage::getFriendManage().getFriendAvatar(fi.uid, QSize(38, 38)), fi.email, fi.isOnline);
     }
     restoreSelect();
 }
@@ -476,7 +498,8 @@ void ContactsWidget::restoreSelect()
     if(!this->selectedUID.isEmpty())
     {
         FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(this->selectedUID);
-        this->widget_contactsInfo->changeInfo(info.avatar, info.username, this->selectedUID, info.sid,
+
+        this->widget_contactsInfo->changeInfo(FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(128, 128)), info.username, this->selectedUID, info.sid,
                                               info.email, info.isOnline);
     }
 }

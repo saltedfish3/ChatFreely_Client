@@ -6,6 +6,7 @@
 #include "../chat/messagesmanager.h"
 #include "../utils/userinfo.h"
 #include "../utils/friendmanage.h"
+#include "../utils/imagecachemanager.h"
 
 class MessageModel : public QAbstractListModel
 {
@@ -15,12 +16,15 @@ public:
     {
         IsMyselfRole = Qt::UserRole + 1,
         IsNeedShowTime,
+        ContentTypeRole,
         ContentRole,
         AvatarRole,
         TimeStamp,
         MessageIDRole,
         ConvSeqRole,
-        MessageStatusRole
+        MessageStatusRole,
+        ImageRole,
+        ImageStateRole
     };
 
     explicit MessageModel(MessagesManager* manager, QObject *parent = nullptr);
@@ -30,13 +34,14 @@ public:
 
 public slots:
     void onMessageAdd(int row);
+    void onMessagesAdd(int first, int end);
     void onMessageUpdate(int row);
     void onMessagesUpdate(int first, int end);
     void onMessagePrepend(int count);
     void onMessageRemove(int row);
     void onMessageMove(int oldRow, int newRow);
-    void onMessageFriendAvatarUpdate(const QString& uid, const QPixmap& avatar);
-    void onMessageMyselfAvatarUpdate(const QPixmap& avatar);
+    void onMessageFriendAvatarUpdate(const QString& uid, const QPixmap& avatar, const QSize& size);
+    void onMessageMyselfAvatarUpdate(const QPixmap& avatar, const QSize& size);
     void onResetModel();
 
 signals:

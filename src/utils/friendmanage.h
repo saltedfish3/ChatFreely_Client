@@ -22,7 +22,6 @@ public:
         QString uid;
         QString sid;
         QString username;
-        QPixmap avatar;
         QString avatarUrl;
         QString email;
         bool isOnline;
@@ -34,6 +33,7 @@ public:
 
     int64_t getFriendCount() const;
     FriendManage::FriendInfo getFriendInfo(const QString& uid) const;
+    QPixmap getFriendAvatar(const QString& uid, const QSize& wantedSize);
 
     QList<FriendManage::FriendInfo> getAllFriend() const;
 
@@ -44,7 +44,7 @@ signals:
     void loadFirstAllFriendList();
 
     //用于专门的更新
-    void friendAvatarUpdate(const QString& uid, const QPixmap& avatar);
+    void friendAvatarUpdate(const QString& uid, const QPixmap& avatar, const QSize& size);
     void friendStatusUpdate(const QString& uid, bool isOnline);
     void friendUsernameUpdate(const QString& uid, const QString& username);
 
@@ -54,6 +54,8 @@ private slots:
 private:
     explicit FriendManage(QObject *parent = nullptr);
     QMap<QString, FriendInfo> map_friend;
+    QSet<QString> set_paddingAvatarSize;
+
     mutable QReadWriteLock lock;
 
     bool isFirstLoad = false;

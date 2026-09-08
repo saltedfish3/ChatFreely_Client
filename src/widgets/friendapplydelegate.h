@@ -46,7 +46,6 @@ private:
     ButtonState refuseState = None;
     bool isRefusePressed = false;
 
-    QPixmap setRadius(const QPixmap& pic, int hei_wid) const;
     void getButtonRect(const QStyleOptionViewItem& option, QRect& refuseRect, QRect& agreeRect) const;
 
 };

@@ -5,6 +5,7 @@
 #include <QHash>
 #include "message.h"
 #include "../database/databasemanager.h"
+#include "../utils/imagecachemanager.h"
 
 class MessagesManager : public QObject
 {
@@ -16,6 +17,7 @@ public:
     void addMessages(const QList<Message>& msgs, bool isStoreDB = true);
 
     bool updateMessageStatus(const QString& tempMsgID, const QString& newServerMsgID, Status status, int64_t newTimeStamp, int64_t newConvSeq);
+    bool updateMessageContent(const QString& tempMsgID, const QString& content);
     void clearMessages();
 
     Message getLastMessage() const;
@@ -26,15 +28,21 @@ public:
     void removeOfIndex(int index);
 
     void retryMessage(int index);
+    void reLoadImage(int index);
     qint64 getNextConvSeq();
 
 signals:
     void messageAdd(int row);
+    void messagesAdd(int first, int end);
     void messagePrepend(int count);
     void messageUpdate(int row);
     void messageRemove(int row);
     void messageMove(int oldRow, int newRow);
     void resetModel();
+
+    //通知item
+    void startLoadingImage();
+    void finishLoadedImage();
 
 private:
     QList<Message> messages;

@@ -95,7 +95,7 @@ void TcpLongConnection::sendUpadteAvatar(QString url)
     if(this->socket->state() != QAbstractSocket::ConnectedState)
     {
         emit mainState(false, "无法连接服务器，请稍后再试");
-        UserInfo::getUserInfo().rollBackAvatar();
+        UserInfo::getUserInfo().rollBackAvatarUrl();
         return;
     }
     QString requestsID = QString::number(getRequestsId());
@@ -124,7 +124,7 @@ void TcpLongConnection::sendUpadteAvatar(QString url)
         if(this->waiting_requestsID.erase(requestsID.toStdString()))
         {
             emit mainState(false, "连接超时，请稍后再试");
-            UserInfo::getUserInfo().rollBackAvatar();
+            UserInfo::getUserInfo().rollBackAvatarUrl();
             this->map_idempotentCache.remove(requestsID);
         }
     });
@@ -611,7 +611,7 @@ void TcpLongConnection::sendHandleNewFriendRequest(QString handle_uid, bool isAg
     });
 }
 
-void TcpLongConnection::sendMessageTo(QString uid, QString message, QString tempMsgID)
+void TcpLongConnection::sendMessageTo(QString uid, QString message, QString tempMsgID, ContentType type)
 {
     if(message.trimmed().isEmpty())
     {
@@ -633,6 +633,7 @@ void TcpLongConnection::sendMessageTo(QString uid, QString message, QString temp
         requestsID = it.value().requestID;
         content = it.value().content;
         thisCount = ++(it.value().reqCount);
+        type = it.value().type;
     }
     else
     {
@@ -640,6 +641,7 @@ void TcpLongConnection::sendMessageTo(QString uid, QString message, QString temp
         content = message;
         MessageRequest mrt;
         mrt.requestID = requestsID;
+        mrt.type = type;
         mrt.content = content;
         mrt.receiverUID = uid;
         mrt.reqCount++;
@@ -652,6 +654,7 @@ void TcpLongConnection::sendMessageTo(QString uid, QString message, QString temp
     obj["Type"] = "SendMessage";
     obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
     obj["ReceiverUID"] = uid;
+    obj["ContentType"] = static_cast<int>(type);
     obj["Content"] = content;
     obj["TempMsgID"] = tempMsgID;
 
@@ -712,13 +715,10 @@ void TcpLongConnection::handleLoginResp(QJsonObject obj)
                 UserInfo::getUserInfo().setSID(obj.value("SID").toString());
                 UserInfo::getUserInfo().setUID(obj.value("UID").toString());
                 if(obj.value("Avatar_Url").toString().isEmpty())
-                    UserInfo::getUserInfo().setAvatar(QPixmap(":/default/images/defaultAvatar.png"));
+                    UserInfo::getUserInfo().setAvatarUrl(QString());
                 else
                 {
-                    ImageCacheManager::getManager().loadImage(obj.value("Avatar_Url").toString(), [this](const QPixmap& pix){
-                        if(!pix.isNull())
-                            UserInfo::getUserInfo().setAvatar(pix);
-                    }, true);
+                    UserInfo::getUserInfo().setAvatarUrl(obj.value("Avatar_Url").toString());
                 }
                 if((!obj.contains("RefreshToken") || !obj.value("RefreshToken").isString() || obj.value("RefreshToken").toString().isEmpty()) &&
                     (!obj.contains("AccessToken") || !obj.value("AccessToken").isString() || obj.value("AccessToken").toString().isEmpty()))
@@ -936,7 +936,7 @@ void TcpLongConnection::handleUpdateAvatarResp(QJsonObject obj)
                         else
                         {
                             emit mainState(false, "上传失败，请稍后再试");
-                            UserInfo::getUserInfo().rollBackAvatar();
+                            UserInfo::getUserInfo().rollBackAvatarUrl();
                         }
                         this->map_idempotentCache.remove(requestsID);
                     }
@@ -945,11 +945,11 @@ void TcpLongConnection::handleUpdateAvatarResp(QJsonObject obj)
             return;
         }
         emit mainState(false, "上传失败，请稍后再试");
-        UserInfo::getUserInfo().rollBackAvatar();
+        UserInfo::getUserInfo().rollBackAvatarUrl();
     }
     else
     {
-        UserInfo::getUserInfo().confirmAvatar();
+        UserInfo::getUserInfo().confirmAvatarUrl();
     }
     this->map_idempotentCache.remove(requestsID);
 }
@@ -1526,6 +1526,7 @@ void TcpLongConnection::handleSyncNewMessagesResp(QJsonObject obj)
                 continue;
             QJsonObject item = jv.toObject();
             Message msg;
+            msg.contentType = static_cast<ContentType>(item.value("ContentType").toString().toInt());
             msg.content = item.value("Content").toString();
             msg.convSeq = item.value("ConvSeq").toString().toLongLong();
             msg.senderUID = item.value("SenderUID").toString();
@@ -1632,14 +1633,17 @@ void TcpLongConnection::handlePushNewMessage(QJsonObject obj)
 {
     if(obj.contains("SenderUID") && obj.value("SenderUID").isString() &&
         obj.contains("MessageID") && obj.value("MessageID").isString() &&
+        obj.contains("ContentType") && obj.value("ContentType").isString() &&
         obj.contains("Content") && obj.value("Content").isString() &&
         obj.contains("TimeStamp") && obj.value("TimeStamp").isString() &&
         obj.contains("ConvSeq") && obj.value("ConvSeq").isString())
     {
         int64_t timeStamp = obj.value("TimeStamp").toString().toLongLong();
         int64_t convSeq = obj.value("ConvSeq").toString().toLongLong();
+        QString contentType = obj.value("ContentType").toString();
         //发送信号
         emit pushMessage(obj.value("SenderUID").toString(),
+                         static_cast<ContentType>(contentType.toInt()),
                          obj.value("Content").toString(),
                          obj.value("MessageID").toString(), timeStamp, convSeq);
     }
@@ -1717,7 +1721,7 @@ void TcpLongConnection::handleSendMessageResp(QJsonObject obj)
                         auto it = this->map_messageCache.find(tempMsgID);
                         if(it != this->map_messageCache.end())
                         {
-                            sendMessageTo(it.value().receiverUID, it.value().content, tempMsgID);
+                            sendMessageTo(it.value().receiverUID, it.value().content, tempMsgID, it.value().type);
                         }
                         return;
                     }

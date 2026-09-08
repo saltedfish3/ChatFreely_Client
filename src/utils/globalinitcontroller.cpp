@@ -205,7 +205,6 @@ void GlobalInitController::startMigrateFile(const QString &newDBPath)
         GlobalVariable::setMigrationState(false);
         emit migrateFinished(false);
     }
-    qDebug()<<success;
 }
 
 GlobalInitController::Step GlobalInitController::step() const

@@ -4,6 +4,7 @@ MessageModel::MessageModel(MessagesManager* manager, QObject *parent)
     : QAbstractListModel(parent), manager(manager)
 {
     connect(manager, &MessagesManager::messageAdd, this, &MessageModel::onMessageAdd);
+    connect(manager, &MessagesManager::messagesAdd, this, &MessageModel::onMessagesAdd);
     connect(manager, &MessagesManager::messageUpdate, this, &MessageModel::onMessageUpdate);
     connect(manager, &MessagesManager::messagePrepend, this, &MessageModel::onMessagePrepend);
     connect(manager, &MessagesManager::messageRemove, this, &MessageModel::onMessageRemove);
@@ -35,7 +36,7 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
     case IsMyselfRole:
         return msg.senderUID == UserInfo::getUserInfo().getUID();
     case AvatarRole:
-        return msg.senderUID == UserInfo::getUserInfo().getUID() ? UserInfo::getUserInfo().getAvatar() : FriendManage::getFriendManage().getFriendInfo(msg.senderUID).avatar;
+        return msg.senderUID == UserInfo::getUserInfo().getUID() ? UserInfo::getUserInfo().getAvatar(QSize(40, 40)) : FriendManage::getFriendManage().getFriendAvatar(msg.senderUID, QSize(40, 40));
     case MessageStatusRole:
         return msg.status;
     case IsNeedShowTime:
@@ -44,6 +45,14 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
         return msg.convSeq;
     case MessageIDRole:
         return msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID;
+    case ImageRole:
+        return ImageCacheManager::getManager().fastLoadImage(msg.content);
+        // return QPixmap();
+    case ContentTypeRole:
+        return static_cast<int>(msg.contentType);
+    case ImageStateRole:
+        return static_cast<int>(ImageCacheManager::getManager().getImageState(msg.content));
+        // return static_cast<int>(ImageCacheManager::ImageState::Loading);
     default:
         return {};
     }
@@ -64,13 +73,22 @@ void MessageModel::onMessageAdd(int row)
     endInsertRows();
 }
 
+void MessageModel::onMessagesAdd(int first, int end)
+{
+    if(first < 0 || first > end || first >= this->manager->getMessages().size())
+        return;
+
+    beginInsertRows(QModelIndex(), first, end);
+    endInsertRows();
+}
+
 void MessageModel::onMessageUpdate(int row)
 {
     if(row < 0 || row >= rowCount())
         return;
     QModelIndex idx = index(row);
 
-    emit dataChanged(idx, idx, {MessageStatusRole, TimeStamp, ConvSeqRole, IsNeedShowTime, MessageIDRole, AvatarRole});
+    emit dataChanged(idx, idx, {MessageStatusRole, TimeStamp, ConvSeqRole, IsNeedShowTime, MessageIDRole, AvatarRole, ContentRole, ImageRole});
 }
 
 void MessageModel::onMessagesUpdate(int first, int end)
@@ -113,7 +131,7 @@ void MessageModel::onMessageMove(int oldRow, int newRow)
     emit dataChanged(index(qMin(oldRow, newRow)), index(qMax(oldRow, newRow)), {MessageStatusRole, MessageIDRole, ConvSeqRole, TimeStamp, IsNeedShowTime});
 }
 
-void MessageModel::onMessageMyselfAvatarUpdate(const QPixmap &avatar)
+void MessageModel::onMessageMyselfAvatarUpdate(const QPixmap &avatar, const QSize& size)
 {
     for(int i = 0; i < this->manager->getMessages().size(); i++)
     {
@@ -123,8 +141,10 @@ void MessageModel::onMessageMyselfAvatarUpdate(const QPixmap &avatar)
     }
 }
 
-void MessageModel::onMessageFriendAvatarUpdate(const QString &uid, const QPixmap &avatar)
+void MessageModel::onMessageFriendAvatarUpdate(const QString &uid, const QPixmap &avatar, const QSize& size)
 {
+    if(size != QSize(40, 40))
+        return;
     for(int i = 0; i < this->manager->getMessages().size(); i++)
     {
         const Message& msg = this->manager->getMessages().at(i);

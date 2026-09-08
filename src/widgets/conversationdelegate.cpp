@@ -11,6 +11,7 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
     painter->setRenderHint(QPainter::SmoothPixmapTransform, true);
+    painter->fillRect(option.rect, option.palette.base());
 
     QRect TimeStamp;
     QRect contain;
@@ -36,63 +37,149 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
     }
 
     QPixmap avatar = index.data(AvatarRole).value<QPixmap>();
+    qreal dpr = 1.0;
+    if(const QWidget* widget = option.widget)
+        dpr = widget->devicePixelRatioF();
     if(avatar.isNull())
+    {
         avatar = QPixmap(":/default/images/defaultAvatar.png");
-    avatar = setRadius(avatar, avatarSize.height());
-    painter->setPen(Qt::NoPen);
-    painter->setBrush(Qt::NoBrush);
+        // avatar = QPixmap::fromImage(QImage(":/default/images/defaultAvatar.png").scaled(avatarSize*dpr, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        avatar.setDevicePixelRatio(dpr);
+    }
+    painter->save();
+    QPainterPath avatarPath;
+    int avatarRadius = avatarSize.width()/2;
+    avatarPath.addRoundedRect(avatarRect, avatarRadius, avatarRadius);
+    painter->setClipPath(avatarPath);
     painter->drawPixmap(avatarRect, avatar);
+    painter->restore();
 
     bool isSelf = index.data(IsMyselfRole).toBool();
+    QFont font = option.font;
 
-    QPainterPath path;
-    path.addRoundedRect(textRegionRect, 8, 8);
-
-    QColor borderColor;
-    QColor textColor;
-    if(isSelf)
+    ContentType type = static_cast<ContentType>(index.data(ContentTypeRole).toInt());
+    if(type == ContentType::Image)
     {
-        borderColor = QColor(99, 102, 241);
-        textColor = QColor(Qt::white);
+        ImageCacheManager::ImageState state = static_cast<ImageCacheManager::ImageState>(index.data(ImageStateRole).toInt());
+        QPixmap pix = index.data(ImageRole).value<QPixmap>();
+        if(state == ImageCacheManager::ImageState::Success && !pix.isNull())
+        {
+            QPixmap scaled = pix.scaled(textRegionRect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            int x = textRegionRect.center().x() - scaled.width() / 2;
+            int y = textRegionRect.center().y() - scaled.height() / 2;
+
+            QPainterPath clipPath;
+            int radius = 8;
+            QRect imageRect(x, y, scaled.width(), scaled.height());
+            clipPath.addRoundedRect(imageRect, radius, radius);
+
+            painter->save();
+            painter->setClipPath(clipPath);
+            painter->drawPixmap(x, y, scaled);
+            painter->setPen(QPen(QColor(209, 213, 219), 1));
+            painter->setBrush(Qt::NoBrush);
+            painter->drawPath(clipPath);
+            painter->restore();
+        }
+        else
+        {
+            painter->setBrush(QColor(240, 240, 240));
+            painter->setPen(QPen(QColor(209, 213, 219), 1));
+            painter->drawRoundedRect(textRegionRect, 8, 8);
+
+            painter->setPen(Qt::gray);
+            font.setPointSize(15);
+            painter->setFont(font);
+
+            if(state == ImageCacheManager::ImageState::Failed)
+            {
+                //图片加载失败
+                QSize loadingSize(60, 60);
+                int x = textRegionRect.topLeft().x() + (textRegionRect.width() - loadingSize.width()) / 2;
+                int y = textRegionRect.topLeft().y() + (textRegionRect.height() - loadingSize.height()) / 2;
+                QRect loadingRect(x, y, loadingSize.width(), loadingSize.height());
+
+                painter->drawPixmap(loadingRect, QPixmap(":/default/images/fresh.png"));
+            }
+            else if(state == ImageCacheManager::ImageState::NotExist)
+            {
+                //图片不存在
+                QSize warnSize(50, 50);
+                int x = textRegionRect.topLeft().x() + (textRegionRect.width() - warnSize.width()) / 2;
+                int y = textRegionRect.topLeft().y() + (textRegionRect.height() - warnSize.height()) / 3;
+                QRect warnRect(x, y, warnSize.width(), warnSize.height());
+                QRect warnTextRect(QPoint(textRegionRect.topLeft().x(), warnRect.bottomLeft().y()), QSize(textRegionRect.width(), 40));
+                painter->drawEllipse(warnRect);
+                painter->drawText(warnRect, Qt::AlignCenter, "!");
+                font.setPointSize(10);
+                painter->setFont(font);
+                painter->drawText(warnTextRect, Qt::AlignCenter, "图片不存在");
+            }
+            else if(state == ImageCacheManager::ImageState::Loading)
+            {
+                //图片正在加载
+                painter->setPen(QPen(QColor(209, 213, 219), 3));
+                QSize loadingSize(40, 40);
+                int x = textRegionRect.topLeft().x() + (textRegionRect.width() - loadingSize.width()) / 2;
+                int y = textRegionRect.topLeft().y() + (textRegionRect.height() - loadingSize.height()) / 2;
+                QRect loadingRect(x, y, loadingSize.width(), loadingSize.height());
+
+                int startAngle = -(*(this->loadingAngle)) * 16;
+                int spanAngle = 240 * 16;
+                painter->drawArc(loadingRect, startAngle, spanAngle);
+            }
+        }
     }
     else
     {
-        borderColor = QColor(209, 213, 219);
-        textColor = QColor(17, 24, 39);
+        QPainterPath path;
+        path.addRoundedRect(textRegionRect, 8, 8);
+
+        QColor borderColor;
+        QColor textColor;
+        if(isSelf)
+        {
+            borderColor = QColor(99, 102, 241);
+            textColor = QColor(Qt::white);
+        }
+        else
+        {
+            borderColor = QColor(209, 213, 219);
+            textColor = QColor(17, 24, 39);
+        }
+        painter->setBrush(borderColor);
+        painter->setPen(Qt::NoPen);
+        painter->drawPath(path);
+
+        font.setPointSizeF(10.2);
+        painter->setFont(font);
+        QString text = index.data(ContentRole).toString();
+
+        QTextOption textOption;
+        textOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+        QTextLayout layout(text, font);
+        layout.setTextOption(textOption);
+
+        QRect textRect = textRegionRect.adjusted(15, 10, -15, -10);
+        qreal drawY = textRect.top() + (textRect.height() - textTotalHeight) / 2.0;
+        qreal drawX = textRect.left();
+
+        layout.beginLayout();
+        qreal y = 0;
+        while (true)
+        {
+            QTextLine line = layout.createLine();
+            if(!line.isValid())
+                break;
+            line.setLineWidth(textRect.width());
+            line.setPosition(QPointF(drawX, drawY + y));
+            y += line.height();
+        }
+        layout.endLayout();
+
+        painter->setPen(textColor);
+        layout.draw(painter, QPointF(0, 0));
     }
-    painter->setBrush(borderColor);
-    painter->setPen(Qt::NoPen);
-    painter->drawPath(path);
-
-    QFont font = option.font;
-    font.setPointSizeF(10.2);
-    painter->setFont(font);
-    QString text = index.data(ContentRole).toString();
-
-    QTextOption textOption;
-    textOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
-    QTextLayout layout(text, font);
-    layout.setTextOption(textOption);
-
-    QRect textRect = textRegionRect.adjusted(15, 10, -15, -10);
-    qreal drawY = textRect.top() + (textRect.height() - textTotalHeight) / 2.0;
-    qreal drawX = textRect.left();
-
-    layout.beginLayout();
-    qreal y = 0;
-    while (true)
-    {
-        QTextLine line = layout.createLine();
-        if(!line.isValid())
-            break;
-        line.setLineWidth(textRect.width());
-        line.setPosition(QPointF(drawX, drawY + y));
-        y += line.height();
-    }
-    layout.endLayout();
-
-    painter->setPen(textColor);
-    layout.draw(painter, QPointF(0, 0));
 
     if(isSelf)
     {
@@ -139,36 +226,58 @@ QSize ConversationDelegate::sizeHint(const QStyleOptionViewItem &option, const Q
     if(isShowTime)
         topTimeStampPadding = 40;
 
+    int rectWidth = getViewportWidth(option);
 
-    QString message = index.data(ContentRole).toString();
-    QFont font = option.font;
-    font.setPointSizeF(10.2);
-
-    QTextOption textOption;
-    textOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
-
-    int textMaxWidth = (option.rect.width() - 60) * 0.7 - 30;//536
-    if(textMaxWidth < 20)
-        textMaxWidth = 20;
-
-    QTextLayout layout(message, font);
-    layout.setTextOption(textOption);
-    layout.beginLayout();
-    qreal height = 0;
-
-    while(true)
+    int totalHeight = 0;
+    ContentType type = static_cast<ContentType>(index.data(ContentTypeRole).toInt());
+    if(type == ContentType::Image)
     {
-        QTextLine line = layout.createLine();
-        if(!line.isValid())
-            break;
-        line.setLineWidth(textMaxWidth);
-        line.setPosition(QPointF(0, height));
-        height += line.height();
+        QPixmap pix = index.data(ImageRole).value<QPixmap>();
+        QSize imageSize;
+        if(!pix.isNull())
+        {
+            int maxWidth = qMax(20, static_cast<int>((rectWidth - 60) * 0.5));
+            int maxHeight = 200;
+            imageSize = pix.size();
+            imageSize.scale(maxWidth, maxHeight, Qt::KeepAspectRatio);
+        }
+        else
+            imageSize = QSize(160, 120);
+        totalHeight = imageSize.height() + 16;//16为了居中
     }
-    layout.endLayout();
+    else
+    {
+        QString message = index.data(ContentRole).toString();
+        QFont font = option.font;
+        font.setPointSizeF(10.2);
 
-    int textHeight = qCeil(height) + 20;
-    int totalHeight = qMax(textHeight, 40) + 16;
+        QTextOption textOption;
+        textOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+
+        int textMaxWidth = (rectWidth - 60) * 0.7 - 30;//30是文字与气泡左右两边的间距相加15+15
+        if(textMaxWidth < 20)
+            textMaxWidth = 20;
+
+        QTextLayout layout(message, font);
+        layout.setTextOption(textOption);
+        layout.beginLayout();
+        qreal height = 0;
+
+        while(true)
+        {
+            QTextLine line = layout.createLine();
+            if(!line.isValid())
+                break;
+            line.setLineWidth(textMaxWidth);
+            line.setPosition(QPointF(0, height));
+            height += line.height();
+        }
+        layout.endLayout();
+        int textHeight = qCeil(height);
+        int bubbleHeight = qMax(textHeight + 20, 40);//20是文本相对于气泡内部的上下间距
+        totalHeight = bubbleHeight + 16;//16是单纯为了居中
+    }
+
     totalHeight += topTimeStampPadding + bottomPadding;
     return QSize(-1, totalHeight);
 }
@@ -200,6 +309,14 @@ bool ConversationDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
         {
             emit ReSendClicked(index.data(MessageIDRole).toString());
             return true;
+        }
+        else if(textRegionRect.contains(mouse->pos()))
+        {
+            if(static_cast<ImageCacheManager::ImageState>(index.data(ImageStateRole).toInt()) == ImageCacheManager::ImageState::Failed)
+            {
+                emit ReloadImageClicked(index.data(MessageIDRole).toString());
+                return true;
+            }
         }
     }
     return QStyledItemDelegate::editorEvent(event, model, option, index);
@@ -239,7 +356,7 @@ QString ConversationDelegate::formatTimestamp(int64_t timestamp) const
         if(msgTime.date() >= thisMonday && msgTime.date() <= thisSunday)
         {
             QStringList weekDays = {"","星期一","星期二","星期三","星期四","星期五","星期六","星期日"};
-            timeStr = QString("%1 %2").arg(weekDays.at(msgTime.date().dayOfWeek()), "hh:mm");
+            timeStr = QString("%1 %2").arg(weekDays.at(msgTime.date().dayOfWeek()), msgTime.toString("hh:mm"));
         }
         else
         {
@@ -249,31 +366,16 @@ QString ConversationDelegate::formatTimestamp(int64_t timestamp) const
     return timeStr;
 }
 
-QPixmap ConversationDelegate::setRadius(const QPixmap& pixmap, int hei_wid) const
+int ConversationDelegate::getViewportWidth(const QStyleOptionViewItem &option) const
 {
-    if(pixmap.isNull())
-        return {};
+    const QAbstractItemView* view = qobject_cast<const QAbstractItemView*>(option.widget);
+    if(view && view->viewport())
+        return view->viewport()->width();
 
-    //适配高DPI
-    const qreal dpr = pixmap.devicePixelRatioF();
-    const int pixmapSize = qRound(hei_wid * dpr);
-    QPixmap scaled = pixmap.scaled(pixmapSize, pixmapSize, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
-    scaled.setDevicePixelRatio(dpr);
+    if(option.rect.width() > 0)
+        return option.rect.width();
 
-    QPixmap roundedPix(pixmapSize, pixmapSize);
-    roundedPix.fill(Qt::transparent);
-    roundedPix.setDevicePixelRatio(pixmap.devicePixelRatioF());
-
-    QPainter painter(&roundedPix);
-    painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
-
-    QPainterPath path;
-    path.addEllipse(0,0,hei_wid,hei_wid);
-
-    painter.setClipPath(path);
-    painter.drawPixmap(0,0,scaled);
-    painter.end();
-    return roundedPix;
+    return 536;
 }
 
 void ConversationDelegate::getLayout(const QStyleOptionViewItem &option, const QModelIndex& index, QRect &timestamp,
@@ -288,6 +390,8 @@ void ConversationDelegate::getLayout(const QStyleOptionViewItem &option, const Q
     int topOffset = isTimeStamp ? 40 : 0;
     contain = option.rect.adjusted(0, topOffset, 0, 0);
 
+    int rectWidth = getViewportWidth(option);
+
     bool isSelf = index.data(IsMyselfRole).toBool();
     QSize avatarSize(40, 40);
     if(isSelf)
@@ -299,42 +403,65 @@ void ConversationDelegate::getLayout(const QStyleOptionViewItem &option, const Q
         avatarRect = QRect(contain.topLeft() + QPoint(10, 8), avatarSize);
     }
 
-    QFont font = option.font;
-    font.setPointSizeF(10.2);
-
-    QString text = index.data(ContentRole).toString();
-
-    QTextOption textOption;
-    textOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
-    int textMaxWidth = (contain.width() - 20 - avatarSize.width()) * 0.7 - 30;
-    if(textMaxWidth < 20)
-        textMaxWidth = 20;
-
-    QTextLayout layout(text, font);
-    layout.setTextOption(textOption);
-    layout.beginLayout();
-    qreal textHeight = 0;
-    qreal textWidth = 0;
-    while(true)
+    ContentType type = static_cast<ContentType>(index.data(ContentTypeRole).toInt());
+    if(type == ContentType::Image)
     {
-        QTextLine line = layout.createLine();
-        if(!line.isValid())
-            break;
-        line.setLineWidth(textMaxWidth);
-        textHeight += line.height();
-        textWidth = qMax(textWidth, line.naturalTextWidth());
+        QPixmap pix = index.data(ImageRole).value<QPixmap>();
+        QSize imageSize;
+        if(!pix.isNull())
+        {
+            int maxWidth = qMax(20, static_cast<int>((rectWidth - 20 - avatarSize.width()) * 0.5));
+            int maxHeight = 200;
+            imageSize = pix.size();
+            imageSize.scale(maxWidth, maxHeight, Qt::KeepAspectRatio);
+        }
+        else
+            imageSize = QSize(160, 120);
+
+        if(isSelf)
+            textRegionRect = QRect(avatarRect.topLeft() - QPoint(10 + imageSize.width(), 0), imageSize);
+        else
+            textRegionRect = QRect(avatarRect.topRight() + QPoint(10, 0), imageSize);
     }
-    layout.endLayout();
-    textTotalHeight = qCeil(textHeight);
-
-    int bubbleWidth = qCeil(textWidth) + 30;
-    int bubbleHeight = textTotalHeight + 20;
-    bubbleHeight = qMax(bubbleHeight, 40);
-
-    if(isSelf)
-        textRegionRect = QRect(avatarRect.topLeft() - QPoint(10 + bubbleWidth, 0), QSize(bubbleWidth, bubbleHeight));
     else
-        textRegionRect = QRect(avatarRect.topRight() + QPoint(10, 0), QSize(bubbleWidth, bubbleHeight));
+    {
+        QFont font = option.font;
+        font.setPointSizeF(10.2);
+
+        QString text = index.data(ContentRole).toString();
+
+        QTextOption textOption;
+        textOption.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+        int textMaxWidth = (rectWidth - 20 - avatarSize.width()) * 0.7 - 30;
+        if(textMaxWidth < 20)
+            textMaxWidth = 20;
+
+        QTextLayout layout(text, font);
+        layout.setTextOption(textOption);
+        layout.beginLayout();
+        qreal textHeight = 0;
+        qreal textWidth = 0;
+        while(true)
+        {
+            QTextLine line = layout.createLine();
+            if(!line.isValid())
+                break;
+            line.setLineWidth(textMaxWidth);
+            textHeight += line.height();
+            textWidth = qMax(textWidth, line.naturalTextWidth());
+        }
+        layout.endLayout();
+        textTotalHeight = qCeil(textHeight);
+
+        int bubbleWidth = qCeil(textWidth) + 30;
+        int bubbleHeight = textTotalHeight + 20;
+        bubbleHeight = qMax(bubbleHeight, 40);
+
+        if(isSelf)
+            textRegionRect = QRect(avatarRect.topLeft() - QPoint(10 + bubbleWidth, 0), QSize(bubbleWidth, bubbleHeight));
+        else
+            textRegionRect = QRect(avatarRect.topRight() + QPoint(10, 0), QSize(bubbleWidth, bubbleHeight));
+    }
 
     if(isSelf)
     {

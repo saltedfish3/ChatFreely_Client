@@ -3,6 +3,13 @@
 ConversationItem::ConversationItem(const QString& conversationID, QObject *parent)
     : conversationID(conversationID), QObject{parent}, msgManager(conversationID, this)
 {
+    connect(&this->msgManager, &MessagesManager::finishLoadedImage, this, [this](){
+        emit finishLoadedImage();
+    });
+
+    connect(&this->msgManager, &MessagesManager::startLoadingImage, this, [this](){
+        emit startLoadingImage();
+    });
 }
 
 QString ConversationItem::getConversationID() const
@@ -47,6 +54,11 @@ void ConversationItem::updateMessageStatus(bool isSuccess, const QString& tempMs
     emit messageStatusChange();
 }
 
+void ConversationItem::updateMessageContent(const QString &tempMsgID, const QString &content)
+{
+    this->msgManager.updateMessageContent(tempMsgID, content);
+}
+
 void ConversationItem::loadHistoryMessages(int limit)
 {
     Message msg = this->getMessagesManager().getFrontMessage();
@@ -64,6 +76,15 @@ void ConversationItem::loadHistoryMessages(int limit)
             emit firstLoadingMessages();
         }
     });
+}
+
+void ConversationItem::reloadImage(const QString &msgID)
+{
+    int index = this->msgManager.indexOfMsg(msgID);
+    if(index < 0)
+        return;
+
+    this->msgManager.reLoadImage(index);
 }
 
 bool ConversationItem::isActive() const

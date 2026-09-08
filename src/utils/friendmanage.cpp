@@ -22,6 +22,67 @@ FriendManage::FriendInfo FriendManage::getFriendInfo(const QString &uid) const
     return it.value();
 }
 
+QPixmap FriendManage::getFriendAvatar(const QString &uid, const QSize &wantedSize)
+{
+    QString url = getFriendInfo(uid).avatarUrl;
+    QString loadUrl = url.isEmpty() ? ":/default/images/defaultAvatar.png" : url;
+    QString key = uid + QString("_%1x%2_%3").arg(wantedSize.width()).arg(wantedSize.height()).arg(loadUrl);
+
+    //查询头像是否已存在
+    QPixmap pix = ImageCacheManager::getManager().fastLoadImage(loadUrl, -1, 0, 0, wantedSize);
+    if(!pix.isNull())
+        return pix;
+
+    //任务去重
+    {
+        QWriteLocker locker(&(this->lock));
+        if(this->set_paddingAvatarSize.contains(key))
+            return QPixmap(":/default/images/defaultAvatar.png");
+        else
+            this->set_paddingAvatarSize.insert(key);
+    }
+
+    if(!url.isEmpty())
+    {
+        QPixmap original = ImageCacheManager::getManager().fastLoadImage(url, 1.0);
+        if(!original.isNull())
+        {
+            ImageCacheManager::getManager().loadImage(url, [this, uid, key, url, wantedSize](const QPixmap& pix){
+                QString currentUrl = getFriendInfo(uid).avatarUrl;
+                {
+                    QWriteLocker locker(&(this->lock));
+                    this->set_paddingAvatarSize.remove(key);
+                }
+                if(currentUrl == url)
+                    emit friendAvatarUpdate(uid, pix, wantedSize);
+            }, false, -1, 0, 0, wantedSize);
+
+            return original;
+        }
+    }
+
+    //url为空 或 默认头像处理
+    QPointer<FriendManage> pointer(this);
+    ImageCacheManager::getManager().loadImage(loadUrl, [this, pointer, uid, key, loadUrl, wantedSize](const QPixmap& pix){
+        if(!pointer)
+            return;
+
+        {
+            QWriteLocker locker(&(this->lock));
+
+            pointer->set_paddingAvatarSize.remove(key);
+        }
+
+        QString current = pointer->getFriendInfo(uid).avatarUrl;
+        bool needUpdate = current.isEmpty() ? loadUrl == ":/default/images/defaultAvatar.png" : current == loadUrl;
+
+        if(needUpdate)
+            emit friendAvatarUpdate(uid, pix, wantedSize);
+    }, false, -1, 0, 0, wantedSize);
+
+    return QPixmap(":/default/images/defaultAvatar.png");
+}
+
 QList<FriendManage::FriendInfo> FriendManage::getAllFriend() const
 {
     QReadLocker locker(&(this->lock));
@@ -32,6 +93,7 @@ void FriendManage::cleanAll()
 {
     QWriteLocker locker(&(this->lock));
     this->map_friend.clear();
+    this->set_paddingAvatarSize.clear();
     this->isFirstLoad = false;
 }
 
@@ -52,25 +114,13 @@ FriendManage::FriendManage(QObject *parent)
             info.sid = sid;
             info.username = username;
             info.email = email;
-            info.avatar = QPixmap(":/default/images/defaultAvatar.png");
             info.avatarUrl = avatar_url;
             info.isOnline = isOnline;
         }
         emit allFriendList();
 
         ImageCacheManager::getManager().loadImage(avatar_url, [this, uid](const QPixmap& pix){
-            QPointer<FriendManage> pointer(this);
-            if(!pointer)
-                return;
-            {
-                QWriteLocker locker(&(this->lock));
-                auto it = this->map_friend.find(uid);
-                if(it == this->map_friend.end())
-                    return;
-
-                it.value().avatar = pix;
-            }
-            emit friendAvatarUpdate(uid, pix);
+            emit friendAvatarUpdate(uid, pix, QSize());
         });
     });
 
@@ -114,21 +164,19 @@ FriendManage::FriendManage(QObject *parent)
             if(it == this->map_friend.end() || it.value().avatarUrl == avatarUrl)
                 return;
             it.value().avatarUrl = avatarUrl;
+
+            QString pre = uid + "_";
+            for(auto it = this->set_paddingAvatarSize.begin(); it != this->set_paddingAvatarSize.end();)
+            {
+                if(it->startsWith(pre))
+                    it = this->set_paddingAvatarSize.erase(it);
+                else
+                    it++;
+            }
         }
 
         ImageCacheManager::getManager().loadImage(avatarUrl, [this, uid](const QPixmap& pix){
-            QPointer<FriendManage> pointer(this);
-            if(!pointer)
-                return;
-            {
-                QWriteLocker locker(&(this->lock));
-                auto it = this->map_friend.find(uid);
-                if(it == this->map_friend.end())
-                    return;
-
-                it.value().avatar = pix;
-            }
-            emit friendAvatarUpdate(uid, pix);
+            emit friendAvatarUpdate(uid, pix, QSize());
         });
     });
 
@@ -141,6 +189,7 @@ FriendManage::FriendManage(QObject *parent)
         {
             QWriteLocker locker(&(this->lock));
             this->map_friend.clear();
+            this->set_paddingAvatarSize.clear();
 
             for(auto& var : std::as_const(list))
             {
@@ -149,12 +198,12 @@ FriendManage::FriendManage(QObject *parent)
                 info.sid = var.value("SID").toString();
                 info.username = var.value("Username").toString();
                 info.email = var.value("Email").toString();
-                info.avatar = QPixmap(":/default/images/defaultAvatar.png");
                 info.avatarUrl = var.value("AvatarUrl").toString();
                 info.isOnline = var.value("IsOnline").toBool();
                 this->map_friend[info.uid] = info;
 
-                avatarTasks[info.uid] = info.avatarUrl;
+                if(!info.avatarUrl.isEmpty())
+                    avatarTasks[info.uid] = info.avatarUrl;
             }
         }
         emit allFriendList();
@@ -169,18 +218,7 @@ FriendManage::FriendManage(QObject *parent)
             QString uid = it.key();
 
             ImageCacheManager::getManager().loadImage(it.value(), [this, uid](const QPixmap& pix){
-                QPointer<FriendManage> pointer(this);
-                if(!pointer)
-                    return;
-                {
-                    QWriteLocker locker(&(this->lock));
-                    auto it = this->map_friend.find(uid);
-                    if(it == this->map_friend.end())
-                        return;
-
-                    it.value().avatar = pix;
-                }
-                emit friendAvatarUpdate(uid, pix);
+                emit friendAvatarUpdate(uid, pix, QSize());
             });
         }
     });

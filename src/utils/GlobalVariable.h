@@ -11,6 +11,8 @@
 #include <QSettings>
 #include <QFileInfo>
 #include <QDirIterator>
+#include <QGuiApplication>
+#include <QSCreen>
 
 class GlobalVariable
 {
@@ -43,6 +45,8 @@ public:
     static QString getMigratingOldPath();
     static QString getMigratingNewPath();
     static void cleanMigratingTemp(const QString& tempPath);
+
+    static qreal getMaxDevicePixelRatio();
 
 private:
     GlobalVariable();

@@ -34,7 +34,7 @@ private:
 
     void initPage();
 
-    void setRadius(QIcon pic, QLabel *label, int hei_wid);
+    void setRadius(QPixmap& pix, QLabel *label, int radius);
 
     //--------------------------------
     QWidget* widget_sideBar;

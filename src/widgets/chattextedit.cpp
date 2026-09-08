@@ -4,6 +4,71 @@ ChatTextEdit::ChatTextEdit(QWidget *parent)
     : QTextEdit{parent}
 {}
 
+void ChatTextEdit::saveBlocks()
+{
+    QTextDocument* doc = document();
+    QTextCursor cursor(doc);
+
+    QString text;
+    while(!cursor.atEnd())
+    {
+        cursor.movePosition(QTextCursor::NextCharacter);
+        QTextCharFormat fmt = cursor.charFormat();
+        QString charText = doc->characterAt(cursor.position() - 1);
+
+        if(fmt.isImageFormat())
+        {
+            //处理图片前文字
+            if(!text.trimmed().isEmpty())
+            {
+                MessageBlock block;
+                block.type = ContentType::Text;
+                block.content = text.trimmed();
+                this->blocks.append(block);
+                text.clear();
+            }
+
+            //处理图片
+            QTextImageFormat imgFmt = fmt.toImageFormat();
+            QString url = imgFmt.property(UrlPro).toString();
+
+            if(url.isEmpty())
+                url = imgFmt.name();
+
+            MessageBlock block;
+            block.type = ContentType::Image;
+            block.content = url;
+            this->blocks.append(block);
+        }
+        else
+            text += charText;
+    }
+
+    //处理末尾文字
+    if(!text.trimmed().isEmpty())
+    {
+        MessageBlock block;
+        block.type = ContentType::Text;
+        block.content = text.trimmed();
+        this->blocks.append(block);
+    }
+}
+
+bool ChatTextEdit::hasBlocks()
+{
+    return !this->blocks.isEmpty();
+}
+
+QList<ChatTextEdit::MessageBlock>& ChatTextEdit::getAllBlocks()
+{
+    return this->blocks;
+}
+
+ChatTextEdit::MessageBlock ChatTextEdit::nextBlock()
+{
+    return this->blocks.takeFirst();
+}
+
 bool ChatTextEdit::canInsertFromMimeData(const QMimeData *source) const
 {
     return source->hasImage();
@@ -14,48 +79,49 @@ void ChatTextEdit::insertFromMimeData(const QMimeData *source)
     if(source->hasImage())
     {
         QImage image = qvariant_cast<QImage>(source->imageData());
-        QString imagePath = QDir::tempPath() + "/chat_image_" + QUuid::createUuid().toString() + ".png";
-        image.save(imagePath);
+        if(image.isNull())
+            return;
 
-        insertImageToEdit(imagePath);
+        //载入缓存
+        QString filename = "local://" + QUuid::createUuid().toString();
+        ImageCacheManager::getManager().insertCache(filename, QPixmap::fromImage(image));
+
+        insertImageToEdit(image, filename);
     }
     else
         QTextEdit::insertFromMimeData(source);
 }
 
-void ChatTextEdit::insertImageToEdit(const QString &imagePath)
+void ChatTextEdit::insertImageToEdit(const QImage& image, const QString& url)
 {
-    QImage temp(imagePath);
-    if(temp.isNull())
-        return;
-
     const int maxWidth = this->width() * 0.5;
     const int maxHeight = this->height() * 0.7;
 
-    QSize tempSize = temp.size();
+    QSize tempSize = image.size();
     if(tempSize.width() > maxWidth || tempSize.height() > maxHeight)
         tempSize.scale(maxWidth, maxHeight, Qt::KeepAspectRatio);
 
-    QImage scaled = temp.scaled(tempSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    QImage scaled = image.scaled(tempSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 
     qreal dpr = this->devicePixelRatioF();
 
     scaled = addRoundedAndPadding(scaled, 5, 1, dpr);
-    QString scaledPath = QDir::tempPath() + "/chat_image_" + QUuid::createUuid().toString() + ".png";
-    scaled.save(scaledPath);
 
     QPixmap pm = QPixmap::fromImage(scaled);
     pm.setDevicePixelRatio(dpr);
-    document()->addResource(QTextDocument::ImageResource, QUrl::fromLocalFile(scaledPath), pm);
+
+    QString tempUrl = "temp://image_" + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    document()->addResource(QTextDocument::ImageResource, QUrl(tempUrl), pm);
 
     QTextCursor cursor = textCursor();
     QTextImageFormat format;
-    format.setName(QUrl::fromLocalFile(scaledPath).toString());
+    format.setName(tempUrl);
     format.setWidth(scaled.width() / dpr);
     format.setHeight(scaled.height() / dpr);
-    cursor.insertImage(format);
 
-    this->list_normalImagePaths.append(scaledPath);
+    format.setProperty(UrlPro, url);
+
+    cursor.insertImage(format);
 }
 
 QImage ChatTextEdit::addRoundedAndPadding(const QImage &pic, int radius, int padding, qreal dpr)

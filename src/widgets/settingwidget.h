@@ -36,7 +36,7 @@ private slots:
 
 private:
 
-    void setRadius(QIcon pic, QPushButton* btn, int hei_wid);
+    void setRadius(QPixmap& pic, QPushButton* btn, int radius);
 
     void initWidget();
     void initThisStyle();

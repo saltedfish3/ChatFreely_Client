@@ -14,6 +14,7 @@ public:
     explicit NewFriendButton(int width, int height, QWidget *parent = nullptr);
 
     void setUnProcessedRequests(size_t num);
+    void setChecked(bool checked);
 signals:
 
 protected:

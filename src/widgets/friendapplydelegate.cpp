@@ -29,12 +29,18 @@ void FriendApplyDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
     painter->drawRoundedRect(cardRect, 10, 10);
 
     //绘制数据项
+    QSize avatarSize = QSize(48, 48);
     QPixmap avatar = index.data(AvatarRole).value<QPixmap>();
     if(avatar.isNull())
         avatar = QPixmap(":/default/images/defaultAvatar.png");
-    QPixmap radius_avatar = setRadius(avatar, 48);
-    QRect pos_avatarRect = QRect(cardRect.topLeft() + QPoint(16, (cardRect.height() - radius_avatar.height())/2), radius_avatar.size());
-    painter->drawPixmap(pos_avatarRect, radius_avatar);
+
+    QRect pos_avatarRect = QRect(cardRect.topLeft() + QPoint(16, (cardRect.height() - avatarSize.height())/2), avatarSize);
+    painter->save();
+    QPainterPath path;
+    path.addRoundedRect(pos_avatarRect, avatarSize.width()/2, avatarSize.height()/2);
+    painter->setClipPath(path);
+    painter->drawPixmap(pos_avatarRect, avatar);
+    painter->restore();
 
     //绘制用户名和sid
     QFont nameFont = option.font;
@@ -284,33 +290,6 @@ bool FriendApplyDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, 
         return true;
     }
     return QStyledItemDelegate::editorEvent(event, model, option, index);
-}
-
-QPixmap FriendApplyDelegate::setRadius(const QPixmap& pixmap, int hei_wid) const
-{
-    if(pixmap.isNull())
-        return {};
-
-    //适配高DPI
-    const qreal dpr = pixmap.devicePixelRatioF();
-    const int pixmapSize = qRound(hei_wid * dpr);
-    QPixmap scaled = pixmap.scaled(pixmapSize, pixmapSize, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
-    scaled.setDevicePixelRatio(dpr);
-
-    QPixmap roundedPix(pixmapSize, pixmapSize);
-    roundedPix.fill(Qt::transparent);
-    roundedPix.setDevicePixelRatio(pixmap.devicePixelRatioF());
-
-    QPainter painter(&roundedPix);
-    painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
-
-    QPainterPath path;
-    path.addEllipse(0,0,hei_wid,hei_wid);
-
-    painter.setClipPath(path);
-    painter.drawPixmap(0,0,scaled);
-    painter.end();
-    return roundedPix;
 }
 
 void FriendApplyDelegate::getButtonRect(const QStyleOptionViewItem& option, QRect& refuseRect, QRect& agreeRect) const

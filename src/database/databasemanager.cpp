@@ -73,6 +73,7 @@ bool DatabaseManager::changeToCurrentUser()
                         "server_msg_id INTEGER UNIQUE,"
                         "temp_msg_id TEXT UNIQUE,"
                         "sender_id INTEGER,"
+                        "type INTEGER,"
                         "content TEXT,"
                         "timestamp INTEGER,"
                         "conv_seq INTEGER,"
@@ -262,7 +263,7 @@ void DatabaseManager::loadAllConversationsList(std::function<void (const QList<C
             if(db.isOpen())
             {
                 QSqlQuery q(db);
-                QString sql = "SELECT cp.conversation_id, COALESCE(c.unread_count, 0), m.content, m.timestamp "
+                QString sql = "SELECT cp.conversation_id, COALESCE(c.unread_count, 0), m.type, m.content, m.timestamp "
                               "FROM conversation_checkpoint cp "
                               "LEFT JOIN conversations c ON cp.conversation_id = c.conversation_id "
                               "LEFT JOIN messages m ON cp.conversation_id = m.conversation_id "
@@ -279,8 +280,12 @@ void DatabaseManager::loadAllConversationsList(std::function<void (const QList<C
                         ConversationInfo info;
                         info.conversationID = QString::number(q.value(0).toLongLong());
                         info.unReadCount = q.value(1).toInt();
-                        info.lastMsg = q.value(2).toString();
-                        info.lastTimestamp = q.value(3).toLongLong();
+                        ContentType type = static_cast<ContentType>(q.value(2).toInt());
+                        if(type == ContentType::Text)
+                            info.lastMsg = q.value(3).toString();
+                        else if(type == ContentType::Image)
+                            info.lastMsg = "[图片]";
+                        info.lastTimestamp = q.value(4).toLongLong();
                         list.append(info);
                     }
                 }
@@ -311,7 +316,7 @@ void DatabaseManager::loadConversationMessages(const QString &conversationID, in
                 qWarning() << "载入历史消息convID转int64失败";
                 return;
             }
-            QString sql = "SELECT server_msg_id, temp_msg_id, sender_id, content, timestamp, conv_seq, status, show_timestamp "
+            QString sql = "SELECT server_msg_id, temp_msg_id, sender_id, type, content, timestamp, conv_seq, status, show_timestamp "
                           "FROM messages WHERE conversation_id = ?";
             if(endConvSeq > 0)
                 sql += " AND conv_seq < ?";
@@ -334,12 +339,13 @@ void DatabaseManager::loadConversationMessages(const QString &conversationID, in
 
                     msg.tempMsgID = q.value(1).toString();
                     msg.senderUID = QString::number(q.value(2).toLongLong());
-                    msg.content = q.value(3).toString();
-                    msg.timeStamp = q.value(4).toLongLong();
-                    msg.convSeq = q.value(5).toLongLong();
-                    Status oldStatus = static_cast<Status>(q.value(6).toInt());
+                    msg.contentType = static_cast<ContentType>(q.value(3).toInt());
+                    msg.content = q.value(4).toString();
+                    msg.timeStamp = q.value(5).toLongLong();
+                    msg.convSeq = q.value(6).toLongLong();
+                    Status oldStatus = static_cast<Status>(q.value(7).toInt());
                     msg.status = oldStatus == Sending ? Failed : oldStatus;
-                    msg.showTimestamp = q.value(7).toBool();
+                    msg.showTimestamp = q.value(8).toBool();
                     msgs.prepend(msg);
 
                     //防止Sending状态的消息永远处于sending
@@ -567,12 +573,13 @@ bool DatabaseManager::executeTask()
 bool DatabaseManager::executeInsertMessageTask(const QSqlDatabase& db, const DBTask &task)
 {
     QSqlQuery q_msg(db);
-    q_msg.prepare("INSERT OR REPLACE INTO messages(conversation_id, server_msg_id, temp_msg_id, sender_id, content, timestamp, conv_seq, status, show_timestamp, is_myself) "
-                  "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    q_msg.prepare("INSERT OR REPLACE INTO messages(conversation_id, server_msg_id, temp_msg_id, sender_id, type, content, timestamp, conv_seq, status, show_timestamp, is_myself) "
+                  "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     q_msg.addBindValue(toInt64(task.conversationID));
     q_msg.addBindValue(task.msg.serverMsgID.isEmpty() ? QVariant() : QVariant(toInt64(task.msg.serverMsgID)));
     q_msg.addBindValue(task.msg.tempMsgID);
     q_msg.addBindValue(toInt64(task.msg.senderUID));
+    q_msg.addBindValue(static_cast<int>(task.msg.contentType));
     q_msg.addBindValue(task.msg.content);
     q_msg.addBindValue(task.msg.timeStamp);
     q_msg.addBindValue(task.msg.convSeq);
@@ -602,10 +609,11 @@ bool DatabaseManager::executeInsertMessageTask(const QSqlDatabase& db, const DBT
 bool DatabaseManager::executeUpdateMessageTask(const QSqlDatabase &db, const DBTask &task)
 {
     QSqlQuery q(db);
-    q.prepare("INSERT INTO messages(conversation_id, server_msg_id, temp_msg_id, sender_id, content, timestamp, conv_seq, status, show_timestamp, is_myself) "
-              "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+    q.prepare("INSERT INTO messages(conversation_id, server_msg_id, temp_msg_id, sender_id, type, content, timestamp, conv_seq, status, show_timestamp, is_myself) "
+              "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
               "ON CONFLICT(temp_msg_id) DO UPDATE SET "
               "server_msg_id = excluded.server_msg_id, "
+              "content = excluded.content, "
               "timestamp = excluded.timestamp, "
               "conv_seq = excluded.conv_seq, "
               "status = excluded.status, "
@@ -614,6 +622,7 @@ bool DatabaseManager::executeUpdateMessageTask(const QSqlDatabase &db, const DBT
     q.addBindValue(task.msg.serverMsgID.isEmpty() ? QVariant() : QVariant(toInt64(task.msg.serverMsgID)));
     q.addBindValue(task.msg.tempMsgID);
     q.addBindValue(toInt64(task.msg.senderUID));
+    q.addBindValue(task.msg.contentType);
     q.addBindValue(task.msg.content);
     q.addBindValue(task.msg.timeStamp);
     q.addBindValue(task.msg.convSeq);

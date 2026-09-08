@@ -183,3 +183,12 @@ void GlobalVariable::cleanMigratingTemp(const QString &tempPath)
 {
     QDir(tempPath).removeRecursively();
 }
+
+qreal GlobalVariable::getMaxDevicePixelRatio()
+{
+    qreal dpr = 1.0;
+    const auto screens = QGuiApplication::screens();
+    for(const QScreen* screen : screens)
+        dpr = qMax(dpr, screen->devicePixelRatio());
+    return dpr;
+}

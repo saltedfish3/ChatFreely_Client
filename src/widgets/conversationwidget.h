@@ -22,6 +22,7 @@
 #include "../utils/userinfo.h"
 #include "../chat/conversationitem.h"
 #include "messagemodel.h"
+#include "../chat/message.h"
 
 class ConversationWidget : public QWidget
 {
@@ -42,6 +43,7 @@ protected:
 private:
     void initStyle();
     void startReFlashTimeStamp();
+    void handleNextBlock();
 
     QWidget* widget_header;
     QLabel* label_name;

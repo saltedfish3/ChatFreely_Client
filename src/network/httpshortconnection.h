@@ -23,13 +23,20 @@ class HttpShortConnection : public QObject
 {
     Q_OBJECT
 public:
+    enum class ImageError
+    {
+        NoError,
+        NotFound
+    };
+
     HttpShortConnection(const HttpShortConnection&) = delete;
     HttpShortConnection& operator=(const HttpShortConnection&) = delete;
 
     static HttpShortConnection& getHttpClient();
 
     void uploadAvatar(const QString& filePath);
-    void getImage(const QString& url, size_t retryTime, std::function<void(const QPixmap&)> onSuccess = nullptr, bool failed_notice = true);
+    void uploadImage(const QString& filePath, std::function<void(const QString& url)> cb_success, bool failed_notice = false, std::function<void(const QString& info)> cb_failed = nullptr);
+    void getImage(const QString& url, size_t retryTime, std::function<void(const QByteArray&, ImageError)> onSuccess = nullptr, bool failed_notice = true);
 
 signals:
     void mainState(bool isSuccess, QString info);
@@ -37,6 +44,7 @@ signals:
 
 private:
     explicit HttpShortConnection(QObject *parent = nullptr);
+    QByteArray getImageFormat(const QByteArray& data) const;
 
     QNetworkAccessManager* httpmanager;
 };

@@ -59,6 +59,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         src/widgets/chattextedit.h src/widgets/chattextedit.cpp
         src/utils/globalinitcontroller.h src/utils/globalinitcontroller.cpp
         src/utils/imagecachemanager.h src/utils/imagecachemanager.cpp
+        src/utils/functionrunnable.h src/utils/functionrunnable.cpp
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET ChatClient APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR

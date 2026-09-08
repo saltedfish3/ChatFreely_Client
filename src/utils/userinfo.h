@@ -4,7 +4,8 @@
 #include <QObject>
 #include <QString>
 #include <QPixmap>
-#include <mutex>
+#include <QReadWriteLock>
+#include <QSet>
 
 class HttpShortConnection;
 class TcpLongConnection;
@@ -33,14 +34,15 @@ public:
     QString getUID();
     QString getSID();
     QString getUsername();
-    QPixmap getAvatar();
+    QPixmap getAvatar(const QSize &wantedSize);
+    QString getAvatarUrl();
     QString getAccessToken();
     QString getRefreshToken();
 
-    void setAvatar(const QPixmap& avatar);
-    void confirmAvatar();
-    void rollBackAvatar();
-    void backupAvatar();
+    void setAvatarUrl(const QString& url);
+    void confirmAvatarUrl();
+    void rollBackAvatarUrl();
+    void backupAvatarUrl();
 
     void sendUpdateSignal();
 
@@ -48,7 +50,7 @@ public:
 
 signals:
     void updateInfo(QString username, QString email, QString sid);
-    void updateAvatar(QPixmap avatar);
+    void updateAvatar(const QPixmap& avatar, const QSize& size);
 
 private:
     explicit UserInfo(QObject *parent = nullptr);
@@ -58,13 +60,14 @@ private:
     QString email;
     QString sid;
     QString uid;
-    QPixmap avatar;
-    QPixmap old_avatar;
+    QString avatarUrl;
+    QString old_avatarUrl;
     QString accessToken;
     QString refreshToken;
     bool is_login;
 
-    std::mutex mutex;
+    QSet<QString> set_paddingAvatarSize;
+    QReadWriteLock rwLock;
 };
 
 #endif // USERINFO_H

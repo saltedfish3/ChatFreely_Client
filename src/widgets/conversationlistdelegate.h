@@ -35,7 +35,6 @@ protected:
     bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem& option, const QModelIndex& index) override;
 
 private:
-    QPixmap setRadius(const QPixmap& pixmap, int hei_wid) const;
     QString formatTimestamp(int64_t timestamp) const;
 
 signals:

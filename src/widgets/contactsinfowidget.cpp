@@ -13,7 +13,7 @@ void ContactsInfoWidget::changeInfo(QPixmap avatar, QString username, QString ui
 {
     this->uid = uid;
 
-    setRadius(avatar,this->label_avatar,128);
+    setRadius(avatar,this->label_avatar, 64);
     QFontMetrics fm(this->label_username->font());
     QString showUsername = fm.elidedText(username, Qt::ElideRight, this->label_username->width() - 20);
     this->label_username->setText(showUsername);
@@ -48,7 +48,7 @@ void ContactsInfoWidget::changeSelectedUsername(QString username)
 
 void ContactsInfoWidget::changeSelectedAvatar(QPixmap avatar)
 {
-    setRadius(avatar, this->label_avatar, 128);
+    setRadius(avatar, this->label_avatar, 64);
 }
 
 void ContactsInfoWidget::changeOnlineStatus(bool isOnline)
@@ -78,7 +78,16 @@ void ContactsInfoWidget::init()
     this->label_avatar->resize(136,136);
     this->label_avatar->setObjectName("label_avatar");
     this->label_avatar->move((this->width() - this->label_avatar->width())/2,64);
-    setRadius(QIcon(":/default/images/defaultAvatar.png"),this->label_avatar,128);
+    QPixmap defaultAvatar = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", -1, 0, 0, QSize(128, 128));
+    if(defaultAvatar.isNull())
+    {
+        ImageCacheManager::getManager().loadImage(":/default/images/defaultAvatar.png", [this](const QPixmap& pix){
+            QPixmap p_ = pix;
+            setRadius(p_, this->label_avatar, 64);
+        }, false, -1, 0, 0, QSize(128, 128));
+    }
+    else
+        setRadius(defaultAvatar, this->label_avatar, 64);
 
     this->label_username = new QLabel("用户名",this);
     this->label_username->resize(this->width(),32);
@@ -158,10 +167,6 @@ void ContactsInfoWidget::init()
 void ContactsInfoWidget::initStyle()
 {
     this->setStyleSheet(QString(R"(
-                    #label_avatar
-                    {
-                        border-radius:%1px;
-                    }
                     #label_username
                     {
                         font-size: 24px;
@@ -183,7 +188,7 @@ void ContactsInfoWidget::initStyle()
                     }
                     #label_status_icon[status="online"]
                     {
-                        border-radius:%2px;
+                        border-radius:%1px;
                         background:rgba(34, 197, 94, 255);
                     }
                     #label_status[status="offline"]
@@ -196,7 +201,7 @@ void ContactsInfoWidget::initStyle()
                     }
                     #label_status_icon[status="offline"]
                     {
-                        border-radius:%2px;
+                        border-radius:%1px;
                         background: rgba(156, 163, 175, 255);
                     }
                     #btn_sendMsg
@@ -254,28 +259,26 @@ void ContactsInfoWidget::initStyle()
                         color: rgba(17, 24, 39, 255);
 
                     }
-                        )").arg(this->label_avatar->height()/2).arg(this->label_status_icon->height()/2));
+                        )").arg(this->label_status_icon->height()/2));
 }
 
-void ContactsInfoWidget::setRadius(QIcon pic, QLabel *label, int hei_wid)
+void ContactsInfoWidget::setRadius(QPixmap& pix, QLabel *label, int radius)
 {
-    QPixmap pixmap = pic.pixmap(hei_wid);
-    //适配高DPI
-    pixmap.setDevicePixelRatio(pixmap.devicePixelRatioF());
+    if(pix.isNull())
+        return;
 
-    QPixmap roundedPix(pixmap.size());
-    roundedPix.fill(Qt::transparent);
-    roundedPix.setDevicePixelRatio(pixmap.devicePixelRatio());
+    QPixmap rounded(label->size() * pix.devicePixelRatioF());
+    rounded.fill(Qt::transparent);
+    rounded.setDevicePixelRatio(pix.devicePixelRatioF());
 
-    QPainter painter(&roundedPix);
+    QPainter painter(&rounded);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
 
     QPainterPath path;
-    path.addEllipse(0,0,hei_wid,hei_wid);
-
+    path.addRoundedRect(label->rect(), radius, radius);
     painter.setClipPath(path);
-    painter.drawPixmap(0,0,pixmap);
+    painter.drawPixmap(label->rect(), pix);
     painter.end();
 
-    label->setPixmap(roundedPix);
+    label->setPixmap(rounded);
 }
