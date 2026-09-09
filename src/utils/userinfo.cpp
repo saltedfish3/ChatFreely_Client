@@ -197,11 +197,10 @@ QString UserInfo::getSID()
 
 void UserInfo::setAvatarUrl(const QString &url)
 {
-    if(url.isEmpty())
-        return;
+    QString loadUrl;
     {
         QWriteLocker locker(&(this->rwLock));
-        if(this->avatarUrl == url)
+        if(!url.isEmpty() && this->avatarUrl == url)
             return;
 
         QString pre = uid + "_";
@@ -213,19 +212,24 @@ void UserInfo::setAvatarUrl(const QString &url)
                 it++;
         }
         this->avatarUrl = url;
+        loadUrl = this->avatarUrl;
     }
 
+    if(loadUrl.isEmpty())
+        loadUrl = ":/default/images/defaultAvatar.png";
+
     QPointer pointer(this);
-    ImageCacheManager::getManager().loadImage(url, [this, pointer, url](const QPixmap& pix){
+    ImageCacheManager::getManager().loadImage(loadUrl, [this, pointer, loadUrl](const QPixmap& pix){
         if(!pointer)
             return;
 
         QString currentUrl;
         {
             QReadLocker locker(&(pointer->rwLock));
-            currentUrl = pointer->avatarUrl;
+            currentUrl = pointer->avatarUrl.isEmpty() ? ":/default/images/defaultAvatar.png" : pointer->avatarUrl;
         }
-        if(currentUrl == url && !pix.isNull())
+
+        if(currentUrl == loadUrl && !pix.isNull())
             emit updateAvatar(pix, QSize());
     }, true);
 }

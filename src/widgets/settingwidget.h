@@ -23,6 +23,7 @@
 #include "avatarbutton.h"
 #include "../utils/globalinitcontroller.h"
 #include "toastmanager.h"
+#include "avatarview.h"
 
 class SettingWidget : public QWidget
 {
@@ -36,7 +37,7 @@ private slots:
 
 private:
 
-    void setRadius(QPixmap& pic, QPushButton* btn, int radius);
+    void setRadius(QPixmap& pic, AvatarView* view, int radius);
 
     void initWidget();
     void initThisStyle();
@@ -55,7 +56,7 @@ private:
     QWidget* widget_personalData;
     QLabel* label_personalData_icon;
     QLabel* label_personalData;
-    AvatarButton* btn_avatar;
+    AvatarView* view_avatar;
     QLabel* label_camera_icon;
     QLabel* label_changeAvatar;
     QLabel* label_username;
