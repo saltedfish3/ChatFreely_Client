@@ -31,11 +31,13 @@ signals:
 private slots:
     void changeWidget(GlobalVariable::MainPage id);
 
-private:
+protected:
     void paintEvent(QPaintEvent* event) override;
     bool eventFilter(QObject* obj,QEvent* ev) override;
     void resizeEvent(QResizeEvent* event) override;
+    void closeEvent(QCloseEvent* event) override;
 
+private:
     void addRoundedMask();
 
     void initTitleBar();

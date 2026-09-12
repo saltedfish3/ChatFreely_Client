@@ -13,6 +13,16 @@ TitleBarWidget::TitleBarWidget(int width, int height, int radius, QWidget *paren
     initTitleBarStyle();
 }
 
+int TitleBarWidget::leftLimit()
+{
+    return this->label_logoText->pos().x() + this->label_logoText->width();
+}
+
+int TitleBarWidget::rightLimit()
+{
+    return this->btn_min->pos().x();
+}
+
 void TitleBarWidget::sendClose()
 {
     emit closeApp();
@@ -21,6 +31,18 @@ void TitleBarWidget::sendClose()
 void TitleBarWidget::sendMinimize()
 {
     emit minimizeApp();
+}
+
+void TitleBarWidget::resizeEvent(QResizeEvent *event)
+{
+    if(this->label_logo && this->label_logoText && this->btn_close && this->btn_min)
+    {
+        this->label_logo->move(12,(this->height() - this->label_logo->height())/2);
+        this->label_logoText->move(this->label_logo->pos().x() + this->label_logo->width() + 8, 0);
+        this->btn_close->move(this->width() - btn_close->width(), 0);
+        this->btn_min->move(this->width() - btn_close->width() - btn_min->width(), 0);
+        update();
+    }
 }
 
 void TitleBarWidget::initWidget()
@@ -37,6 +59,9 @@ void TitleBarWidget::initWidget()
     this->label_logoText->setObjectName("label_logoText");
     this->label_logoText->setMinimumHeight(this->height());
     this->label_logoText->setMaximumHeight(this->height());
+    QFontMetrics fm(this->label_logoText->text());
+    int textWidth = fm.horizontalAdvance(this->label_logoText->text());
+    this->label_logoText->resize(textWidth, this->label_logoText->height());
     this->label_logoText->move(this->label_logo->pos().x() + this->label_logo->width() + 8, 0);
 
     //关闭按钮
@@ -50,7 +75,7 @@ void TitleBarWidget::initWidget()
     this->btn_min = new MinimizeButton(50,this->height(),this);
     this->btn_min->setFlat(true);
     this->btn_min->setObjectName("btn_min");
-    this->btn_close->move(this->width() - btn_close->width(), 0);
+    this->btn_close->move(this->width() - btn_close->width() - 1, 0);
     this->btn_min->move(this->width() - btn_close->width() - btn_min->width(), 0);
 
     connect(this->btn_close,&QPushButton::clicked,this,&TitleBarWidget::sendClose);

@@ -264,6 +264,25 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         this->item->reloadImage(msgID);
     });
 
+    connect(this->delegate, &ConversationDelegate::previewImageClicked, this, [this](const QString& url){
+        QPixmap pix = ImageCacheManager::getManager().fastLoadImage(url, -1, 0, 0, QSize());
+        if(!pix.isNull())
+        {
+            ImagePreviewWidget::getPreviewWidget().setPixmap(pix);
+            ImagePreviewWidget::getPreviewWidget().show();
+            return;
+        }
+        else
+        {
+            ImageCacheManager::getManager().loadImage(url, [this](const QPixmap& pix){
+                if(pix.isNull())
+                    return;
+                ImagePreviewWidget::getPreviewWidget().setPixmap(pix);
+                ImagePreviewWidget::getPreviewWidget().show();
+            }, false, -1, 0, 0, QSize());
+        }
+    });
+
     connect(this->item, &ConversationItem::finishLoadedImage, this, [this](){
         this->loadingCount--;
     });

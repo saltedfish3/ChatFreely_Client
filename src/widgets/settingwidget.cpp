@@ -60,8 +60,8 @@ void SettingWidget::initWidget()
 {
     this->scrollArea = new QScrollArea(this);
     this->scrollArea->setObjectName("scrollArea");
-    this->scrollArea->resize(this->width(),this->height() - 10);
-    this->scrollArea->move(0,0);
+    this->scrollArea->resize(this->width() - 1,this->height() - 10);
+    this->scrollArea->move(0,1);
 
     this->widget_holy = new QWidget();
     this->widget_holy->setObjectName("widget_holy");
@@ -131,8 +131,9 @@ void SettingWidget::initThisStyle()
                 QScrollBar::handle:vertical
                 {
                     background: rgba(0, 0, 0, 0.2);
-                    border-radius: 3px;
+                    border-radius: 2px;
                     min-height: 30px;
+                    margin-right: 2px;
                 }
                 QScrollBar::handle:vertical:hover
                 {

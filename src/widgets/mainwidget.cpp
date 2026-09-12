@@ -32,7 +32,6 @@ void MainWidget::buttonColorChange(QAbstractButton* button)
                                     border-left: 2px solid rgba(99, 102, 241, 255);
                                     background: rgba(238, 242, 255, 255);
                                     padding-top: -20px;
-                                    padding-left: -2px;
                                 }
                                 #%1 QLabel
                                 {
@@ -61,7 +60,6 @@ void MainWidget::buttonColorChange(QAbstractButton* button)
                                     border-left: none;
                                     background: transparent;
                                     padding-top: -20px;
-                                    padding-left: -2px;
                                 }
                                 #%1 QLabel
                                 {
@@ -96,8 +94,8 @@ void MainWidget::initSideBar()
 {
     this->widget_sideBar = new QWidget(this);
     this->widget_sideBar->setObjectName("widget_sideBar");
-    this->widget_sideBar->resize(64,this->height());
-    this->widget_sideBar->move(0,0);
+    this->widget_sideBar->resize(64 - 2,this->height() - 3);
+    this->widget_sideBar->move(1,1);
 
     this->label_avatar = new QLabel(this->widget_sideBar);
     this->label_avatar->setObjectName("label_avatar");
@@ -114,7 +112,6 @@ void MainWidget::initSideBar()
     else
         setRadius(defaultAvatar, this->label_avatar, 20);
 
-    // setRadius(QIcon(":/default/images/defaultAvatar.png"),this->label_avatar,this->label_avatar->width());
     this->label_avatar->move((this->widget_sideBar->width() - this->label_avatar->width()) / 2,16);
 
     connect(&UserInfo::getUserInfo(), &UserInfo::updateAvatar, this, [this](const QPixmap& avatar, const QSize& size){
@@ -202,6 +199,7 @@ void MainWidget::initSideBarDefaultStyle()
                                         {
                                             background: rgba(255, 255, 255, 255);
                                             border-right: 1px solid rgba(0, 0, 0, 26);
+                                            border-bottom-left-radius: 8px;
                                         }
                                         #label_avatar
                                         {

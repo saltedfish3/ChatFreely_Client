@@ -51,6 +51,7 @@ public:
 signals:
     void ReSendClicked(const QString& tempMsgID);
     void ReloadImageClicked(const QString& msgID);
+    void previewImageClicked(const QString& url);
 
 protected:
     void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;

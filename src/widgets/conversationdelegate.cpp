@@ -64,14 +64,19 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
         QPixmap pix = index.data(ImageRole).value<QPixmap>();
         if(state == ImageCacheManager::ImageState::Success && !pix.isNull())
         {
-            QPixmap scaled = pix.scaled(textRegionRect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
-            int x = textRegionRect.center().x() - scaled.width() / 2;
-            int y = textRegionRect.center().y() - scaled.height() / 2;
+            int originalWidth = qRound(pix.width()*static_cast<double>(textRegionRect.height()) / pix.height());
+            QSize drawSize(qMax(originalWidth, textRegionRect.width()), textRegionRect.height());
+
+            QPixmap scaled = pix.scaled(drawSize * pix.devicePixelRatio(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            scaled.setDevicePixelRatio(pix.devicePixelRatio());
+
+            int x = textRegionRect.center().x() - scaled.deviceIndependentSize().toSize().width() / 2;
+            int y = textRegionRect.center().y() - scaled.deviceIndependentSize().toSize().height() / 2;
 
             QPainterPath clipPath;
             int radius = 8;
-            QRect imageRect(x, y, scaled.width(), scaled.height());
-            clipPath.addRoundedRect(imageRect, radius, radius);
+            QRect imageRect(x, y, scaled.deviceIndependentSize().toSize().width(), scaled.deviceIndependentSize().toSize().height());
+            clipPath.addRoundedRect(textRegionRect, radius, radius);
 
             painter->save();
             painter->setClipPath(clipPath);
@@ -234,15 +239,23 @@ QSize ConversationDelegate::sizeHint(const QStyleOptionViewItem &option, const Q
     {
         QPixmap pix = index.data(ImageRole).value<QPixmap>();
         QSize imageSize;
+
+        int maxWidth = qMax(20, static_cast<int>((rectWidth - 60) * 0.6));
+        int maxHeight = 200;
         if(!pix.isNull())
         {
-            int maxWidth = qMax(20, static_cast<int>((rectWidth - 60) * 0.5));
-            int maxHeight = 200;
             imageSize = pix.size();
             imageSize.scale(maxWidth, maxHeight, Qt::KeepAspectRatio);
         }
         else
             imageSize = QSize(160, 120);
+
+        if(imageSize.height() < 40 && imageSize.height() > 0)
+        {
+            int width = qRound(imageSize.width() * 40.0 / imageSize.height());
+            imageSize = QSize(qMin(width, maxWidth), 40);
+        }
+
         totalHeight = imageSize.height() + 16;//16为了居中
     }
     else
@@ -315,6 +328,11 @@ bool ConversationDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
             if(static_cast<ImageCacheManager::ImageState>(index.data(ImageStateRole).toInt()) == ImageCacheManager::ImageState::Failed)
             {
                 emit ReloadImageClicked(index.data(MessageIDRole).toString());
+                return true;
+            }
+            else if(static_cast<ImageCacheManager::ImageState>(index.data(ImageStateRole).toInt()) == ImageCacheManager::ImageState::Success)
+            {
+                emit previewImageClicked(index.data(ContentRole).toString());
                 return true;
             }
         }
@@ -408,15 +426,22 @@ void ConversationDelegate::getLayout(const QStyleOptionViewItem &option, const Q
     {
         QPixmap pix = index.data(ImageRole).value<QPixmap>();
         QSize imageSize;
+
+        int maxWidth = qMax(20, static_cast<int>((rectWidth - 20 - avatarSize.width()) * 0.6));
+        int maxHeight = 200;
         if(!pix.isNull())
         {
-            int maxWidth = qMax(20, static_cast<int>((rectWidth - 20 - avatarSize.width()) * 0.5));
-            int maxHeight = 200;
             imageSize = pix.size();
             imageSize.scale(maxWidth, maxHeight, Qt::KeepAspectRatio);
         }
         else
             imageSize = QSize(160, 120);
+
+        if(imageSize.height() < 40 && imageSize.height() > 0)
+        {
+            int width = qRound(imageSize.width() * 40.0 / imageSize.height());
+            imageSize = QSize(qMin(width, maxWidth), 40);
+        }
 
         if(isSelf)
             textRegionRect = QRect(avatarRect.topLeft() - QPoint(10 + imageSize.width(), 0), imageSize);

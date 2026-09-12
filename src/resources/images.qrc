@@ -24,6 +24,10 @@
         <file>images/loading.png</file>
         <file>images/loading_gray.png</file>
         <file>images/fresh.png</file>
+        <file>images/left90.png</file>
+        <file>images/right90.png</file>
+        <file>images/zoomIn.png</file>
+        <file>images/zoomOut.png</file>
     </qresource>
     <qresource prefix="/icon">
         <file>images/favicon.ico</file>

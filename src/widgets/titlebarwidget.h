@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QLabel>
+#include <QTextLayout>
 #include "minimizebutton.h"
 #include "closebutton.h"
 #include "../utils/GlobalVariable.h"
@@ -13,6 +14,8 @@ class TitleBarWidget : public QWidget
     Q_OBJECT
 public:
     explicit TitleBarWidget(int width, int height, int radius, QWidget *parent = nullptr);
+    int leftLimit();
+    int rightLimit();
 
 signals:
     void closeApp();
@@ -21,6 +24,9 @@ signals:
 private slots:
     void sendClose();
     void sendMinimize();
+
+protected:
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
     void initWidget();

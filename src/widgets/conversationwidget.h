@@ -23,6 +23,7 @@
 #include "../chat/conversationitem.h"
 #include "messagemodel.h"
 #include "../chat/message.h"
+#include "imagepreviewwidget.h"
 
 class ConversationWidget : public QWidget
 {

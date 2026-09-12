@@ -47,12 +47,10 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
         return msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID;
     case ImageRole:
         return ImageCacheManager::getManager().fastLoadImage(msg.content);
-        // return QPixmap();
     case ContentTypeRole:
         return static_cast<int>(msg.contentType);
     case ImageStateRole:
         return static_cast<int>(ImageCacheManager::getManager().getImageState(msg.content));
-        // return static_cast<int>(ImageCacheManager::ImageState::Loading);
     default:
         return {};
     }

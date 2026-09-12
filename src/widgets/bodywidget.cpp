@@ -52,12 +52,13 @@ void BodyWidget::paintEvent(QPaintEvent * event)
 {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);//抗锯齿
-    QPainterPath path;
+
     QRect rect = QRect(QRect(0, 0, this->width(), this->height()));
-    path.addRoundedRect(rect, this->radius, this->radius);
+    rect.adjust(1, 1, -1, -1);
+
     painter.setBrush(QColor(255, 255, 255));
     painter.setPen(QPen(QColor(0, 0, 0, 26), 1));
-    painter.drawPath(path);
+    painter.drawRoundedRect(rect, this->radius, this->radius);
 }
 
 bool BodyWidget::eventFilter(QObject* obj, QEvent* ev)
@@ -93,6 +94,12 @@ void BodyWidget::resizeEvent(QResizeEvent *event)
     addRoundedMask();
 }
 
+void BodyWidget::closeEvent(QCloseEvent *event)
+{
+    ImagePreviewWidget::getPreviewWidget().close();
+    QWidget::closeEvent(event);
+}
+
 void BodyWidget::addRoundedMask()
 {
     QPainterPath path;
@@ -104,9 +111,9 @@ void BodyWidget::addRoundedMask()
 void BodyWidget::initTitleBar()
 {
     //初始化标题栏
-    this->widget_titleBar = new TitleBarWidget(this->width(),40,this->radius,this);
+    this->widget_titleBar = new TitleBarWidget(this->width() - 2, 40 - 1, this->radius,this);
     this->widget_titleBar->setObjectName("titleBar");
-    this->widget_titleBar->move(0,0);
+    this->widget_titleBar->move(1,1);
     connect(this->widget_titleBar,&TitleBarWidget::closeApp,this,&BodyWidget::close);
     connect(this->widget_titleBar,&TitleBarWidget::minimizeApp,this,&BodyWidget::showMinimized);
 }
@@ -116,8 +123,8 @@ void BodyWidget::initStackWidget()
     //初始化页面
     this->stackedWidget_page = new QStackedWidget(this);
     this->stackedWidget_page->setObjectName("stackedWidget_page");
-    this->stackedWidget_page->resize(this->width(),this->height() - this->widget_titleBar->height());
-    this->stackedWidget_page->move(0,this->widget_titleBar->height());
+    this->stackedWidget_page->resize(this->width() - 1, this->height() - this->widget_titleBar->height());
+    this->stackedWidget_page->move(1,this->widget_titleBar->height());
 
     initLoginWidget();
     initRegisterWidget();

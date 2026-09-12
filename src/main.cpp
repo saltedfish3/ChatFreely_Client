@@ -17,6 +17,11 @@ int main(int argc, char *argv[])
     TcpLongConnection::getTcpClient();
     HttpShortConnection::getHttpClient();
     DatabaseManager::getDatabaseManager();
+    FriendManage::getFriendManage();
+    UserInfo::getUserInfo();
+    ImageCacheManager::getManager();
+    ImagePreviewWidget::getPreviewWidget();
+    GlobalInitController::getController();
 
     BodyWidget w(800,600,8);
     w.show();

@@ -20,7 +20,6 @@
 #include "../utils/userinfo.h"
 #include "../network/tcplongconnection.h"
 #include "../network/httpshortconnection.h"
-#include "avatarbutton.h"
 #include "../utils/globalinitcontroller.h"
 #include "toastmanager.h"
 #include "avatarview.h"

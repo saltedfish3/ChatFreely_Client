@@ -70,7 +70,7 @@ void ChatWidget::initSearchWidget()
     this->widget_search = new QWidget(this);
     this->widget_search->setObjectName("widget_search");
     this->widget_search->setAttribute(Qt::WA_StyledBackground,true);
-    this->widget_search->setGeometry(0,0,200,64);
+    this->widget_search->setGeometry(1,1,200,64);
 
     this->edit_search = new QLineEdit(this->widget_search);
     this->edit_search->setObjectName("edit_search");
@@ -117,7 +117,7 @@ void ChatWidget::initListWidget()
 {
     this->listView_conversationList = new QListView(this);
     this->listView_conversationList->setObjectName("listView_conversationList");
-    this->listView_conversationList->setGeometry(0, this->widget_search->height(), this->widget_search->width(), this->height());
+    this->listView_conversationList->setGeometry(1, this->widget_search->height() + 1, this->widget_search->width(), this->height() - this->widget_search->height() - 3);
 
     this->model = new QStandardItemModel(this);
     this->model->setSortRole(ConversationListDelegate::LastTimestampRole);
@@ -257,8 +257,8 @@ void ChatWidget::initListStyle()
 void ChatWidget::initStackedConversation()
 {
     this->stackedWidget_Conversation = new QStackedWidget(this);
-    this->stackedWidget_Conversation->resize(this->width() - this->widget_search->width(),this->height());
-    this->stackedWidget_Conversation->move(this->widget_search->width(), 0);
+    this->stackedWidget_Conversation->resize(this->width() - this->widget_search->width() - 3,this->height() - 2);
+    this->stackedWidget_Conversation->move(this->widget_search->width() + 1, 1);
 
     this->widget_noSelect = new QWidget(this->stackedWidget_Conversation);
     this->widget_noSelect->resize(this->stackedWidget_Conversation->width(), this->stackedWidget_Conversation->height());

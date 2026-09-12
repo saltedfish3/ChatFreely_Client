@@ -32,8 +32,8 @@ void ContactsWidget::initSideBar()
 {
     this->widget_sideBar = new QWidget(this);
     this->widget_sideBar->setObjectName("widget_sideBar");
-    this->widget_sideBar->resize(200,this->height());
-    this->widget_sideBar->move(0,0);
+    this->widget_sideBar->resize(200,this->height() - 3);
+    this->widget_sideBar->move(1,1);
 
     this->btn_addFriend = new QPushButton("添加联系人",this->widget_sideBar);
     this->btn_addFriend->setObjectName("btn_addFriend");
@@ -313,7 +313,7 @@ void ContactsWidget::initSideUnStyle()
                                 }
                                 #listView_myFriend QScrollBar:vertical
                                 {
-                                    width: 4px;
+                                    width: 5px;
                                     background: transparent;
                                     margin: 0px;
                                     margin-top: 2px;
@@ -323,6 +323,7 @@ void ContactsWidget::initSideUnStyle()
                                     background: rgba(0, 0, 0, 0.2);
                                     border-radius: 2px;
                                     min-height: 30px;
+                                    margin-right: 1px;
                                 }
                                 #listView_myFriend QScrollBar::handle:vertical:hover
                                 {
