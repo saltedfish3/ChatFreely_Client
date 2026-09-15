@@ -1532,6 +1532,14 @@ void TcpLongConnection::handleSyncNewMessagesResp(QJsonObject obj)
             msg.senderUID = item.value("SenderUID").toString();
             msg.serverMsgID = item.value("MessageID").toString();
             msg.timeStamp = item.value("Timestamp").toString().toLongLong();
+
+            if(msg.contentType == Image)
+            {
+                QJsonObject obj = QJsonDocument::fromJson(msg.content.toUtf8()).object();
+                msg.info.url = obj["Url"].toString();
+                msg.info.width = obj["Width"].toString().toInt();
+                msg.info.height = obj["Height"].toString().toInt();
+            }
             list.append(msg);
         }
         emit syncMessagesStatus(true, friendUID, list);
@@ -1641,6 +1649,7 @@ void TcpLongConnection::handlePushNewMessage(QJsonObject obj)
         int64_t timeStamp = obj.value("TimeStamp").toString().toLongLong();
         int64_t convSeq = obj.value("ConvSeq").toString().toLongLong();
         QString contentType = obj.value("ContentType").toString();
+
         //发送信号
         emit pushMessage(obj.value("SenderUID").toString(),
                          static_cast<ContentType>(contentType.toInt()),

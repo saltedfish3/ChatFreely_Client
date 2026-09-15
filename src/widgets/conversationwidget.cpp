@@ -181,6 +181,11 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
             msg.contentType = block.type;
             msg.content = block.content;
 
+            if(msg.contentType == ContentType::Image)
+            {
+                msg.info.url = content;
+            }
+
             this->item->addNewMessage(msg);
             this->loadingCount++;
             QTimer::singleShot(0, this, [this](){
@@ -602,10 +607,21 @@ void ConversationWidget::handleNextBlock()
                 handleNextBlock();
                 return;
             }
-            HttpShortConnection::getHttpClient().uploadImage(filePath, [this, block, content](const QString& url){
+            HttpShortConnection::getHttpClient().uploadImage(filePath, [this, block, content, filePath](const QString& url){
+                QImageReader reader(filePath);
+                QSize size = reader.size();
+                int width = size.width();
+                int height = size.height();
+
+                QJsonObject obj;
+                obj["Url"] = url;
+                obj["Width"] = QString::number(width);
+                obj["Height"] = QString::number(height);
+                QString contentJson = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+
                 ImageCacheManager::getManager().migrateCache(content, url);
-                this->item->updateMessageContent(block.tempID, url);
-                TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), url, block.tempID, ContentType::Image);
+                this->item->updateMessageContent(block.tempID, contentJson);
+                TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), contentJson, block.tempID, ContentType::Image);
                 handleNextBlock();
             }, false, [this, block](const QString& info){
                 this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);

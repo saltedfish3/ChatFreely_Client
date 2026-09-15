@@ -17,6 +17,13 @@ enum ContentType
     Image
 };
 
+struct MediaInfo
+{
+    QString url;
+    int width = 0;
+    int height = 0;
+};
+
 struct Message
 {
     QString serverMsgID;
@@ -29,6 +36,7 @@ struct Message
     QString senderUID;
     ContentType contentType = Text;
     QString content;
+    MediaInfo info;
     Status status = Success;
 };
 

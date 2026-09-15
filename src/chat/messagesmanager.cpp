@@ -31,7 +31,7 @@ void MessagesManager::addMessage(const Message &msg, bool isStoreDB)
     if(msg.contentType == Image)
     {
         emit startLoadingImage();
-        ImageCacheManager::getManager().loadImage(msg.content, [this, msg](const QPixmap&){
+        ImageCacheManager::getManager().loadImage(msg.info.url, [this, msg](const QPixmap&){
             emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
             emit finishLoadedImage();
         });
@@ -114,7 +114,7 @@ void MessagesManager::addMessages(const QList<Message> &msgs, bool isStoreDB)
         if(msg.contentType == Image)
         {
             emit startLoadingImage();
-            ImageCacheManager::getManager().loadImage(msg.content, [this, msg](const QPixmap&){
+            ImageCacheManager::getManager().loadImage(msg.info.url, [this, msg](const QPixmap&){
                 emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
                 emit finishLoadedImage();
             });
@@ -199,6 +199,18 @@ bool MessagesManager::updateMessageContent(const QString &tempMsgID, const QStri
 
     int row = it.value();
     Message& msg = this->messages[row];
+    if(msg.contentType == Image)
+    {
+        if(content.startsWith("{"))
+        {
+            QJsonObject obj = QJsonDocument::fromJson(content.toUtf8()).object();
+            msg.info.url = obj["Url"].toString();
+            msg.info.width = obj["Width"].toString().toInt();
+            msg.info.height = obj["Height"].toString().toInt();
+        }
+        else
+            msg.info.url = content;
+    }
     msg.content = content;
 
     emit messageUpdate(row);
@@ -297,7 +309,7 @@ void MessagesManager::reLoadImage(int index)
 
     Message& msg = this->messages[index];
     emit startLoadingImage();
-    ImageCacheManager::getManager().loadImage(msg.content, [this, msg](const QPixmap& pix){
+    ImageCacheManager::getManager().loadImage(msg.info.url, [this, msg](const QPixmap& pix){
         emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
         emit finishLoadedImage();
     });

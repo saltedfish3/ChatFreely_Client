@@ -346,6 +346,19 @@ void DatabaseManager::loadConversationMessages(const QString &conversationID, in
                     Status oldStatus = static_cast<Status>(q.value(7).toInt());
                     msg.status = oldStatus == Sending ? Failed : oldStatus;
                     msg.showTimestamp = q.value(8).toBool();
+                    if(msg.contentType == Image)
+                    {
+                        if(msg.content.startsWith("{"))
+                        {
+                            QJsonObject obj = QJsonDocument::fromJson(msg.content.toUtf8()).object();
+                            msg.info.url = obj["Url"].toString();
+                            msg.info.width = obj["Width"].toString().toInt();
+                            msg.info.height = obj["Height"].toString().toInt();
+                        }
+                        else
+                            msg.info.url = msg.content;
+                    }
+
                     msgs.prepend(msg);
 
                     //防止Sending状态的消息永远处于sending

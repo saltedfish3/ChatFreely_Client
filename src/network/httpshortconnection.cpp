@@ -125,24 +125,20 @@ void HttpShortConnection::uploadImage(const QString &filePath, std::function<voi
     }
 
     QString mimeType = (format == "JPEG") ? "image/jpeg" : "image/png";
-    QString fileName = QFileInfo(filePath).completeBaseName() + ((format == "JPEG") ? ".jpg" : ".png");
+    QString suffix = (format == "JPEG" ? "jpg" : "png");
+    QByteArray md5 = QCryptographicHash::hash(fileData, QCryptographicHash::Md5).toHex();
 
-    //构建 multipart/form-data请求
-    QHttpMultiPart* multiPart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
-
-    QHttpPart imagePart;
-    imagePart.setHeader(QNetworkRequest::ContentDispositionHeader, QString("form-data; name=\"file\"; filename=\"%1\"").arg(fileName));
-    imagePart.setHeader(QNetworkRequest::ContentTypeHeader, mimeType);
-    imagePart.setBody(fileData);
-    multiPart->append(imagePart);
-
-    QNetworkRequest request(QUrl("http://192.168.153.128:9001/upload"));
+    QNetworkRequest request(QUrl("http://192.168.153.128:9003/upload/init"));
     request.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
-    QNetworkReply* reply = this->httpmanager->post(request, multiPart);
-    multiPart->setParent(reply);
+    QJsonObject obj;
+    obj["Md5"] = QString::fromLatin1(md5);
+    obj["Suffix"] = suffix;
 
-    connect(reply, &QNetworkReply::finished, this, [reply, this, filePath, cb_success, cb_failed, failed_notice](){
+    QNetworkReply* reply = this->httpmanager->post(request, QJsonDocument(obj).toJson());
+
+    connect(reply, &QNetworkReply::finished, this, [reply, this, filePath, cb_success, cb_failed, failed_notice, mimeType, fileData](){
         reply->deleteLater();
         if(reply->error() == QNetworkReply::AuthenticationRequiredError)
         {
@@ -189,8 +185,7 @@ void HttpShortConnection::uploadImage(const QString &filePath, std::function<voi
             return;
         }
 
-        QByteArray responseData = reply->readAll();
-        QJsonDocument doc = QJsonDocument::fromJson(responseData);
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
         if(doc.isNull() || !doc.isObject())
         {
             if(failed_notice)
@@ -199,6 +194,9 @@ void HttpShortConnection::uploadImage(const QString &filePath, std::function<voi
                 cb_failed("上传失败，请稍后再试");
             return;
         }
+
+        QJsonObject resp = doc.object();
+        bool isExists = resp.value("Exists").toBool();
         QString url = doc.object().value("Url").toString();
         if(url.isEmpty())
         {
@@ -209,8 +207,44 @@ void HttpShortConnection::uploadImage(const QString &filePath, std::function<voi
             return;
         }
 
-        if(cb_success)
-            cb_success(url);
+        if(isExists)
+        {
+            if(cb_success)
+                cb_success(url);
+            return;
+        }
+
+        QString uploadUrl = resp.value("UploadUrl").toString();
+        if(uploadUrl.isEmpty())
+        {
+            if(failed_notice)
+                emit mainState(false, "上传失败，请稍后再试");
+            if(cb_failed)
+                cb_failed("上传失败，请稍后再试");
+            return;
+        }
+
+        QNetworkRequest putReq(uploadUrl);
+        putReq.setHeader(QNetworkRequest::ContentTypeHeader, mimeType);
+
+        QNetworkReply* reply_upload = this->httpmanager->put(putReq, fileData);
+
+        connect(reply_upload, &QNetworkReply::finished, this, [this, reply_upload, cb_success, cb_failed, failed_notice, url](){
+            reply_upload->deleteLater();
+
+            if(reply_upload->error() != QNetworkReply::NoError)
+            {
+                if(failed_notice)
+                    emit mainState(false, "上传失败，请稍后再试");
+                if(cb_failed)
+                    cb_failed("上传失败，请稍后再试");
+                return;
+            }
+
+            if(cb_success)
+                cb_success(url);
+        });
+
     });
 }
 

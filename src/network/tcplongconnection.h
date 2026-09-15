@@ -17,8 +17,8 @@
 #include "../chat/message.h"
 #include "../utils/imagecachemanager.h"
 
-#define SADDR "127.0.0.1"
-#define SPORT 9000
+#define SADDR "192.168.153.128"
+#define SPORT 9002
 
 class UserInfo;
 class HttpShortConnection;

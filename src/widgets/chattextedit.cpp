@@ -7,41 +7,46 @@ ChatTextEdit::ChatTextEdit(QWidget *parent)
 void ChatTextEdit::saveBlocks()
 {
     QTextDocument* doc = document();
-    QTextCursor cursor(doc);
-
+    QTextBlock block = doc->begin();
     QString text;
-    while(!cursor.atEnd())
+
+    for(; block.isValid(); block = block.next())
     {
-        cursor.movePosition(QTextCursor::NextCharacter);
-        QTextCharFormat fmt = cursor.charFormat();
-        QString charText = doc->characterAt(cursor.position() - 1);
-
-        if(fmt.isImageFormat())
+        for(QTextBlock::iterator it = block.begin(); !it.atEnd(); it++)
         {
-            //处理图片前文字
-            if(!text.trimmed().isEmpty())
+            QTextFragment fragment = it.fragment();
+            if(!fragment.isValid())
+                continue;
+
+            QTextCharFormat fmt = fragment.charFormat();
+            QString fragText = fragment.text();
+            if(fmt.isImageFormat())
             {
-                MessageBlock block;
-                block.type = ContentType::Text;
-                block.content = text.trimmed();
-                this->blocks.append(block);
-                text.clear();
+                if(!text.trimmed().isEmpty())
+                {
+                    MessageBlock b;
+                    b.type = ContentType::Text;
+                    b.content = text.trimmed();
+                    text.clear();
+                    this->blocks.append(b);
+                }
+
+                QTextImageFormat imgFmt = fmt.toImageFormat();
+                QString url = imgFmt.property(UrlPro).toString();
+                if(url.isEmpty())
+                    url = imgFmt.name();
+
+                MessageBlock b;
+                b.type = ContentType::Image;
+                b.content = url;
+                this->blocks.append(b);
             }
-
-            //处理图片
-            QTextImageFormat imgFmt = fmt.toImageFormat();
-            QString url = imgFmt.property(UrlPro).toString();
-
-            if(url.isEmpty())
-                url = imgFmt.name();
-
-            MessageBlock block;
-            block.type = ContentType::Image;
-            block.content = url;
-            this->blocks.append(block);
+            else
+                text += fragText;
         }
-        else
-            text += charText;
+
+        if(block.next().isValid())
+            text += '\n';
     }
 
     //处理末尾文字

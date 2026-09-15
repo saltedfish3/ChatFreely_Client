@@ -2,6 +2,7 @@
 #define CONVERSATIONMANAGER_H
 
 #include <QObject>
+#include <QJsonDocument>
 #include "conversationitem.h"
 #include "../network/tcplongconnection.h"
 #include "../network/httpshortconnection.h"

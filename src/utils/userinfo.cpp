@@ -36,11 +36,17 @@ QPixmap UserInfo::getAvatar(const QSize &wantedSize)
     if(!pix.isNull())
         return pix;
 
+    pix = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", -1, 0, 0, wantedSize);
+
     //任务去重
     {
         QWriteLocker locker(&(this->rwLock));
         if(this->set_paddingAvatarSize.contains(key))
+        {
+            if(!pix.isNull())
+                return pix;
             return QPixmap(":/default/images/defaultAvatar.png");
+        }
         else
             this->set_paddingAvatarSize.insert(key);
     }
@@ -91,6 +97,8 @@ QPixmap UserInfo::getAvatar(const QSize &wantedSize)
             emit updateAvatar(pix, wantedSize);
     }, false, -1, 0, 0, wantedSize);
 
+    if(!pix.isNull())
+        return pix;
     return QPixmap(":/default/images/defaultAvatar.png");
 }
 
@@ -103,6 +111,7 @@ QString UserInfo::getAvatarUrl()
 QString UserInfo::getAccessToken()
 {
     QReadLocker locker(&(this->rwLock));
+    // qDebug()<<this->accessToken;
     return this->accessToken;
 }
 
@@ -229,8 +238,18 @@ void UserInfo::setAvatarUrl(const QString &url)
             currentUrl = pointer->avatarUrl.isEmpty() ? ":/default/images/defaultAvatar.png" : pointer->avatarUrl;
         }
 
-        if(currentUrl == loadUrl && !pix.isNull())
+        if(currentUrl == loadUrl)
+        {
+            if(pix.isNull())
+            {
+                ImageCacheManager::getManager().loadImage(":/default/images/defaultAvatar.png", [this](const QPixmap& pix){
+                    if(!pix.isNull())
+                        emit updateAvatar(pix, QSize());
+                }, false);
+                return;
+            }
             emit updateAvatar(pix, QSize());
+        }
     }, true);
 }
 

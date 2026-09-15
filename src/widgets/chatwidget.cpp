@@ -163,7 +163,7 @@ void ChatWidget::initListWidget()
                 {
                     QPixmap newAvatar = FriendManage::getFriendManage().getFriendAvatar(uid, QSize(36, 36));
                     if(!newAvatar.isNull())
-                        item->setData(avatar, ConversationListDelegate::AvatarRole);
+                        item->setData(newAvatar, ConversationListDelegate::AvatarRole);
                 }
             }
         }

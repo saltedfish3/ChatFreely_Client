@@ -10,6 +10,7 @@
 #include <QPainterPath>
 #include <QApplication>
 #include <QCryptographicHash>
+#include <QTextBlock>
 #include "../utils/GlobalVariable.h"
 #include "../utils/imagecachemanager.h"
 #include "../chat/message.h"

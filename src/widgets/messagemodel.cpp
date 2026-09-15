@@ -46,11 +46,17 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
     case MessageIDRole:
         return msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID;
     case ImageRole:
-        return ImageCacheManager::getManager().fastLoadImage(msg.content);
+        return ImageCacheManager::getManager().fastLoadImage(msg.info.url);
     case ContentTypeRole:
         return static_cast<int>(msg.contentType);
     case ImageStateRole:
-        return static_cast<int>(ImageCacheManager::getManager().getImageState(msg.content));
+        return static_cast<int>(ImageCacheManager::getManager().getImageState(msg.info.url));
+    case MediaUrl:
+        return msg.info.url;
+    case MediaWidth:
+        return msg.info.width;
+    case MediaHeight:
+        return msg.info.height;
     default:
         return {};
     }
@@ -141,7 +147,7 @@ void MessageModel::onMessageMyselfAvatarUpdate(const QPixmap &avatar, const QSiz
 
 void MessageModel::onMessageFriendAvatarUpdate(const QString &uid, const QPixmap &avatar, const QSize& size)
 {
-    if(size != QSize(40, 40))
+    if(!size.isEmpty() && size != QSize(40, 40))
         return;
     for(int i = 0; i < this->manager->getMessages().size(); i++)
     {

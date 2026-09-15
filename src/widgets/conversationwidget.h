@@ -13,6 +13,7 @@
 #include <QScrollBar>
 #include <QDateTime>
 #include <QTimer>
+#include <QImageReader>
 #include <QUuid>
 #include "morewidget.h"
 #include "conversationdelegate.h"

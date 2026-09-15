@@ -24,7 +24,10 @@ public:
         ConvSeqRole,
         MessageStatusRole,
         ImageRole,
-        ImageStateRole
+        ImageStateRole,
+        MediaUrl,
+        MediaWidth,
+        MediaHeight
     };
 
     explicit MessageModel(MessagesManager* manager, QObject *parent = nullptr);

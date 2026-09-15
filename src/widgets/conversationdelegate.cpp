@@ -244,11 +244,21 @@ QSize ConversationDelegate::sizeHint(const QStyleOptionViewItem &option, const Q
         int maxHeight = 200;
         if(!pix.isNull())
         {
-            imageSize = pix.size();
+            imageSize = pix.deviceIndependentSize().toSize();
             imageSize.scale(maxWidth, maxHeight, Qt::KeepAspectRatio);
         }
         else
-            imageSize = QSize(160, 120);
+        {
+            int width = index.data(MediaWidth).toInt();
+            int height = index.data(MediaHeight).toInt();
+            if(width <= 0 || height <= 0)
+                imageSize = QSize(160, 120);
+            else
+            {
+                imageSize = QSize(width, height);
+                imageSize.scale(maxWidth, maxHeight, Qt::KeepAspectRatio);
+            }
+        }
 
         if(imageSize.height() < 40 && imageSize.height() > 0)
         {
@@ -307,8 +317,6 @@ bool ConversationDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
             return false;
 
         bool isSelf = index.data(IsMyselfRole).toBool();
-        if (!isSelf)
-            return false;
 
         QRect TimeStamp;
         QRect contain;
@@ -318,7 +326,7 @@ bool ConversationDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
         int textTotalHeight = 0;
         getLayout(option, index, TimeStamp, contain, avatarRect, textRegionRect, statusRect, textTotalHeight);
 
-        if(statusRect.contains(mouse->pos()))
+        if(statusRect.contains(mouse->pos()) && isSelf)
         {
             emit ReSendClicked(index.data(MessageIDRole).toString());
             return true;
@@ -332,7 +340,7 @@ bool ConversationDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
             }
             else if(static_cast<ImageCacheManager::ImageState>(index.data(ImageStateRole).toInt()) == ImageCacheManager::ImageState::Success)
             {
-                emit previewImageClicked(index.data(ContentRole).toString());
+                emit previewImageClicked(index.data(MediaUrl).toString());
                 return true;
             }
         }
@@ -431,11 +439,21 @@ void ConversationDelegate::getLayout(const QStyleOptionViewItem &option, const Q
         int maxHeight = 200;
         if(!pix.isNull())
         {
-            imageSize = pix.size();
+            imageSize = pix.deviceIndependentSize().toSize();
             imageSize.scale(maxWidth, maxHeight, Qt::KeepAspectRatio);
         }
         else
-            imageSize = QSize(160, 120);
+        {
+            int width = index.data(MediaWidth).toInt();
+            int height = index.data(MediaHeight).toInt();
+            if(width <= 0 || height <= 0)
+                imageSize = QSize(160, 120);
+            else
+            {
+                imageSize = QSize(width, height);
+                imageSize.scale(maxWidth, maxHeight, Qt::KeepAspectRatio);
+            }
+        }
 
         if(imageSize.height() < 40 && imageSize.height() > 0)
         {

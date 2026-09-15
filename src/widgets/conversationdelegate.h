@@ -32,7 +32,10 @@ public:
         ConvSeqRole,
         MessageStatusRole,
         ImageRole,
-        ImageStateRole
+        ImageStateRole,
+        MediaUrl,
+        MediaWidth,
+        MediaHeight
     };
 
     enum ContentType

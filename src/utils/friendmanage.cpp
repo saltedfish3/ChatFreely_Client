@@ -33,11 +33,17 @@ QPixmap FriendManage::getFriendAvatar(const QString &uid, const QSize &wantedSiz
     if(!pix.isNull())
         return pix;
 
+    pix = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", -1, 0, 0, wantedSize);
+
     //任务去重
     {
         QWriteLocker locker(&(this->lock));
         if(this->set_paddingAvatarSize.contains(key))
+        {
+            if(!pix.isNull())
+                return pix;
             return QPixmap(":/default/images/defaultAvatar.png");
+        }
         else
             this->set_paddingAvatarSize.insert(key);
     }
@@ -69,7 +75,6 @@ QPixmap FriendManage::getFriendAvatar(const QString &uid, const QSize &wantedSiz
 
         {
             QWriteLocker locker(&(this->lock));
-
             pointer->set_paddingAvatarSize.remove(key);
         }
 
@@ -77,9 +82,23 @@ QPixmap FriendManage::getFriendAvatar(const QString &uid, const QSize &wantedSiz
         bool needUpdate = current.isEmpty() ? loadUrl == ":/default/images/defaultAvatar.png" : current == loadUrl;
 
         if(needUpdate)
+        {
+            if(pix.isNull())
+            {
+                ImageCacheManager::getManager().loadImage(":/default/images/defaultAvatar.png", [this, uid, wantedSize](const QPixmap& pix){
+                    if(!pix.isNull())
+                    {
+                        emit friendAvatarUpdate(uid, pix, wantedSize);
+                    }
+                }, false, -1, 0, 0, wantedSize);
+                return;
+            }
             emit friendAvatarUpdate(uid, pix, wantedSize);
+        }
     }, false, -1, 0, 0, wantedSize);
 
+    if(!pix.isNull())
+        return pix;
     return QPixmap(":/default/images/defaultAvatar.png");
 }
 
@@ -119,7 +138,9 @@ FriendManage::FriendManage(QObject *parent)
         }
         emit allFriendList();
 
-        ImageCacheManager::getManager().loadImage(avatar_url, [this, uid](const QPixmap& pix){
+        QString loadUrl = avatar_url.isEmpty() ? ":/default/images/defaultAvatar.png" : avatar_url;
+
+        ImageCacheManager::getManager().loadImage(loadUrl, [this, uid](const QPixmap& pix){
             emit friendAvatarUpdate(uid, pix, QSize());
         });
     });
@@ -175,7 +196,9 @@ FriendManage::FriendManage(QObject *parent)
             }
         }
 
-        ImageCacheManager::getManager().loadImage(avatarUrl, [this, uid](const QPixmap& pix){
+        QString loadUrl = avatarUrl.isEmpty() ? ":/default/images/defaultAvatar.png" : avatarUrl;
+
+        ImageCacheManager::getManager().loadImage(loadUrl, [this, uid](const QPixmap& pix){
             emit friendAvatarUpdate(uid, pix, QSize());
         });
     });
@@ -217,7 +240,8 @@ FriendManage::FriendManage(QObject *parent)
         {
             QString uid = it.key();
 
-            ImageCacheManager::getManager().loadImage(it.value(), [this, uid](const QPixmap& pix){
+            QString loadUrl = it.value().isEmpty() ? ":/default/images/defaultAvatar.png" : it.value();
+            ImageCacheManager::getManager().loadImage(loadUrl, [this, uid](const QPixmap& pix){
                 emit friendAvatarUpdate(uid, pix, QSize());
             });
         }

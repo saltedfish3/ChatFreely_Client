@@ -16,7 +16,7 @@ void NewFriendManageWidget::addRequestsItem(QString uid, QString sid, QString us
     item->setData(uid, FriendApplyDelegate::UIDRole);
     item->setData(sid, FriendApplyDelegate::SIDRole);
     item->setData(username, FriendApplyDelegate::UsernameRole);
-    item->setData("", FriendApplyDelegate::AvatarRole);
+    item->setData(QPixmap(":/default/images/defaultAvatar.pn"), FriendApplyDelegate::AvatarRole);
 
     item->setData(verMsg, FriendApplyDelegate::VerMsgRole);
     this->model->appendRow(item);
@@ -28,10 +28,21 @@ void NewFriendManageWidget::addRequestsItem(QString uid, QString sid, QString us
     QPointer<QStandardItemModel> modelPtr(this->model);
 
     ImageCacheManager::getManager().loadImage(loadUrl, [this, modelPtr, index](const QPixmap& pix){
-        if(modelPtr && index.isValid())
+        if(!pix.isNull())
         {
-            modelPtr->setData(index, pix, FriendApplyDelegate::AvatarRole);
+            if(modelPtr && index.isValid())
+            {
+                modelPtr->setData(index, pix, FriendApplyDelegate::AvatarRole);
+            }
+            return;
         }
+        ImageCacheManager::getManager().loadImage(":/default/images/defaultAvatar.png", [this, modelPtr, index](const QPixmap& pix){
+            if(pix.isNull())
+                return;
+            if(modelPtr && index.isValid())
+                 modelPtr->setData(index, pix, FriendApplyDelegate::AvatarRole);
+        }, false, -1, 0, 0, QSize(48, 48));
+
     }, false, -1, 0, 0, QSize(48, 48));
 
     emit RequestsNumberChange(this->model->rowCount());

@@ -50,8 +50,8 @@ void FriendApplyDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
 
     QString name = index.data(UsernameRole).toString();
     QString name_sid;
-    if(name.length() > 17)
-        name_sid = name.left(17) + "...";
+    if(name.length() > 15)
+        name_sid = name.left(15) + "...";
     else
         name_sid += name;
     name_sid += " (ID:" + index.data(SIDRole).toString() + ")";
