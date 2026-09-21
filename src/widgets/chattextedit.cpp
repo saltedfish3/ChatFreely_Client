@@ -36,8 +36,11 @@ void ChatTextEdit::saveBlocks()
                 if(url.isEmpty())
                     url = imgFmt.name();
 
+                int typeInt = imgFmt.property(TypePro).toInt();
+                ContentType type = (typeInt == 0) ? ContentType::Image : static_cast<ContentType>(typeInt);
+
                 MessageBlock b;
-                b.type = ContentType::Image;
+                b.type = type;
                 b.content = url;
                 this->blocks.append(b);
             }
@@ -62,6 +65,102 @@ void ChatTextEdit::saveBlocks()
 bool ChatTextEdit::hasBlocks()
 {
     return !this->blocks.isEmpty();
+}
+
+void ChatTextEdit::insertFileToEdit(const QString &filePath, ContentType type)
+{
+    if(type == Image)
+    {
+        QImage image(filePath);
+        if(image.isNull())
+            return;
+
+        QString filename = "local://" + QUuid::createUuid().toString();
+        ImageCacheManager::getManager().insertCache(filename, QPixmap::fromImage(image));
+        insertImageToEdit(image, filename);
+        return;
+    }
+
+    //视频及其它文件
+    QFileInfo info(filePath);
+    QString fileName = info.fileName();
+    qint64 fileSize = info.size();
+
+    const int cardWidth = 250;
+    const int cardHeight = 60;
+    const int padding = 10;
+    const int cardRadius = 8;
+    const QSize iconSize(36, 36);
+
+    qreal dpr = this->devicePixelRatioF();
+
+    QPixmap card(cardWidth * dpr, cardHeight * dpr);
+    card.setDevicePixelRatio(dpr);
+    card.fill(Qt::transparent);
+
+    {
+        QPainter painter(&card);
+        painter.setRenderHint(QPainter::Antialiasing);
+
+        QPainterPath path;
+        path.addRoundedRect(QRectF(0, 0, cardWidth, cardHeight).adjusted(2, 2, -2, -2), cardRadius, cardRadius);
+        painter.fillPath(path, QColor(229, 231, 235));
+
+        //绘制图标
+        int textX = padding + 10;
+        int rightMargin = padding + 10;
+        int textWidth = cardWidth - textX - rightMargin - iconSize.width();
+
+        QFont font = this->font();
+        font.setPointSize(9);
+        font.setBold(true);
+        painter.setFont(font);
+        painter.setPen(QColor(55, 65, 81));
+
+        QFontMetrics fm(font);
+        QString showName = fm.elidedText(fileName, Qt::ElideMiddle, textWidth);
+        painter.drawText(QRect(textX, 8, textWidth, 20), Qt::AlignVCenter | Qt::AlignLeft, showName);
+
+        QString sizeText;
+        if(fileSize < 1024)
+            sizeText = QString::number(fileSize) + " B";
+        else if(fileSize < 1024 * 1024)
+            sizeText = QString::number(fileSize / 1024.0, 'f', 2) + " KB";
+        else if(fileSize < 1024LL * 1024 * 1024)
+            sizeText = QString::number(fileSize / 1024.0 / 1024.0, 'f', 2) + " MB";
+        else
+            sizeText = QString::number(fileSize / 1024.0 / 1024.0 / 1024.0, 'f', 2) + " GB";
+
+        font.setBold(false);
+        font.setPointSize(8);
+        painter.setFont(font);
+        painter.setPen(QColor(107, 114, 128));
+        painter.drawText(QRectF(textX, cardHeight - 26, textWidth, 18), Qt::AlignVCenter | Qt::AlignLeft, sizeText);
+
+        QPixmap icon(":/default/images/showFile.png");
+        icon = icon.scaled(iconSize * dpr, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        icon.setDevicePixelRatio(dpr);
+
+        QRect iconRect(textX + textWidth, (cardHeight - iconSize.height()) / 2, iconSize.width(), iconSize.height());
+        QPoint drawPos(iconRect.x() + (iconRect.width() - icon.width()) / 2, iconRect.y() + (iconRect.height() - icon.height()) / 2 + 4);
+        painter.drawPixmap(drawPos, icon);
+    }
+
+    QString tempUrl = "temp://file_" + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    document()->addResource(QTextDocument::ImageResource, QUrl(tempUrl), card);
+
+    QTextCursor cursor = textCursor();
+    QTextImageFormat format;
+    format.setName(tempUrl);
+    format.setWidth(cardWidth);
+    format.setHeight(cardHeight);
+
+    format.setProperty(UrlPro, filePath);
+    format.setProperty(TypePro, static_cast<int>(type));
+    format.setProperty(SizePro, fileSize);
+
+    cursor.insertImage(format);
+
 }
 
 QList<ChatTextEdit::MessageBlock>& ChatTextEdit::getAllBlocks()
@@ -125,6 +224,7 @@ void ChatTextEdit::insertImageToEdit(const QImage& image, const QString& url)
     format.setHeight(scaled.height() / dpr);
 
     format.setProperty(UrlPro, url);
+    format.setProperty(TypePro, static_cast<int>(Image));
 
     cursor.insertImage(format);
 }

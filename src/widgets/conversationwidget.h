@@ -15,6 +15,7 @@
 #include <QTimer>
 #include <QImageReader>
 #include <QUuid>
+#include <QFileDialog>
 #include "morewidget.h"
 #include "conversationdelegate.h"
 #include "chattextedit.h"
@@ -25,6 +26,7 @@
 #include "messagemodel.h"
 #include "../chat/message.h"
 #include "imagepreviewwidget.h"
+#include "../utils/videoutils.h"
 
 class ConversationWidget : public QWidget
 {
@@ -57,6 +59,7 @@ private:
     QWidget* widget_editRegion;
     ChatTextEdit* edit_message;
     QPushButton* btn_send;
+    QPushButton* btn_file;
 
     QTimer* timer_loading;
     int loadingCount = 0;

@@ -36,6 +36,14 @@ void MessagesManager::addMessage(const Message &msg, bool isStoreDB)
             emit finishLoadedImage();
         });
     }
+    else if(msg.contentType == Video && !msg.info.thumbnailUrl.isEmpty())
+    {
+        emit startLoadingImage();
+        ImageCacheManager::getManager().loadImage(msg.info.thumbnailUrl, [this, msg](const QPixmap&){
+            emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
+            emit finishLoadedImage();
+        });
+    }
 
     if(isStoreDB)
         calcShowTimestamp(index);
@@ -115,6 +123,14 @@ void MessagesManager::addMessages(const QList<Message> &msgs, bool isStoreDB)
         {
             emit startLoadingImage();
             ImageCacheManager::getManager().loadImage(msg.info.url, [this, msg](const QPixmap&){
+                emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
+                emit finishLoadedImage();
+            });
+        }
+        else if(msg.contentType == Video && !msg.info.thumbnailUrl.isEmpty())
+        {
+            emit startLoadingImage();
+            ImageCacheManager::getManager().loadImage(msg.info.thumbnailUrl, [this, msg](const QPixmap&){
                 emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
                 emit finishLoadedImage();
             });
@@ -199,19 +215,20 @@ bool MessagesManager::updateMessageContent(const QString &tempMsgID, const QStri
 
     int row = it.value();
     Message& msg = this->messages[row];
-    if(msg.contentType == Image)
-    {
-        if(content.startsWith("{"))
-        {
-            QJsonObject obj = QJsonDocument::fromJson(content.toUtf8()).object();
-            msg.info.url = obj["Url"].toString();
-            msg.info.width = obj["Width"].toString().toInt();
-            msg.info.height = obj["Height"].toString().toInt();
-        }
-        else
-            msg.info.url = content;
-    }
     msg.content = content;
+    msg.parseMedia();
+
+    if(msg.contentType == Video)
+    {
+        if(content.startsWith("{") && !msg.info.thumbnailUrl.isEmpty())
+        {
+            emit startLoadingImage();
+            ImageCacheManager::getManager().loadImage(msg.info.thumbnailUrl, [this, msg](const QPixmap&){
+                emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
+                emit finishLoadedImage();
+            });
+        }
+    }
 
     emit messageUpdate(row);
     DatabaseManager::getDatabaseManager().addUpdateMessageTask(this->conversationID, msg);

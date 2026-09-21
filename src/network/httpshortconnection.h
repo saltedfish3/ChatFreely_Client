@@ -29,13 +29,20 @@ public:
         NotFound
     };
 
+    enum class MediaType
+    {
+        Image,
+        Video,
+        File
+    };
+
     HttpShortConnection(const HttpShortConnection&) = delete;
     HttpShortConnection& operator=(const HttpShortConnection&) = delete;
 
     static HttpShortConnection& getHttpClient();
 
     void uploadAvatar(const QString& filePath);
-    void uploadImage(const QString& filePath, std::function<void(const QString& url)> cb_success, bool failed_notice = false, std::function<void(const QString& info)> cb_failed = nullptr);
+    void uploadMedia(MediaType type, const QString& filePath, std::function<void(const QString& url)> cb_success, bool failed_notice = false, std::function<void(const QString& info)> cb_failed = nullptr);
     void getImage(const QString& url, size_t retryTime, std::function<void(const QByteArray&, ImageError)> onSuccess = nullptr, bool failed_notice = true);
 
 signals:
@@ -45,6 +52,16 @@ signals:
 private:
     explicit HttpShortConnection(QObject *parent = nullptr);
     QByteArray getImageFormat(const QByteArray& data) const;
+    QString isVideo(const QByteArray& data) const;
+
+    void sendUploadInit(MediaType type, const QString& filePath, qint64 fileSize, const QByteArray& md5, const QString& suffix,
+                        const QString& mimeType, const QByteArray& fileData, std::function<void(const QString&)> cb_success, bool failed_notice, std::function<void(const QString&)> cb_failed);
+    void multipartUpload(const QString& filePath, qint64 everyPartSize, const QString& objectKey, const QString& uploadId,
+                         const QString& finalUrl, std::function<void(const QString&)> cb_success, bool failed_notice, std::function<void(const QString&)> cb_failed);
+    void uploadOnePart(const QString& filePath, qint64 partSize, const QString& objectKey, const QString& uploadId, int partNumber, int totalParts,
+                       QSharedPointer<QJsonArray> parts, QSharedPointer<std::function<void()>> next, const QString& finalUrl,
+                       std::function<void(const QString&)> cb_success, bool failed_notice, std::function<void(const QString&)> cb_failed);
+    void sendComplete(const QString& objectKey, const QString& uploadId, const QJsonArray& parts, const QString& finalUrl, std::function<void(const QString&)> cb_success, bool failed_notice, std::function<void(const QString&)> cb_failed);
 
     QNetworkAccessManager* httpmanager;
 };

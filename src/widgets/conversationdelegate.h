@@ -35,13 +35,19 @@ public:
         ImageStateRole,
         MediaUrl,
         MediaWidth,
-        MediaHeight
+        MediaHeight,
+        MediaSize,
+        VideoThumbnail,
+        VideoDuration,
+        FileName
     };
 
     enum ContentType
     {
         Text = 0,
-        Image
+        Image,
+        Video,
+        File
     };
 
     enum Status

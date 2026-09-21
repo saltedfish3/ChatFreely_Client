@@ -184,6 +184,7 @@ void UserInfo::setAccessToken(const QString &accessToken)
 {
     QWriteLocker locker(&(this->rwLock));
     this->accessToken = accessToken;
+    qDebug()<<this->accessToken;
 }
 
 void UserInfo::setRefreshToken(const QString &refreshToken)

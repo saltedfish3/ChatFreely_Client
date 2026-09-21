@@ -21,7 +21,9 @@ class ChatTextEdit : public QTextEdit
 public:
     enum EditProperty
     {
-        UrlPro = QTextFormat::UserProperty + 1
+        UrlPro = QTextFormat::UserProperty + 1,
+        TypePro,
+        SizePro
     };
 
     struct MessageBlock
@@ -36,6 +38,8 @@ public:
     bool hasBlocks();
     MessageBlock nextBlock();
     QList<MessageBlock>& getAllBlocks();
+
+    void insertFileToEdit(const QString& filePath, ContentType type);
 
 protected:
     bool canInsertFromMimeData(const QMimeData* source) const override;

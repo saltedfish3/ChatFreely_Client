@@ -1533,18 +1533,12 @@ void TcpLongConnection::handleSyncNewMessagesResp(QJsonObject obj)
             msg.serverMsgID = item.value("MessageID").toString();
             msg.timeStamp = item.value("Timestamp").toString().toLongLong();
 
-            if(msg.contentType == Image)
-            {
-                QJsonObject obj = QJsonDocument::fromJson(msg.content.toUtf8()).object();
-                msg.info.url = obj["Url"].toString();
-                msg.info.width = obj["Width"].toString().toInt();
-                msg.info.height = obj["Height"].toString().toInt();
-            }
+            msg.parseMedia();
+
             list.append(msg);
         }
         emit syncMessagesStatus(true, friendUID, list);
         timer->start();
-
     }
     else
     {

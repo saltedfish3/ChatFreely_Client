@@ -361,14 +361,7 @@ GlobalInitController::GlobalInitController(QObject *parent)
         if(!UserInfo::getUserInfo().isLogin())
             return;
 
-        if(this->nowStep == Step::SyncingGlobalSeq || this->nowStep == Step::SyncingMessages)
-        {
-            this->waitingSyncConversationID.clear();
-            this->syncingConversationID.clear();
-            this->retryCounts.clear();
-        }
-
-        syncGlobalSeq();
+        TcpLongConnection::getTcpClient().sendAccessTokenLogin();
     });
 
     //令牌登录成功响应处理

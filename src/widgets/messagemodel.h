@@ -27,7 +27,11 @@ public:
         ImageStateRole,
         MediaUrl,
         MediaWidth,
-        MediaHeight
+        MediaHeight,
+        MediaSize,
+        VideoThumbnail,
+        VideoDuration,
+        FileName
     };
 
     explicit MessageModel(MessagesManager* manager, QObject *parent = nullptr);

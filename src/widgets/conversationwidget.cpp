@@ -147,6 +147,42 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         }
     });
 
+    //初始化 文件 按钮
+    this->btn_file = new QPushButton(this->widget_editRegion);
+    this->btn_file->setObjectName("btn_file");
+    int fileSize = this->widget_editRegion->height() - this->edit_message->pos().y() - this->edit_message->height();
+    this->btn_file->resize(fileSize * 0.8,fileSize * 0.8);
+    this->btn_file->setIcon(QIcon(":/default/images/file.png"));
+    this->btn_file->setIconSize(QSize(this->btn_file->width() * 0.8,this->btn_file->height() * 0.8));
+    int file_h = this->edit_message->pos().y() + this->edit_message->height();
+    this->btn_file->move(15, file_h + (this->widget_editRegion->height() - file_h - this->btn_file->height())/2);
+
+    connect(this->btn_file, &QPushButton::clicked, this, [this](){
+        QString filePath = QFileDialog::getOpenFileName(this, "选择文件", QStandardPaths::writableLocation(QStandardPaths::PicturesLocation), "所有文件 (*)");
+        if(filePath.isEmpty())
+            return;
+        qDebug()<<filePath;
+        QString suffix = QFileInfo(filePath).suffix().toLower();
+        if(suffix == "jpg" || suffix == "jpeg" || suffix == "png")
+        {
+            QImage image(filePath);
+            if(image.isNull())
+            {
+                ToastManager::getToastManager(true).error("图片读取失败", this);
+                return;
+            }
+
+            QString localUrl = "local://" + QUuid::createUuid().toString();
+            ImageCacheManager::getManager().insertCache(localUrl, QPixmap::fromImage(image));
+
+            this->edit_message->insertFileToEdit(filePath, Image);
+        }
+        else if(suffix == "mp4" || suffix == "mov" || suffix == "webm")
+            this->edit_message->insertFileToEdit(filePath, Video);
+        else
+            this->edit_message->insertFileToEdit(filePath, File);
+    });
+
     //初始化 发送 按钮
     this->btn_send = new QPushButton(this->widget_editRegion);
     this->btn_send->setObjectName("btn_send");
@@ -165,7 +201,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         for(auto& block : blocks)
         {
             const QString& content = block.content.trimmed();
-            if(content.isEmpty() || (block.type != ContentType::Text && block.type != ContentType::Image))
+            if(content.trimmed().isEmpty())
                 continue;
 
             QString tempMsgID = QUuid::createUuid().toString();
@@ -181,10 +217,8 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
             msg.contentType = block.type;
             msg.content = block.content;
 
-            if(msg.contentType == ContentType::Image)
-            {
+            if(msg.contentType != ContentType::Text)
                 msg.info.url = content;
-            }
 
             this->item->addNewMessage(msg);
             this->loadingCount++;
@@ -261,7 +295,53 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
                 this->timer_loading->start(30);
         });
 
-        TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), msg.content, msg.tempMsgID, msg.contentType);
+        if(msg.contentType == ContentType::Text)
+            TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), msg.content, msg.tempMsgID, msg.contentType);
+        else if(msg.contentType == ContentType::Image)
+        {
+            if(msg.content.startsWith("local://"))
+            {
+                ChatTextEdit::MessageBlock block;
+                block.type = ContentType::Image;
+                block.tempID = msg.tempMsgID;
+                block.content = msg.content;
+
+                this->edit_message->getAllBlocks().append(block);
+                handleNextBlock();
+            }
+            else if(msg.content.startsWith("{"))
+                TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), msg.content, msg.tempMsgID, ContentType::Image);
+        }
+        else if(msg.contentType == ContentType::Video)
+        {
+            if(msg.content.startsWith("{"))
+                TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), msg.content, msg.tempMsgID, ContentType::Video);
+            else
+            {
+                ChatTextEdit::MessageBlock block;
+                block.type = ContentType::Video;
+                block.tempID = msg.tempMsgID;
+                block.content = msg.content;
+
+                this->edit_message->getAllBlocks().append(block);
+                handleNextBlock();
+            }
+        }
+        else if(msg.contentType == ContentType::File)
+        {
+            if(msg.content.startsWith("{"))
+                TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), msg.content, msg.tempMsgID, ContentType::File);
+            else
+            {
+                ChatTextEdit::MessageBlock block;
+                block.type = ContentType::File;
+                block.tempID = msg.tempMsgID;
+                block.content = msg.content;
+
+                this->edit_message->getAllBlocks().append(block);
+                handleNextBlock();
+            }
+        }
         this->listView_messages->scrollToBottom();
     });
 
@@ -536,6 +616,20 @@ void ConversationWidget::initStyle()
                                 outline:none;
                                 border-bottom: 1px solid rgba(229, 231, 235, 255);
                             }
+                            #btn_file
+                            {
+                                background-color: transparent;
+                                border: none;
+                                border-radius: 6px;
+                            }
+                            #btn_file:hover
+                            {
+                                background-color: rgba(243, 244, 246, 255);
+                            }
+                            #btn_file:pressed
+                            {
+                                background-color: rgba(229, 231, 235, 255);
+                            }
                             #btn_send
                             {
                                 background-color: rgba(99, 102, 241, 255);
@@ -607,7 +701,7 @@ void ConversationWidget::handleNextBlock()
                 handleNextBlock();
                 return;
             }
-            HttpShortConnection::getHttpClient().uploadImage(filePath, [this, block, content, filePath](const QString& url){
+            HttpShortConnection::getHttpClient().uploadMedia(HttpShortConnection::MediaType::Image, filePath, [this, block, content, filePath](const QString& url){
                 QImageReader reader(filePath);
                 QSize size = reader.size();
                 int width = size.width();
@@ -628,5 +722,97 @@ void ConversationWidget::handleNextBlock()
                 handleNextBlock();
             });
         }
+    }
+    else if(block.type == Video)
+    {
+        QString filePath = block.content;
+
+        if(!QFile::exists(filePath))
+        {
+            this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
+            handleNextBlock();
+            return;
+        }
+
+        VideoUtils::extractAsync(filePath, [this, block, filePath](const VideoUtils::VideoInfo& info){
+            if(!info.valid)
+            {
+                this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
+                handleNextBlock();
+                return;
+            }
+
+            //上传视频
+            HttpShortConnection::getHttpClient().uploadMedia(HttpShortConnection::MediaType::Video, filePath, [=](const QString& url){
+                QString tempUrl = "local://" + QUuid::createUuid().toString();
+                ImageCacheManager::getManager().insertCache(tempUrl, info.thumbnail);
+                QString thumFilePath = ImageCacheManager::getManager().getCacheFilePath(tempUrl);
+
+                QJsonObject obj;
+                obj["Url"] = url;
+                obj["Width"] = QString::number(info.width);
+                obj["Height"] = QString::number(info.height);
+                obj["ThumbnailUrl"] = "";
+                obj["Duration"] = QString::number(info.duration);
+                obj["Size"] = QString::number(QFileInfo(filePath).size());
+
+                if(thumFilePath.isEmpty())
+                {
+                    QString contentJson = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+
+                    this->item->updateMessageContent(block.tempID, contentJson);
+                    TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), contentJson, block.tempID, block.type);
+                    handleNextBlock();
+                    return;
+                }
+
+                //上传缩略图
+                HttpShortConnection::getHttpClient().uploadMedia(HttpShortConnection::MediaType::Image, thumFilePath, [=](const QString& url){
+                    QJsonObject newObj = obj;
+                    ImageCacheManager::getManager().migrateCache(tempUrl, url);
+                    newObj["ThumbnailUrl"] = url;
+                    QString contentJson = QString::fromUtf8(QJsonDocument(newObj).toJson(QJsonDocument::Compact));
+
+                    this->item->updateMessageContent(block.tempID, contentJson);
+                    TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), contentJson, block.tempID, block.type);
+                    handleNextBlock();
+                }, false, [=](const QString&){
+                    QString contentJson = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+
+                    this->item->updateMessageContent(block.tempID, contentJson);
+                    TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), contentJson, block.tempID, block.type);
+                    handleNextBlock();
+                });
+            }, false, [=](const QString&){
+                this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
+                handleNextBlock();
+            });
+        });
+    }
+    else if(block.type == File)
+    {
+        QString filePath = block.content;
+
+        if(!QFile::exists(filePath))
+        {
+            this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
+            handleNextBlock();
+            return;
+        }
+
+        HttpShortConnection::getHttpClient().uploadMedia(HttpShortConnection::MediaType::File, filePath, [this, block, filePath](const QString& url){
+            QJsonObject obj;
+            obj["Url"] = url;
+            obj["Name"] = QFileInfo(filePath).fileName();
+            obj["Size"] = QString::number(QFileInfo(filePath).size());
+            QString contentJson = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+
+            this->item->updateMessageContent(block.tempID, contentJson);
+            TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), contentJson, block.tempID, block.type);
+            handleNextBlock();
+        }, false, [this, block](const QString& info){
+            this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
+            handleNextBlock();
+        });
     }
 }

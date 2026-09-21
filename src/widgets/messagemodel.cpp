@@ -57,6 +57,14 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
         return msg.info.width;
     case MediaHeight:
         return msg.info.height;
+    case MediaSize:
+        return msg.info.size;
+    case VideoThumbnail:
+        return ImageCacheManager::getManager().fastLoadImage(msg.info.thumbnailUrl);
+    case VideoDuration:
+        return msg.info.duration;
+    case FileName:
+        return msg.info.name;
     default:
         return {};
     }
@@ -92,7 +100,8 @@ void MessageModel::onMessageUpdate(int row)
         return;
     QModelIndex idx = index(row);
 
-    emit dataChanged(idx, idx, {MessageStatusRole, TimeStamp, ConvSeqRole, IsNeedShowTime, MessageIDRole, AvatarRole, ContentRole, ImageRole});
+    emit dataChanged(idx, idx, {MessageStatusRole, TimeStamp, ConvSeqRole, IsNeedShowTime, MessageIDRole, AvatarRole, ContentRole, ImageRole,
+                                ImageStateRole, MediaUrl, MediaWidth, MediaHeight, MediaSize, VideoThumbnail, VideoDuration, FileName});
 }
 
 void MessageModel::onMessagesUpdate(int first, int end)

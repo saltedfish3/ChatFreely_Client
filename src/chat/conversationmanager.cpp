@@ -60,18 +60,7 @@ ConversationManager::ConversationManager(QObject *parent)
         msg.serverMsgID = messageID;
         msg.timeStamp = timeStamp;
 
-        if(type == ContentType::Image)
-        {
-            if(msg.content.startsWith("{"))
-            {
-                QJsonObject obj = QJsonDocument::fromJson(msg.content.toUtf8()).object();
-                msg.info.url = obj["Url"].toString();
-                msg.info.width = obj["Width"].toString().toInt();
-                msg.info.height = obj["Height"].toString().toInt();
-            }
-            else
-                msg.info.url = msg.content;
-        }
+        msg.parseMedia();
 
         ConversationItem* item = getOrCreateConversationItem(senderUID);
         item->addNewMessage(msg);

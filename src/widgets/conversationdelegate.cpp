@@ -43,7 +43,6 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
     if(avatar.isNull())
     {
         avatar = QPixmap(":/default/images/defaultAvatar.png");
-        // avatar = QPixmap::fromImage(QImage(":/default/images/defaultAvatar.png").scaled(avatarSize*dpr, Qt::KeepAspectRatio, Qt::SmoothTransformation));
         avatar.setDevicePixelRatio(dpr);
     }
     painter->save();
@@ -134,6 +133,106 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
                 painter->drawArc(loadingRect, startAngle, spanAngle);
             }
         }
+    }
+    else if(type == ContentType::Video)
+    {
+        QPixmap thumbnail = index.data(VideoThumbnail).value<QPixmap>();
+        if(!thumbnail.isNull())
+        {
+            int originalWidth = qRound(thumbnail.width()*static_cast<double>(textRegionRect.height()) / thumbnail.height());
+            QSize drawSize(qMax(originalWidth, textRegionRect.width()), textRegionRect.height());
+
+            QPixmap scaled = thumbnail.scaled(drawSize * thumbnail.devicePixelRatio(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            scaled.setDevicePixelRatio(thumbnail.devicePixelRatio());
+
+            int x = textRegionRect.center().x() - scaled.deviceIndependentSize().toSize().width() / 2;
+            int y = textRegionRect.center().y() - scaled.deviceIndependentSize().toSize().height() / 2;
+
+            QPainterPath clipPath;
+            int radius = 8;
+            QRect imageRect(x, y, scaled.deviceIndependentSize().toSize().width(), scaled.deviceIndependentSize().toSize().height());
+            clipPath.addRoundedRect(textRegionRect, radius, radius);
+
+            painter->save();
+            painter->setClipPath(clipPath);
+            painter->drawPixmap(x, y, scaled);
+            painter->setPen(QPen(QColor(209, 213, 219), 1));
+            painter->setBrush(Qt::NoBrush);
+            painter->drawPath(clipPath);
+            painter->restore();
+        }
+        else
+        {
+            painter->setBrush(QColor(240, 240, 240));
+            painter->setPen(QPen(QColor(209, 213, 219), 1));
+            painter->drawRoundedRect(textRegionRect, 8, 8);
+        }
+
+        painter->save();
+        painter->setBrush(Qt::NoBrush);
+        painter->setPen(QPen(QColor(209, 213, 219), 2));
+
+        QSize playSize(60, 60);
+        QRect playIcon(textRegionRect.topLeft() + QPoint((textRegionRect.width() - playSize.width()) / 2, (textRegionRect.height() - playSize.height()) / 2), playSize);
+
+        painter->drawRoundedRect(playIcon, playSize.width() / 2, playSize.width() / 2);
+
+        int lineWidth = playSize.height() / 2;
+
+        QPoint triangleCenter = playIcon.center();
+
+        int padding = qCeil(std::sqrt(lineWidth*lineWidth - (lineWidth / 2) * (lineWidth / 2))) / 2;
+        int margin = 4;
+
+        QPoint point1 = triangleCenter - QPoint(padding - margin, lineWidth / 2);
+        QPoint point2 = triangleCenter + QPoint(padding + margin, 0);
+        QPoint point3 = point1 + QPoint(0, lineWidth);
+
+        painter->drawLine(point1, point2);
+        painter->drawLine(point2, point3);
+        painter->drawLine(point1, point3);
+
+        QPolygon triangle;
+        triangle << point1 << point2 << point3;
+        painter->setBrush(QColor(209, 213, 219));
+        painter->setPen(Qt::NoPen);
+        painter->drawPolygon(triangle);
+
+        painter->setBrush(Qt::NoBrush);
+        if(!thumbnail.isNull())
+            painter->setPen(Qt::white);
+        else
+            painter->setPen(QColor(107, 114, 128));
+
+        qint64 duration = index.data(VideoDuration).toLongLong();
+        if(duration > 0)
+        {
+            font.setPointSize(9);
+            painter->setFont(font);
+            QRect durationRect(textRegionRect.bottomLeft() - QPoint(-15, 30), QSize(textRegionRect.width(), 30));
+            qint64 totalSec = duration / 1000;
+            qint64 hours = totalSec / 3600;
+            qint64 minutes = (totalSec % 3600) / 60;
+            qint64 seconds = totalSec % 60;
+
+            QString durationText;
+            if(hours > 0)
+                durationText = QString("%1:%2:%3").arg(hours, 2, 10, QChar('0'))
+                                   .arg(minutes, 2, 10, QChar('0'))
+                                   .arg(seconds, 2, 10, QChar('0'));
+            else
+                durationText = QString("%1:%2").arg(minutes, 2, 10, QChar('0')).arg(seconds, 2, 10, QChar('0'));
+
+            painter->drawText(durationRect, Qt::AlignVCenter | Qt::AlignLeft, durationText);
+        }
+
+        painter->restore();
+    }
+    else if(type == ContentType::File)
+    {
+        painter->setBrush(QColor(240, 240, 240));
+        painter->setPen(QPen(QColor(209, 213, 219), 1));
+        painter->drawRoundedRect(textRegionRect, 8, 8);
     }
     else
     {
@@ -268,6 +367,34 @@ QSize ConversationDelegate::sizeHint(const QStyleOptionViewItem &option, const Q
 
         totalHeight = imageSize.height() + 16;//16为了居中
     }
+    else if(type == ContentType::Video)
+    {
+        int maxWidth = qMax(20, static_cast<int>((rectWidth - 60) * 0.6));
+        int maxHeight = 200;
+
+        QSize thumbnailSize(index.data(MediaWidth).toInt(), index.data(MediaHeight).toInt());
+        if(thumbnailSize.width() <= 0 || thumbnailSize.height() <= 0)
+            thumbnailSize = QSize(160, 120);
+
+        thumbnailSize.scale(maxWidth, maxHeight, Qt::KeepAspectRatio);
+
+        if(thumbnailSize.height() < 40 && thumbnailSize.height() > 0)
+        {
+            int width = qRound(thumbnailSize.width() * 40.0 / thumbnailSize.height());
+            thumbnailSize = QSize(qMin(width, maxWidth), 40);
+        }
+
+        totalHeight = thumbnailSize.height() + 16;
+    }
+    else if(type == ContentType::File)
+    {
+        int maxWidth = qMax(20, static_cast<int>((rectWidth - 60) * 0.5));
+        int maxHeight = 100;
+
+        QSize fileSize(maxWidth, maxHeight);
+
+        totalHeight = fileSize.height() + 16;
+    }
     else
     {
         QString message = index.data(ContentRole).toString();
@@ -333,15 +460,19 @@ bool ConversationDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
         }
         else if(textRegionRect.contains(mouse->pos()))
         {
-            if(static_cast<ImageCacheManager::ImageState>(index.data(ImageStateRole).toInt()) == ImageCacheManager::ImageState::Failed)
+            ContentType type = static_cast<ContentType>(index.data(ContentTypeRole).toInt());
+            if(type == ContentType::Image)
             {
-                emit ReloadImageClicked(index.data(MessageIDRole).toString());
-                return true;
-            }
-            else if(static_cast<ImageCacheManager::ImageState>(index.data(ImageStateRole).toInt()) == ImageCacheManager::ImageState::Success)
-            {
-                emit previewImageClicked(index.data(MediaUrl).toString());
-                return true;
+                if(static_cast<ImageCacheManager::ImageState>(index.data(ImageStateRole).toInt()) == ImageCacheManager::ImageState::Failed)
+                {
+                    emit ReloadImageClicked(index.data(MessageIDRole).toString());
+                    return true;
+                }
+                else if(static_cast<ImageCacheManager::ImageState>(index.data(ImageStateRole).toInt()) == ImageCacheManager::ImageState::Success)
+                {
+                    emit previewImageClicked(index.data(MediaUrl).toString());
+                    return true;
+                }
             }
         }
     }
@@ -465,6 +596,41 @@ void ConversationDelegate::getLayout(const QStyleOptionViewItem &option, const Q
             textRegionRect = QRect(avatarRect.topLeft() - QPoint(10 + imageSize.width(), 0), imageSize);
         else
             textRegionRect = QRect(avatarRect.topRight() + QPoint(10, 0), imageSize);
+    }
+    else if(type == ContentType::Video)
+    {
+        // QPixmap thumbnail = index.data(VideoThumbnail).value<QPixmap>();
+        int maxWidth = qMax(20, static_cast<int>((rectWidth - 20 - avatarSize.width()) * 0.6));
+        int maxHeight = 200;
+
+        QSize thumbnailSize(index.data(MediaWidth).toInt(), index.data(MediaHeight).toInt());
+        if(thumbnailSize.width() <= 0 || thumbnailSize.height() <= 0)
+            thumbnailSize = QSize(160, 120);
+
+        thumbnailSize.scale(maxWidth, maxHeight, Qt::KeepAspectRatio);
+
+        if(thumbnailSize.height() < 40 && thumbnailSize.height() > 0)
+        {
+            int width = qRound(thumbnailSize.width() * 40.0 / thumbnailSize.height());
+            thumbnailSize = QSize(qMin(width, maxWidth), 40);
+        }
+
+        if(isSelf)
+            textRegionRect = QRect(avatarRect.topLeft() - QPoint(10 + thumbnailSize.width(), 0), thumbnailSize);
+        else
+            textRegionRect = QRect(avatarRect.topRight() + QPoint(10, 0), thumbnailSize);
+    }
+    else if(type == ContentType::File)
+    {
+        int maxWidth = qMax(20, static_cast<int>((rectWidth - 20 - avatarSize.width()) * 0.5));
+        int maxHeight = 100;
+
+        QSize fileSize(maxWidth, maxHeight);
+
+        if(isSelf)
+            textRegionRect = QRect(avatarRect.topLeft() - QPoint(10 + fileSize.width(), 0), fileSize);
+        else
+            textRegionRect = QRect(avatarRect.topRight() + QPoint(10, 0), fileSize);
     }
     else
     {
