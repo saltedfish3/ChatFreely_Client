@@ -21,6 +21,7 @@ int main(int argc, char *argv[])
     UserInfo::getUserInfo();
     ImageCacheManager::getManager();
     ImagePreviewWidget::getPreviewWidget();
+    VideoPreviewWidget::getPreviewWidget();
     GlobalInitController::getController();
 
     BodyWidget w(800,600,8);

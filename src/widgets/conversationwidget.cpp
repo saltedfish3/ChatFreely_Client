@@ -368,6 +368,11 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         }
     });
 
+    connect(this->delegate, &ConversationDelegate::previewVideoClicked, this, [this](const QString& url){
+        VideoPreviewWidget::getPreviewWidget().show();
+        VideoPreviewWidget::getPreviewWidget().setVideoUrl(url);
+    });
+
     connect(this->item, &ConversationItem::finishLoadedImage, this, [this](){
         this->loadingCount--;
     });

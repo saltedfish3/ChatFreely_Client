@@ -420,27 +420,25 @@ void TcpLongConnection::sendSyncNewMessages(const QString &friendUID, qint64 sta
     obj["StartConvSeq"] = startConvSeq;
     obj["Limit"] = limit;
 
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    this->hash_conversationToCurrentReq[friendUID] = requestsID;
+
     QJsonDocument doc(obj);
     QByteArray data =doc.toJson(QJsonDocument::Compact) + "\n";
     this->socket->write(data);
     this->socket->flush();
 
-    QTimer* timer = new QTimer(this);
-    timer->setSingleShot(true);
-    timer->setInterval(5000);
-    this->hash_timeoutTimers.insert(requestsID, timer);
-    this->hash_requestsToFriendUID.insert(requestsID, friendUID);
-
-    connect(timer, &QTimer::timeout, this, [this, requestsID, friendUID](){
-        if(this->hash_timeoutTimers.contains(requestsID))
+    QTimer::singleShot(5000, this, [this, requestsID, friendUID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
         {
-            this->hash_timeoutTimers[requestsID]->deleteLater();
-            this->hash_timeoutTimers.remove(requestsID);
+            if(this->hash_conversationToCurrentReq.value(friendUID) == requestsID)
+            {
+                this->hash_conversationToCurrentReq.remove(friendUID);
+                emit syncMessagesStatus(false, friendUID, {});
+                qDebug()<<"同步消息超时"<<requestsID;
+            }
         }
-        emit syncMessagesStatus(false, friendUID, {});
-        qDebug()<<"同步消息超时"<<requestsID;
     });
-    timer->start();
 }
 
 bool TcpLongConnection::isConnect()
@@ -623,39 +621,21 @@ void TcpLongConnection::sendMessageTo(QString uid, QString message, QString temp
         emit sendMessageStatus(false, tempMsgID, uid);
         return;
     }
-    QString requestsID;
-    QString content;
-    uint64_t thisCount = 0;
+    QString requestsID = QString::number(getRequestsId());
 
-    auto it = this->map_messageCache.find(tempMsgID);
-    if(it != this->map_messageCache.end())
-    {
-        requestsID = it.value().requestID;
-        content = it.value().content;
-        thisCount = ++(it.value().reqCount);
-        type = it.value().type;
-    }
-    else
-    {
-        requestsID = QString::number(getRequestsId());
-        content = message;
-        MessageRequest mrt;
-        mrt.requestID = requestsID;
-        mrt.type = type;
-        mrt.content = content;
-        mrt.receiverUID = uid;
-        mrt.reqCount++;
-        thisCount = mrt.reqCount;
-        this->map_messageCache[tempMsgID] = mrt;
-    }
+    MessageRequest mrt;
+    mrt.type = type;
+    mrt.content = message;
+    mrt.receiverUID = uid;
+    this->map_messageCache[tempMsgID] = mrt;
+
     QJsonObject obj;
-
     obj["Requests_id"] = requestsID;
     obj["Type"] = "SendMessage";
     obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
     obj["ReceiverUID"] = uid;
     obj["ContentType"] = static_cast<int>(type);
-    obj["Content"] = content;
+    obj["Content"] = message;
     obj["TempMsgID"] = tempMsgID;
 
     QJsonDocument doc(obj);
@@ -665,19 +645,11 @@ void TcpLongConnection::sendMessageTo(QString uid, QString message, QString temp
     this->socket->flush();
 
     this->waiting_requestsID.insert(requestsID.toStdString());
-    QTimer::singleShot(10000,[this,requestsID,tempMsgID, thisCount, uid](){
-        auto it = this->map_messageCache.find(tempMsgID);
-        if(it != this->map_messageCache.end())
+    QTimer::singleShot(10000,[this,requestsID, tempMsgID, uid](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
         {
-            uint64_t newCount = it.value().reqCount;
-            if(newCount == thisCount)
-            {
-                if(this->waiting_requestsID.erase(requestsID.toStdString()))
-                {
-                    //发送超时信号更新状态
-                    emit sendMessageStatus(false, tempMsgID, uid);
-                }
-            }
+            //发送超时信号更新状态
+            emit sendMessageStatus(false, tempMsgID, uid);
         }
     });
 }
@@ -871,7 +843,7 @@ void TcpLongConnection::handleAccessTokenLoginResp(QJsonObject obj)
 
 void TcpLongConnection::handleRegisterResp(QJsonObject obj)
 {
-    if(!obj.contains("Result") || !obj.value("Result").toBool())
+    if(!obj.contains("Result") || !obj.value("Result").isBool())
         return;
 
     QString requestsID = obj.value("Requests_id").toString();
@@ -1046,7 +1018,7 @@ void TcpLongConnection::handleRefreshTokenResp(QJsonObject obj)
     }
     else
     {
-        bool isExpired;
+        bool isExpired = false;
         if(obj.contains("RefreshTokenExpired") && obj.value("RefreshTokenExpired").isBool())
         {
             isExpired = obj.value("RefreshTokenExpired").toBool();
@@ -1473,39 +1445,28 @@ void TcpLongConnection::handleGetConversationsFriendUIDListAndSeqResp(QJsonObjec
 void TcpLongConnection::handleSyncNewMessagesResp(QJsonObject obj)
 {
     QString requestsID = obj.value("Requests_id").toString();
-    if(!this->hash_timeoutTimers.contains(requestsID) || !this->hash_requestsToFriendUID.contains(requestsID))
-        return;
+    QString friendUID = obj.value("FriendUID").toString();
 
-    QTimer* timer = this->hash_timeoutTimers[requestsID];
-    timer->stop();
-    QString friendUID = this->hash_requestsToFriendUID[requestsID];
+    if(this->hash_conversationToCurrentReq.value(friendUID) != requestsID)
+    {
+        qDebug() << "丢弃旧同步信息" << "reqID:" << requestsID;
+        return;
+    }
+
+    this->hash_conversationToCurrentReq.remove(friendUID);
 
     if(!obj.contains("Result") || !obj.value("Result").isBool())
     {
         emit syncMessagesStatus(false, friendUID, {});
-        timer->deleteLater();
-        this->hash_timeoutTimers.remove(requestsID);
-        this->hash_requestsToFriendUID.remove(requestsID);
         return;
     }
+
     bool success = obj.value("Result").toBool();
     if(success)
     {
-        if(!obj.contains("Messages") || !obj.value("Messages").isArray() ||
-            !obj.contains("FriendUID") || !obj.value("FriendUID").isString())
+        if(!obj.contains("Messages") || !obj.value("Messages").isArray() || friendUID.isEmpty())
         {
             emit syncMessagesStatus(false, friendUID, {});
-            timer->deleteLater();
-            this->hash_timeoutTimers.remove(requestsID);
-            this->hash_requestsToFriendUID.remove(requestsID);
-            return;
-        }
-        if(friendUID != obj.value("FriendUID").toString())
-        {
-            emit syncMessagesStatus(false, friendUID, {});
-            timer->deleteLater();
-            this->hash_timeoutTimers.remove(requestsID);
-            this->hash_requestsToFriendUID.remove(requestsID);
             return;
         }
 
@@ -1513,9 +1474,6 @@ void TcpLongConnection::handleSyncNewMessagesResp(QJsonObject obj)
         if(arr.isEmpty())
         {
             emit syncMessagesStatus(true, friendUID, {});
-            timer->deleteLater();
-            this->hash_timeoutTimers.remove(requestsID);
-            this->hash_requestsToFriendUID.remove(requestsID);
             return;
         }
 
@@ -1538,7 +1496,6 @@ void TcpLongConnection::handleSyncNewMessagesResp(QJsonObject obj)
             list.append(msg);
         }
         emit syncMessagesStatus(true, friendUID, list);
-        timer->start();
     }
     else
     {
@@ -1547,41 +1504,26 @@ void TcpLongConnection::handleSyncNewMessagesResp(QJsonObject obj)
             bool isExpired = obj.value("AccessTokenExpired").toBool();
             if(isExpired)
             {
-                sendRefreshToken([this, timer, requestsID, friendUID](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
-                    if(isSuccess)
+                sendRefreshToken([this, requestsID, friendUID](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                    if(isSuccess && !newAccessToken.isEmpty())
                     {
-                        if(newAccessToken.isEmpty())
-                        {
-                            emit refreshExpiredExit();
-                            return;
-                        }
                         UserInfo::getUserInfo().setAccessToken(newAccessToken);
                         emit syncMessagesStatus(false, friendUID, {});
-                        timer->deleteLater();
-                        this->hash_timeoutTimers.remove(requestsID);
-                        this->hash_requestsToFriendUID.remove(requestsID);
                         return;
                     }
-                    else
+
+                    if(isRefreshTokenExpired)
                     {
-                        if(isRefreshTokenExpired)
-                            emit refreshExpiredExit();
-                        else
-                        {
-                            emit syncMessagesStatus(false, friendUID, {});
-                        }
-                        timer->deleteLater();
-                        this->hash_timeoutTimers.remove(requestsID);
-                        this->hash_requestsToFriendUID.remove(requestsID);
+                        emit refreshExpiredExit();
+                        return;
                     }
+
+                    emit syncMessagesStatus(false, friendUID, {});
                 });
                 return;
             }
         }
         emit syncMessagesStatus(false, friendUID, {});
-        timer->deleteLater();
-        this->hash_timeoutTimers.remove(requestsID);
-        this->hash_requestsToFriendUID.remove(requestsID);
     }
 }
 
@@ -1741,11 +1683,9 @@ void TcpLongConnection::handleSendMessageResp(QJsonObject obj)
                 });
                 return;
             }
-            emit sendMessageStatus(false, tempMsgID, receiverUID);
-            return;
         }
-        emit sendMessageStatus(false, tempMsgID, receiverUID);
     }
+    emit sendMessageStatus(false, tempMsgID, receiverUID);
 }
 
 uint64_t TcpLongConnection::getRequestsId()

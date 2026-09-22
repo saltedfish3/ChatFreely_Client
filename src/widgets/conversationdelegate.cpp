@@ -453,12 +453,13 @@ bool ConversationDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
         int textTotalHeight = 0;
         getLayout(option, index, TimeStamp, contain, avatarRect, textRegionRect, statusRect, textTotalHeight);
 
-        if(statusRect.contains(mouse->pos()) && isSelf)
+        Status status = static_cast<Status>(index.data(MessageStatusRole).toInt());
+        if(statusRect.contains(mouse->pos()) && isSelf && status == Failed)
         {
             emit ReSendClicked(index.data(MessageIDRole).toString());
             return true;
         }
-        else if(textRegionRect.contains(mouse->pos()))
+        else if(textRegionRect.contains(mouse->pos()) && status == Success)
         {
             ContentType type = static_cast<ContentType>(index.data(ContentTypeRole).toInt());
             if(type == ContentType::Image)
@@ -473,6 +474,15 @@ bool ConversationDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
                     emit previewImageClicked(index.data(MediaUrl).toString());
                     return true;
                 }
+            }
+            else if(type == ContentType::Video && status == Success)
+            {
+                QString url = index.data(MediaUrl).toString();
+                if(url.isEmpty() || !url.startsWith("http"))
+                    return true;
+
+                emit previewVideoClicked(index.data(MediaUrl).toString());
+                return true;
             }
         }
     }

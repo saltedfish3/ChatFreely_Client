@@ -27,6 +27,7 @@
 #include "../chat/message.h"
 #include "imagepreviewwidget.h"
 #include "../utils/videoutils.h"
+#include "videopreviewwidget.h"
 
 class ConversationWidget : public QWidget
 {

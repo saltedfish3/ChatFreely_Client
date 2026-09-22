@@ -97,6 +97,7 @@ void BodyWidget::resizeEvent(QResizeEvent *event)
 void BodyWidget::closeEvent(QCloseEvent *event)
 {
     ImagePreviewWidget::getPreviewWidget().close();
+    VideoPreviewWidget::getPreviewWidget().close();
     QWidget::closeEvent(event);
 }
 

@@ -77,7 +77,6 @@ signals:
     void sendMessageStatus(bool isSuccess, QString tempMsgID, QString receiverUID, QString messageID = "", int64_t timeStamp = 0, int64_t convSeq = 0);
     void pushMessage(QString senderUID, ContentType type, QString content, QString messageID, int64_t timeStamp, int64_t convSeq);
     void cleanNewFriendRequestsList();
-    // void cleanFriendList();
     void refreshExpiredExit();
     void exitAccount();
 
@@ -118,8 +117,10 @@ private:
     QTimer* clock_heartbeat;
 
     std::unordered_set<std::string> waiting_requestsID;
-    QHash<QString, QTimer*> hash_timeoutTimers;
-    QHash<QString, QString> hash_requestsToFriendUID;
+    // QHash<QString, QTimer*> hash_timeoutTimers;//Request作键
+    // QHash<QString, QTimer*> hash_msgTimeoutTimers;//tempMsgID作键
+    // QHash<QString, QString> hash_requestsToFriendUID;
+    QHash<QString, QString> hash_conversationToCurrentReq;//friendUID -> requestID
     std::map<QString, std::function<void(bool, const QString&, bool)>> refreshCallBack;
 
     //曾经是否连接成功过
@@ -148,11 +149,9 @@ private:
     };
     struct MessageRequest
     {
-        QString requestID;
         ContentType type;
         QString content;
         QString receiverUID;
-        uint64_t reqCount = 0;
     };
     QMap<QString, PendingRequest> map_idempotentCache;//QString是RequestID
     QMap<QString, MessageRequest> map_messageCache;//QString是tempMsgID
