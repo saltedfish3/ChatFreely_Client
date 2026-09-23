@@ -1,10 +1,12 @@
 #include "videocontentview.h"
 
-VideoContentView::VideoContentView(QWidget *parent)
+VideoContentView::VideoContentView(QMediaPlayer* player, QAudioOutput* output, QWidget *parent)
     : QOpenGLWidget{parent}
 {
     this->setMouseTracking(true);
     rebuildPath();
+
+    this->bar = new VideoControlBar(player, output, this);
 }
 
 void VideoContentView::setState(State state)
@@ -81,6 +83,19 @@ void VideoContentView::paintGL()
 void VideoContentView::resizeGL(int w, int h)
 {
     rebuildPath();
+    if(!this->bar)
+        return;
+
+    this->bar->adjustSize();
+    int barWidth = this->bar->width();
+    int barHeight = this->bar->height();
+
+    if(barWidth <= 0 || barHeight <= 0 || this->height() <= 0)
+        return;
+
+    int margin = 12;
+    this->bar->move((this->width() - barWidth) / 2, this->height() - barHeight - margin);
+    this->bar->raise();
 }
 
 void VideoContentView::mousePressEvent(QMouseEvent *event)

@@ -63,7 +63,6 @@ private:
 
     QPoint pos_widget;
 
-    QFuture<void> waitingFrame;
     QAtomicInt isFrameBusy{0};
     QSize currentFrameSize;
 };

@@ -373,6 +373,10 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
                     item->setData(msg.content, ConversationListDelegate::LastMsgRole);
                 else if(msg.contentType == ContentType::Image)
                     item->setData("[图片]", ConversationListDelegate::LastMsgRole);
+                else if(msg.contentType == ContentType::Video)
+                    item->setData("[视频]", ConversationListDelegate::LastMsgRole);
+                else if(msg.contentType == ContentType::File)
+                    item->setData("[文件]", ConversationListDelegate::LastMsgRole);
                 item->setData(msg.timeStamp, ConversationListDelegate::LastTimestampRole);
             }
         }

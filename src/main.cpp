@@ -26,5 +26,10 @@ int main(int argc, char *argv[])
 
     BodyWidget w(800,600,8);
     w.show();
-    return a.exec();
+
+    int ret = a.exec();
+
+    std::fflush(stderr);
+    std::fflush(stdout);
+    std::_Exit(ret);
 }

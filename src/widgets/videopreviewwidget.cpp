@@ -182,16 +182,16 @@ VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
     this->widget_titleBar = new TitleBarWidget(this->width() - 2, 40, 8, this);
     this->widget_titleBar->move(1,1);
 
-    this->view_video = new VideoContentView(this);
-    this->view_video->resize(this->width() - 2, this->height() - this->widget_titleBar->height() - 2);
-    this->view_video->move(1, this->widget_titleBar->pos().y() + this->widget_titleBar->height());
-
     this->player = new QMediaPlayer(this);
     this->output = new QAudioOutput(this);
     this->sink = new QVideoSink(this);
 
     this->player->setAudioOutput(this->output);
     this->player->setVideoSink(this->sink);
+
+    this->view_video = new VideoContentView(player, output, this);
+    this->view_video->resize(this->width() - 2, this->height() - this->widget_titleBar->height() - 2);
+    this->view_video->move(1, this->widget_titleBar->pos().y() + this->widget_titleBar->height());
 
     //获取帧
     connect(this->sink, &QVideoSink::videoFrameChanged, this, [this](const QVideoFrame& frame){
@@ -284,10 +284,7 @@ VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
 
     connect(qApp, &QCoreApplication::aboutToQuit, this, [this](){
         if(this->player)
-        {
             this->player->stop();
-            this->player->setSource(QUrl());
-        }
     });
 
     connect(this->widget_titleBar, &TitleBarWidget::minimizeApp, this, &VideoPreviewWidget::showMinimized);

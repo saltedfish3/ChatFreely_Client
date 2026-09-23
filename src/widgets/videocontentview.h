@@ -6,6 +6,7 @@
 #include <QPainterPath>
 #include <QMouseEvent>
 #include <QtOpenGLWidgets/QtOpenGLWidgets>
+#include "videocontrolbar.h"
 
 class VideoContentView : public QOpenGLWidget
 {
@@ -20,7 +21,7 @@ public:
         Error
     };
 
-    explicit VideoContentView(QWidget *parent = nullptr);
+    explicit VideoContentView(QMediaPlayer* player, QAudioOutput* output, QWidget *parent = nullptr);
 
     void setState(State state);
     State getState() const;
@@ -37,6 +38,7 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
 
+
 private:
     void rebuildPath();
 
@@ -49,6 +51,8 @@ private:
 
     //缓存路径
     QPainterPath path;
+
+    VideoControlBar* bar;
 };
 
 #endif // VIDEOCONTENTVIEW_H
