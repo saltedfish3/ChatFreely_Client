@@ -1,10 +1,11 @@
 #include "GlobalVariable.h"
 
+GlobalVariable GlobalVariable::myself;
 QString GlobalVariable::pos_ini;
 QString GlobalVariable::pos_downloadFile;
 QString GlobalVariable::pos_chatRecord;
 QString GlobalVariable::pos_imageCache;
-GlobalVariable GlobalVariable::myself;
+bool GlobalVariable::isHaveGPU = false;
 
 GlobalVariable::GlobalVariable()
 {
@@ -191,4 +192,14 @@ qreal GlobalVariable::getMaxDevicePixelRatio()
     for(const QScreen* screen : screens)
         dpr = qMax(dpr, screen->devicePixelRatio());
     return dpr;
+}
+
+bool GlobalVariable::hasGPU()
+{
+    return isHaveGPU;
+}
+
+void GlobalVariable::setHasGPU(bool gpu)
+{
+    isHaveGPU = gpu;
 }

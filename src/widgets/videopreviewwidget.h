@@ -9,6 +9,7 @@
 #include <QVideoSink>
 #include <QVideoFrame>
 #include <QFuture>
+#include <QMediaMetaData>
 #include <QtConcurrent/QtConcurrent>
 #include "imageview.h"
 #include "closebutton.h"
@@ -42,6 +43,7 @@ protected:
     void paintEvent(QPaintEvent* event) override;
     bool eventFilter(QObject* obj,QEvent* ev) override;
     void resizeEvent(QResizeEvent* event) override;
+    // void hideEvent(QHideEvent* event) override;
 
 signals:
 
@@ -49,6 +51,7 @@ private:
     explicit VideoPreviewWidget(int width = 900, int height = 600, QWidget *parent = nullptr);
     VideoPreviewWidget::Edge edgeAt(const QPoint& pos);
     void updateCursor(Edge edge);
+    void trySetVideoSize();
 
     Edge edge = Edge::None;
     QPoint pos_startScaleGlobal;
@@ -59,12 +62,8 @@ private:
 
     QMediaPlayer* player;
     QAudioOutput* output;
-    QVideoSink* sink;
 
     QPoint pos_widget;
-
-    QAtomicInt isFrameBusy{0};
-    QSize currentFrameSize;
 };
 
 #endif // VIDEOPREVIEWWIDGET_H

@@ -15,7 +15,7 @@ void VideoPreviewWidget::setVideoUrl(const QUrl &url)
         return;
     }
 
-    this->view_video->clearFrame();
+    this->view_video->setVideoNativeSize(QSize());
     this->view_video->setState(VideoContentView::State::Loading);
 
     this->player->setSource(url);
@@ -38,7 +38,7 @@ void VideoPreviewWidget::paintEvent(QPaintEvent *event)
 bool VideoPreviewWidget::eventFilter(QObject *obj, QEvent *ev)
 {
     //过滤窗口拖动事件
-    if (obj != this)
+    if (obj != this && obj != this->view_video && obj != this->view_video->viewport())
         return QObject::eventFilter(obj, ev);
 
     if(ev->type() != QEvent::MouseButtonPress && ev->type() != QEvent::MouseButtonRelease && ev->type() != QEvent::MouseMove)
@@ -48,9 +48,13 @@ bool VideoPreviewWidget::eventFilter(QObject *obj, QEvent *ev)
     if(!qme)
         return QObject::eventFilter(obj, ev);
 
-    QPoint posThis = qme->pos();
+    QPoint posThis;
     if(obj == this)
         posThis = qme->pos();
+    else if(obj == this->view_video)
+        posThis = this->view_video->mapTo(this, qme->pos());
+    else
+        posThis = this->view_video->viewport()->mapTo(this, qme->pos());
 
     switch(ev->type())
     {
@@ -164,11 +168,15 @@ void VideoPreviewWidget::resizeEvent(QResizeEvent *event)
     }
     if(this->view_video)
     {
-        this->view_video->resize(this->width() - 2, this->height() - this->widget_titleBar->height() - 2);
-        this->view_video->move(1, this->widget_titleBar->pos().y() + this->widget_titleBar->height());
+        this->view_video->resize(this->width() - 4, this->height() - this->widget_titleBar->height() - 3);
+        this->view_video->move(2, this->widget_titleBar->height() + 1);
     }
     update();
 }
+
+// void VideoPreviewWidget::hideEvent(QHideEvent *event)
+// {
+// }
 
 VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
     : QWidget{parent}
@@ -184,49 +192,16 @@ VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
 
     this->player = new QMediaPlayer(this);
     this->output = new QAudioOutput(this);
-    this->sink = new QVideoSink(this);
 
     this->player->setAudioOutput(this->output);
-    this->player->setVideoSink(this->sink);
 
     this->view_video = new VideoContentView(player, output, this);
-    this->view_video->resize(this->width() - 2, this->height() - this->widget_titleBar->height() - 2);
-    this->view_video->move(1, this->widget_titleBar->pos().y() + this->widget_titleBar->height());
+    this->view_video->resize(this->width() - 4, this->height() - this->widget_titleBar->height() - 3);
+    this->view_video->move(2, this->widget_titleBar->height() + 1);
 
-    //获取帧
-    connect(this->sink, &QVideoSink::videoFrameChanged, this, [this](const QVideoFrame& frame){
-        if(!frame.isValid())
-            return;
-
-        if(this->isFrameBusy.loadAcquire() == 1)
-            return;
-        this->isFrameBusy.storeRelaxed(1);
-
-        QVideoFrame frame_copy = frame;
-        QSize target = this->view_video->size();
-
-        auto future = QtConcurrent::run([this, frame_copy, target](){
-            QImage img = frame_copy.toImage();
-
-            QSize scaled = img.size();
-            scaled.scale(target, Qt::KeepAspectRatio);
-
-            if(scaled.width() <= 0 || scaled.height() <= 0)
-            {
-                QMetaObject::invokeMethod(this, [this, img = std::move(img)](){
-                    this->isFrameBusy.storeRelaxed(0);
-                }, Qt::QueuedConnection);
-                return;
-            }
-
-            if(scaled != img.size())
-                img = img.scaled(scaled, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-
-            QMetaObject::invokeMethod(this, [this, img = std::move(img)](){
-                this->isFrameBusy.storeRelaxed(0);
-                this->view_video->setFrame(img);
-            }, Qt::QueuedConnection);
-        });
+    //分辨率
+    connect(this->player, &QMediaPlayer::metaDataChanged, this, [this](){
+        trySetVideoSize();
     });
 
     //播放状态
@@ -253,6 +228,10 @@ VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
         case QMediaPlayer::LoadingMedia:
         case QMediaPlayer::StalledMedia:
             this->view_video->setState(VideoContentView::State::Loading);
+            break;
+        case QMediaPlayer::LoadedMedia:
+        case QMediaPlayer::BufferedMedia:
+            trySetVideoSize();
             break;
         case QMediaPlayer::InvalidMedia:
             this->view_video->setState(VideoContentView::State::Error);
@@ -290,6 +269,8 @@ VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
     connect(this->widget_titleBar, &TitleBarWidget::minimizeApp, this, &VideoPreviewWidget::showMinimized);
 
     this->installEventFilter(this);
+    this->view_video->installEventFilter(this);
+    this->view_video->viewport()->installEventFilter(this);
 }
 
 VideoPreviewWidget::Edge VideoPreviewWidget::edgeAt(const QPoint &pos)
@@ -326,26 +307,51 @@ VideoPreviewWidget::Edge VideoPreviewWidget::edgeAt(const QPoint &pos)
 
 void VideoPreviewWidget::updateCursor(Edge edge)
 {
+    QCursor cursor;
+
     switch(edge)
     {
     case Edge::Left:
     case Edge::Right:
-        this->setCursor(Qt::SizeHorCursor);
+        cursor = Qt::SizeHorCursor;
         break;
     case Edge::Top:
     case Edge::Bottom:
-        this->setCursor(Qt::SizeVerCursor);
+        cursor = Qt::SizeVerCursor;
         break;
     case Edge::TopLeft:
     case Edge::BottomRight:
-        this->setCursor(Qt::SizeFDiagCursor);
+        cursor = Qt::SizeFDiagCursor;
         break;
     case Edge::TopRight:
     case Edge::BottomLeft:
-        this->setCursor(Qt::SizeBDiagCursor);
+        cursor = Qt::SizeBDiagCursor;
         break;
     default:
-        this->unsetCursor();
+        cursor = QCursor(Qt::ArrowCursor);
         break;
     }
+
+    this->setCursor(cursor);
+    if(this->view_video)
+    {
+        this->view_video->setCursor(cursor);
+        this->view_video->viewport()->setCursor(cursor);
+    }
+}
+
+void VideoPreviewWidget::trySetVideoSize()
+{
+    if(!this->player || !this->view_video)
+        return;
+
+    QVariant var = this->player->metaData().value(QMediaMetaData::Resolution);
+    if(!var.isValid())
+        return;
+
+    QSize size = var.toSize();
+    if(!size.isValid() || size.isEmpty())
+        return;
+
+    this->view_video->setVideoNativeSize(size);
 }

@@ -47,6 +47,8 @@ public:
     static void cleanMigratingTemp(const QString& tempPath);
 
     static qreal getMaxDevicePixelRatio();
+    static bool hasGPU();
+    static void setHasGPU(bool gpu);
 
 private:
     GlobalVariable();
@@ -57,6 +59,7 @@ private:
     static QString pos_downloadFile;
     static QString pos_chatRecord;
     static QString pos_imageCache;
+    static bool isHaveGPU;
 };
 
 

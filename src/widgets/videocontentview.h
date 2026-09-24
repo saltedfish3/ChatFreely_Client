@@ -5,10 +5,13 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QMouseEvent>
-#include <QtOpenGLWidgets/QtOpenGLWidgets>
+#include <QGraphicsView>
+#include <QGraphicsVideoItem>
+#include <QOpenGLWidget>
 #include "videocontrolbar.h"
+#include "../utils/GlobalVariable.h"
 
-class VideoContentView : public QOpenGLWidget
+class VideoContentView : public QGraphicsView
 {
     Q_OBJECT
 public:
@@ -25,34 +28,35 @@ public:
 
     void setState(State state);
     State getState() const;
-    void setFrame(const QImage& frame);
     void setErrorText(const QString& text);
-    void clearFrame();
+    void setVideoNativeSize(const QSize& size);
 
 signals:
     void clicked();
 
 protected:
-    void paintGL() override;
-    void resizeGL(int w, int h) override;
+    void drawForeground(QPainter* painter, const QRectF& rect) override;
+    void resizeEvent(QResizeEvent *event) override;
+
     void mousePressEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
 
 
 private:
-    void rebuildPath();
+    void updateViewTransform();
+    void updateMask();
 
+    QMediaPlayer* player;
+    QAudioOutput* output;
+    QGraphicsScene* scene;
+    QGraphicsVideoItem* item_video;
+
+    QSize videoNativeSize;
     State currentState = State::None;
     QString errorText;
-
     QPoint pressPos = QPoint(-1, -1);
 
-    QImage frame;
-
-    //缓存路径
-    QPainterPath path;
-
-    VideoControlBar* bar;
+    // VideoControlBar* bar;
 };
 
 #endif // VIDEOCONTENTVIEW_H
