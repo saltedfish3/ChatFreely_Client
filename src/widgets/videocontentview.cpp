@@ -86,7 +86,6 @@ void VideoContentView::drawForeground(QPainter* painter, const QRectF& rect)
 {
     QGraphicsView::drawForeground(painter, rect);
 
-    QRectF textRect = (this->videoNativeSize.isValid() && !this->videoNativeSize.isEmpty()) ? QRectF(0, 0, this->videoNativeSize.width(), this->videoNativeSize.height()) : this->rect();
     if(this->currentState == State::Error)
     {
         painter->setPen(QColor(150, 150, 150));
@@ -153,7 +152,7 @@ void VideoContentView::updateMask()
 
 
     QRectF rect(0, 0, this->width(), this->height());
-    qreal radius = 6;
+    qreal radius = 8;
 
     QPainterPath path;
     path.moveTo(rect.topLeft());

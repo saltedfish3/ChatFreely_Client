@@ -161,6 +161,8 @@ bool VideoPreviewWidget::eventFilter(QObject *obj, QEvent *ev)
 void VideoPreviewWidget::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
+    const int titleHeight = this->widget_titleBar ? this->widget_titleBar->height() : 40;
+
     if(this->widget_titleBar)
     {
         this->widget_titleBar->resize(this->width() - 2, 40);
@@ -168,15 +170,11 @@ void VideoPreviewWidget::resizeEvent(QResizeEvent *event)
     }
     if(this->view_video)
     {
-        this->view_video->resize(this->width() - 4, this->height() - this->widget_titleBar->height() - 3);
-        this->view_video->move(2, this->widget_titleBar->height() + 1);
+        this->view_video->resize(this->width() - 2 * 3, this->height() - titleHeight - 2 * 3);
+        this->view_video->move(3, titleHeight + 1);
     }
     update();
 }
-
-// void VideoPreviewWidget::hideEvent(QHideEvent *event)
-// {
-// }
 
 VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
     : QWidget{parent}
@@ -196,8 +194,8 @@ VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
     this->player->setAudioOutput(this->output);
 
     this->view_video = new VideoContentView(player, output, this);
-    this->view_video->resize(this->width() - 4, this->height() - this->widget_titleBar->height() - 3);
-    this->view_video->move(2, this->widget_titleBar->height() + 1);
+    this->view_video->resize(this->width() - 2 * 3, this->height() - this->widget_titleBar->height() - 2 * 3);
+    this->view_video->move(3, this->widget_titleBar->height() + 1);
 
     //分辨率
     connect(this->player, &QMediaPlayer::metaDataChanged, this, [this](){
