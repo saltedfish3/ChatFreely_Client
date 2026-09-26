@@ -13,6 +13,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QThreadPool>
+#include <QDir>
 #include "../network/httpshortconnection.h"
 #include "GlobalVariable.h"
 #include "functionrunnable.h"
@@ -41,6 +42,10 @@ public:
     void migrateCache(const QString& oldUrl, const QString& newUrl, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize());
     void removeCache(const QString& url, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize());
     QString getCacheFilePath(const QString& url, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize()) const;
+    QString getFilenameFromUrl(const QString& url, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize()) const;
+
+    bool saveTo(const QString& url, const QString& targetDir);
+
     QPixmap fastLoadImage(const QString& url, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize());
 
     ImageState getImageState(const QString& url, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize());
@@ -66,7 +71,7 @@ private:
 
     void handleDownloadFinished(const QString& url, const QByteArray& data);
     QString getUrlKey(const QString& url, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize()) const;
-    QString getFilenameFromKey(const QString& key) const;
+    QString getFilePathFromKey(const QString& key) const;
     void invokeCallbacks(const QList<std::function<void(const QPixmap&)>>& callbacks, const QPixmap& pic);
 
     //图片处理

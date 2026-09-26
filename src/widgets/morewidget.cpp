@@ -6,7 +6,7 @@ MoreWidget::MoreWidget(QWidget *parent)
     this->setMaximumWidth(150);
     this->setMinimumWidth(150);
     this->setWindowFlags(Qt::Tool | Qt::FramelessWindowHint);
-    this->setAttribute(Qt::WA_StyledBackground, true);
+    this->setAttribute(Qt::WA_TranslucentBackground, true);
     this->setFocusPolicy(Qt::StrongFocus);
     initMore();
     initStyle();
@@ -17,6 +17,18 @@ void MoreWidget::focusOutEvent(QFocusEvent *event)
     QWidget::focusOutEvent(event);
     this->hide();
     emit closed();
+}
+
+void MoreWidget::paintEvent(QPaintEvent *event)
+{
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    QPainterPath path;
+    path.addRoundedRect(QRectF(this->rect()), 8, 8);
+    painter.setBrush(QColor(255, 255, 255, 255));
+    painter.setPen(QPen(QColor(229, 231, 235, 255), 1));
+    painter.drawPath(path);
 }
 
 void MoreWidget::initMore()
@@ -83,13 +95,6 @@ void MoreWidget::initMore()
 void MoreWidget::initStyle()
 {
     this->setStyleSheet(R"(
-                    QWidget
-                    {
-                        background:rgba(255, 255, 255, 255);
-                        border: 1px solid rgba(229, 231, 235, 255);
-                        border-radius: 8px;
-                        padding: 4px 0px;
-                    }
                     QFrame
                     {
                         background-color: rgba(229, 231, 235, 255);

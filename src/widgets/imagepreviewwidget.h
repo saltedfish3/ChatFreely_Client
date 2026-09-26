@@ -8,6 +8,8 @@
 #include "closebutton.h"
 #include "minimizebutton.h"
 #include "titlebarwidget.h"
+#include "../utils/imagecachemanager.h"
+#include "toastmanager.h"
 
 class ImagePreviewWidget : public QWidget
 {
@@ -30,6 +32,7 @@ public:
     ImagePreviewWidget(const ImagePreviewWidget&) = delete;
 
     void setPixmap(const QPixmap& pix);
+    void setPixmapUrl(const QString& url);
 
 signals:
 
@@ -42,6 +45,7 @@ private:
     explicit ImagePreviewWidget(int width = 600, int height = 800, QWidget *parent = nullptr);
     ImagePreviewWidget::Edge edgeAt(const QPoint& pos);
     void updateCursor(Edge edge);
+    void updateSaveButton();
 
     void initStyle();
 
@@ -54,7 +58,11 @@ private:
     QPushButton* btn_rotateRight;
     QPushButton* btn_zoomIn;
     QPushButton* btn_zoomOut;
+    QPushButton* btn_save;
     QPoint pos_widget;
+
+    bool isSaved = false;
+    QString pixmapUrl;
 
     ImageView* view;
 };

@@ -30,7 +30,7 @@ void VideoPreviewWidget::paintEvent(QPaintEvent *event)
     QRect rect = QRect(QRect(0, 0, this->width(), this->height()));
     rect.adjust(1, 1, -1, -1);
 
-    painter.setBrush(QColor(255, 255, 255));
+    painter.setBrush(QColor(240, 240, 240));
     painter.setPen(QPen(QColor(0, 0, 0, 26), 1));
     painter.drawRoundedRect(rect, 8, 8);
 }
@@ -179,7 +179,7 @@ void VideoPreviewWidget::resizeEvent(QResizeEvent *event)
 VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
     : QWidget{parent}
 {
-    this->setMinimumSize(300, 400);
+    this->setMinimumSize(400, 300);
     this->resize(width, height);
     setWindowFlags(Qt::FramelessWindowHint);
     setAttribute(Qt::WA_TranslucentBackground);
@@ -235,6 +235,16 @@ VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
             this->view_video->setState(VideoContentView::State::Error);
             this->view_video->setErrorText("无法识别视频格式");
             break;
+        case QMediaPlayer::EndOfMedia:
+        {
+            qint64 dur = this->player->duration();
+            if(dur > 0)
+            {
+                this->player->pause();
+                this->player->setPosition(0);
+            }
+            break;
+        }
         default:
             break;
         }

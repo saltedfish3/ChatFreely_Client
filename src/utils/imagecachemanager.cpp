@@ -123,7 +123,7 @@ void ImageCacheManager::insertCache(const QString &url, const QByteArray &data, 
     QDir().mkpath(this->pos_imageCache);
     QString key = getUrlKey(url, dpr, radius, padding, size);
 
-    QFile file(getFilenameFromKey(key));
+    QFile file(getFilePathFromKey(key));
     if(file.open(QIODevice::WriteOnly))
     {
         file.write(data);
@@ -153,8 +153,8 @@ void ImageCacheManager::migrateCache(const QString &oldUrl, const QString &newUr
     QString oldKey = getUrlKey(oldUrl, dpr, radius, padding, size);
     QString newKey = getUrlKey(newUrl, dpr, radius, padding, size);
 
-    QString oldPath = getFilenameFromKey(oldKey);
-    QString newPath = getFilenameFromKey(newKey);
+    QString oldPath = getFilePathFromKey(oldKey);
+    QString newPath = getFilePathFromKey(newKey);
 
     if(!QFile::exists(oldPath))
         return;
@@ -199,18 +199,48 @@ void ImageCacheManager::removeCache(const QString &url, qreal dpr, int radius, i
         this->cache_memoryCache.remove(key);
         this->hash_imageState.remove(key);
     }
-    QFile::remove(getFilenameFromKey(key));
+    QFile::remove(getFilePathFromKey(key));
 }
 
 QString ImageCacheManager::getCacheFilePath(const QString &url, qreal dpr, int radius, int padding, QSize size) const
 {
     dpr = dpr == -1 ? GlobalVariable::getMaxDevicePixelRatio() : dpr;
     QString key = getUrlKey(url, dpr, radius, padding, size);
-    QString filePath = getFilenameFromKey(key);
+    QString filePath = getFilePathFromKey(key);
     if(QFile::exists(filePath))
         return filePath;
 
     return QString();
+}
+
+QString ImageCacheManager::getFilenameFromUrl(const QString &url, qreal dpr, int radius, int padding, QSize size) const
+{
+    dpr = dpr == -1 ? GlobalVariable::getMaxDevicePixelRatio() : dpr;
+    QString key = getUrlKey(url, dpr, radius, padding, size);
+    return QString(QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Md5).toHex()) + ".png";
+}
+
+bool ImageCacheManager::saveTo(const QString &url, const QString &targetDir)
+{
+    if(url.isEmpty() || targetDir.isEmpty())
+        return false;
+
+    QString cachePath = getCacheFilePath(url, 1.0);
+    if(cachePath.isEmpty())
+        return false;
+
+    QString filename = getFilenameFromUrl(url, 1.0);
+    if(filename.isEmpty())
+        return false;
+
+    QDir dir(targetDir);
+    if(!dir.exists() && !QDir().mkpath(targetDir))
+        return false;
+
+    if(QFile::exists(dir.filePath(filename)))
+        QFile::remove(dir.filePath(filename));
+
+    return QFile::copy(cachePath, dir.filePath(filename));
 }
 
 QPixmap ImageCacheManager::fastLoadImage(const QString &url, qreal dpr, int radius, int padding, QSize size)
@@ -263,7 +293,7 @@ bool ImageCacheManager::loadCacheFromMemory(const QString &url, QPixmap &outPixm
 bool ImageCacheManager::loadCacheFromDisk(const QString &url, QPixmap &outPixmap, qreal dpr, int radius, int padding, QSize size)
 {
     QString key = getUrlKey(url, dpr, radius, padding, size);
-    QString path = getFilenameFromKey(key);
+    QString path = getFilePathFromKey(key);
     if(QFile::exists(path))
     {
         QPixmap pix;
@@ -394,7 +424,7 @@ QString ImageCacheManager::getUrlKey(const QString &url, qreal dpr, int radius, 
     return QString("%1rounded%2_p%3_d%4_s%5").arg(url).arg(radius).arg(padding).arg(dpr, 0, 'f', 3).arg(sizeStr);
 }
 
-QString ImageCacheManager::getFilenameFromKey(const QString& key) const
+QString ImageCacheManager::getFilePathFromKey(const QString& key) const
 {
     QString hash = QString(QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Md5).toHex());
     return this->pos_imageCache + "/" + hash;

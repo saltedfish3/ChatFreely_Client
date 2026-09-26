@@ -168,12 +168,9 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
             QImage image(filePath);
             if(image.isNull())
             {
-                ToastManager::getToastManager(true).error("图片读取失败", this);
+                ToastManager::getToastManager(this).error("图片读取失败");
                 return;
             }
-
-            QString localUrl = "local://" + QUuid::createUuid().toString();
-            ImageCacheManager::getManager().insertCache(localUrl, QPixmap::fromImage(image));
 
             this->edit_message->insertFileToEdit(filePath, Image);
         }
@@ -353,15 +350,17 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         QPixmap pix = ImageCacheManager::getManager().fastLoadImage(url, -1, 0, 0, QSize());
         if(!pix.isNull())
         {
+            ImagePreviewWidget::getPreviewWidget().setPixmapUrl(url);
             ImagePreviewWidget::getPreviewWidget().setPixmap(pix);
             ImagePreviewWidget::getPreviewWidget().show();
             return;
         }
         else
         {
-            ImageCacheManager::getManager().loadImage(url, [this](const QPixmap& pix){
+            ImageCacheManager::getManager().loadImage(url, [this, url](const QPixmap& pix){
                 if(pix.isNull())
                     return;
+                ImagePreviewWidget::getPreviewWidget().setPixmapUrl(url);
                 ImagePreviewWidget::getPreviewWidget().setPixmap(pix);
                 ImagePreviewWidget::getPreviewWidget().show();
             }, false, -1, 0, 0, QSize());

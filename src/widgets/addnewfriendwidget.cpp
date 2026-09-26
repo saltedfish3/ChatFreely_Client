@@ -92,7 +92,7 @@ void AddNewFriendWidget::initWidget()
         QString verMsg = this->edit_verMsg->text().trimmed();
         if(sid_email == "")
         {
-            ToastManager::getToastManager(true).error("待添加人信息不能为空", this);
+            ToastManager::getToastManager(this).error("待添加人信息不能为空");
             return;
         }
         QRegularExpression regExp_email("^[0-9a-zA-Z._%+\\-]+@[0-9a-zA-Z.\\-]+\\.[a-zA-Z]{2,}$");
@@ -107,7 +107,7 @@ void AddNewFriendWidget::initWidget()
         }
         else
         {
-            ToastManager::getToastManager(true).error("输入为非邮箱或者用户ID", this);
+            ToastManager::getToastManager(this).error("输入为非邮箱或者用户ID");
             return;
         }
 

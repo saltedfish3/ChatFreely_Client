@@ -40,6 +40,15 @@ VideoContentView::VideoContentView(QMediaPlayer* player, QAudioOutput* output, Q
     this->scene->addItem(this->item_video);
 
     this->player->setVideoOutput(this->item_video);
+
+    this->bar = new VideoControlBar(this->player, this->output, this);
+    connect(this->bar, &VideoControlBar::transAreaClicked, this, [this](){
+        emit clicked();
+    });
+
+    QMetaObject::invokeMethod(this, [this](){
+        updateControlBarGeometry();
+    }, Qt::QueuedConnection);
 }
 
 void VideoContentView::setState(State state)
@@ -104,12 +113,17 @@ void VideoContentView::resizeEvent(QResizeEvent* event)
     QGraphicsView::resizeEvent(event);
     updateViewTransform();
     updateMask();
+    updateControlBarGeometry();
 }
 
 void VideoContentView::mousePressEvent(QMouseEvent *event)
 {
     if(event->button() == Qt::LeftButton)
+    {
         this->pressPos = event->pos();
+        event->accept();
+        return;
+    }
 
     QWidget::mousePressEvent(event);
 }
@@ -123,6 +137,8 @@ void VideoContentView::mouseReleaseEvent(QMouseEvent *event)
             emit clicked();
 
         this->pressPos = QPoint(-1, -1);
+        event->accept();
+        return;
     }
     QWidget::mouseReleaseEvent(event);
 }
@@ -168,4 +184,25 @@ void VideoContentView::updateMask()
     this->setMask(region);
     if(this->viewport())
         this->viewport()->setMask(region);
+}
+
+void VideoContentView::updateControlBarGeometry()
+{
+    if(!this->bar)
+        return;
+
+    this->bar->adjustSize();
+    if(this->bar->width() <= 0 || this->bar->height() <= 0 || this->width() <= 0 || this->height() <= 0)
+        return;
+
+    int margin = 36;
+    int width = this->width() - 2 * margin;
+
+    this->bar->resize(width, this->bar->height());
+
+    int x = (this->width() - this->bar->width()) / 2;
+    int y = this->height() - this->bar->height() - margin;
+
+    this->bar->move(x, y);
+    this->bar->raise();
 }

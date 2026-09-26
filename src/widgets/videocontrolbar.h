@@ -9,7 +9,11 @@
 #include <QLabel>
 #include <QSlider>
 #include <QComboBox>
-
+#include <QPainter>
+#include <QEvent>
+#include <QMouseEvent>
+#include <QMenu>
+#include "ratewidget.h"
 
 class VideoControlBar : public QWidget
 {
@@ -18,9 +22,22 @@ public:
     explicit VideoControlBar(QMediaPlayer* player, QAudioOutput* output, QWidget *parent = nullptr);
 
 signals:
+    void transAreaClicked();
+
+protected:
+    // void mouseMoveEvent(QMouseEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
+    // void enterEvent(QEnterEvent* event) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
+    QString formatTime(qint64 ms);
+
     void initStyle();
+    void updateAudioSlierPosistion();
+    QIcon colorToIcon(const QIcon& icon, const QColor& color, const QSize& size = QSize(18, 18));
 
     QMediaPlayer* player;
     QAudioOutput* output;
@@ -28,13 +45,19 @@ private:
     QHBoxLayout* layout;
     QToolButton* btn_play;
     QToolButton* btn_audio;
+    QToolButton* btn_rate;
+    RateWidget* menu_rate;
 
-    QLabel* label_time;
+    QLabel* label_currentTime;
+    QLabel* label_totalTime;
 
     QSlider* slider_video;
     QSlider* slider_audio;
+    int lastVolume = 100;
 
-    QComboBox* combobox_rate;
+    QWidget* widget_control;
+
+    QPoint pressPos = QPoint(-1, -1);
 };
 
 #endif // VIDEOCONTROLBAR_H

@@ -407,9 +407,9 @@ void RegisterWidget::initRegisterSytle()
 void RegisterWidget::showToast(const QString &msg, bool isSuccess)
 {
     if(isSuccess)
-        ToastManager::getToastManager(false).success(msg, this->window(), this);
+        ToastManager::getToastManager(this).success(msg, this);
     else
-        ToastManager::getToastManager(false).error(msg, this->window(), this);
+        ToastManager::getToastManager(this).error(msg, this);
 }
 
 //按钮 按下动画

@@ -11,6 +11,12 @@ void ImagePreviewWidget::setPixmap(const QPixmap &pix)
     this->view->setPixmap(pix);
 }
 
+void ImagePreviewWidget::setPixmapUrl(const QString &url)
+{
+    this->pixmapUrl = url;
+    this->updateSaveButton();
+}
+
 void ImagePreviewWidget::paintEvent(QPaintEvent *event)
 {
     QPainter painter(this);
@@ -230,6 +236,30 @@ ImagePreviewWidget::ImagePreviewWidget(int width, int height, QWidget *parent)
         this->view->zoomOut();
     });
 
+    this->btn_save = new QPushButton(this->widget_titleBar);
+    this->btn_save->setObjectName("btn_save");
+    this->btn_save->resize(this->widget_titleBar->height(), this->widget_titleBar->height());
+    this->btn_save->setIcon(QIcon(":/default/images/download.png"));
+    this->btn_save->setIconSize(QSize(20, 20));
+    this->btn_save->move(this->btn_zoomOut->pos().x() + this->btn_zoomOut->width(), 0);
+
+    connect(this->btn_save, &QPushButton::clicked, this, [this](){
+        if(this->isSaved)
+            return;
+
+        if(this->pixmapUrl.isEmpty())
+        {
+            ToastManager::getToastManager(this).success("保存失败，请稍后重试");
+            return;
+        }
+
+        if(!ImageCacheManager::getManager().saveTo(this->pixmapUrl, GlobalVariable::getPosOfDownloadFile()))
+            return;
+
+        this->updateSaveButton();
+        ToastManager::getToastManager(this).success("保存成功");
+    });
+
     this->view = new ImageView(this);
     this->view->setObjectName("view");
     this->view->resize(this->width() - 4, this->height() - this->widget_titleBar->height() - 4);
@@ -305,6 +335,21 @@ void ImagePreviewWidget::updateCursor(Edge edge)
     }
 }
 
+void ImagePreviewWidget::updateSaveButton()
+{
+    QString filename = ImageCacheManager::getManager().getFilenameFromUrl(this->pixmapUrl, 1.0);
+    if(filename.isEmpty())
+    {
+        this->btn_save->setIcon(QIcon(":/default/images/download.png"));
+        this->isSaved = false;
+        return;
+    }
+
+    bool saved = GlobalVariable::isDownloadFileExists(filename);
+    this->btn_save->setIcon(saved ? QIcon(":/default/images/downloadSuccess.png") : QIcon(":/default/images/download.png"));
+    this->isSaved = saved;
+}
+
 void ImagePreviewWidget::initStyle()
 {
     this->setStyleSheet(R"(
@@ -312,16 +357,16 @@ void ImagePreviewWidget::initStyle()
                             {
                                 background: transparent;
                             }
-                            #btn_rotateLeft,#btn_rotateRight,#btn_zoomIn,#btn_zoomOut
+                            #btn_rotateLeft,#btn_rotateRight,#btn_zoomIn,#btn_zoomOut,#btn_save
                             {
                                 background: transparent;
                                 border: none;
                             }
-                            #btn_rotateLeft:hover,#btn_rotateRight:hover,#btn_zoomIn:hover,#btn_zoomOut:hover
+                            #btn_rotateLeft:hover,#btn_rotateRight:hover,#btn_zoomIn:hover,#btn_zoomOut:hover,#btn_save:hover
                             {
                                 background: rgba(0, 0, 0, 26);
                             }
-                            #btn_rotateLeft:hover,#btn_rotateRight:pressed,#btn_zoomIn:pressed,#btn_zoomOut:pressed
+                            #btn_rotateLeft:hover,#btn_rotateRight:pressed,#btn_zoomIn:pressed,#btn_zoomOut:pressed,#btn_save:pressed
                             {
                                 background: rgba(0, 0, 0, 51);
                             }

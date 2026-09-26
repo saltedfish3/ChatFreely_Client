@@ -72,6 +72,14 @@ void GlobalVariable::setPosOfDownloadFile(const QString &dir)
     settings.setValue("pos_downloadFile",pos_downloadFile);
 }
 
+bool GlobalVariable::isDownloadFileExists(const QString &filename)
+{
+    QFileInfo info(pos_downloadFile + "/" + filename);
+    if(info.exists())
+        return true;
+    return false;
+}
+
 QString GlobalVariable::getPosOfChatRecord()
 {
     return pos_chatRecord;

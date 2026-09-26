@@ -76,7 +76,7 @@ void ChatTextEdit::insertFileToEdit(const QString &filePath, ContentType type)
             return;
 
         QString filename = "local://" + QUuid::createUuid().toString();
-        ImageCacheManager::getManager().insertCache(filename, QPixmap::fromImage(image));
+        ImageCacheManager::getManager().insertCache(filename, QPixmap::fromImage(image), 1.0);
         insertImageToEdit(image, filename);
         return;
     }
@@ -188,7 +188,7 @@ void ChatTextEdit::insertFromMimeData(const QMimeData *source)
 
         //载入缓存
         QString filename = "local://" + QUuid::createUuid().toString();
-        ImageCacheManager::getManager().insertCache(filename, QPixmap::fromImage(image));
+        ImageCacheManager::getManager().insertCache(filename, QPixmap::fromImage(image), 1.0);
 
         insertImageToEdit(image, filename);
     }

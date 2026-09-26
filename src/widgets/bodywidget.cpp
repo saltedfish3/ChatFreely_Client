@@ -34,17 +34,17 @@ BodyWidget::BodyWidget(int width, int height, int radius, QWidget* parent)
     //退出账户信号接收
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, [this](){
         this->stackedWidget_page->setCurrentWidget(this->widget_login);
-        ToastManager::getToastManager(false).success("退出成功", this, this->stackedWidget_page);
+        ToastManager::getToastManager(this).success("退出成功", this->stackedWidget_page);
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, [this](){
         this->stackedWidget_page->setCurrentWidget(this->widget_login);
-        ToastManager::getToastManager(false).info("登录凭证过期，请重新登录", this, this->stackedWidget_page);
+        ToastManager::getToastManager(this).info("登录凭证过期，请重新登录", this->stackedWidget_page);
     });
 
     connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::refreshExpiredExit, this, [this](){
         this->stackedWidget_page->setCurrentWidget(this->widget_login);
-        ToastManager::getToastManager(false).info("登录凭证过期，请重新登录", this, this->stackedWidget_page);
+        ToastManager::getToastManager(this).info("登录凭证过期，请重新登录", this->stackedWidget_page);
     });
 }
 

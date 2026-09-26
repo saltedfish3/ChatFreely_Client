@@ -270,9 +270,9 @@ void LoginWidget::clearError(QLineEdit* edit, QLabel* label)
 void LoginWidget::showToast(const QString &msg, bool isSuccess)
 {
     if(isSuccess)
-        ToastManager::getToastManager(false).success(msg, this->window(), this);
+        ToastManager::getToastManager(this).success(msg, this);
     else
-        ToastManager::getToastManager(false).error(msg,this->window(), this);
+        ToastManager::getToastManager(this).error(msg, this);
 }
 
 //初始化 登录界面 样式表

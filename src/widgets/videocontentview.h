@@ -45,6 +45,7 @@ protected:
 private:
     void updateViewTransform();
     void updateMask();
+    void updateControlBarGeometry();
 
     QMediaPlayer* player;
     QAudioOutput* output;
@@ -56,7 +57,7 @@ private:
     QString errorText;
     QPoint pressPos = QPoint(-1, -1);
 
-    // VideoControlBar* bar;
+    VideoControlBar* bar;
 };
 
 #endif // VIDEOCONTENTVIEW_H

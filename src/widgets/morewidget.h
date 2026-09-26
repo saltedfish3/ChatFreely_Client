@@ -6,6 +6,8 @@
 #include <QPushButton>
 #include <QToolButton>
 #include <QLabel>
+#include <QPainter>
+#include <QPainterPath>
 
 class MoreWidget : public QWidget
 {
@@ -17,6 +19,7 @@ signals:
     void closed();
 protected:
     void focusOutEvent(QFocusEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
 
 private:
     void initMore();

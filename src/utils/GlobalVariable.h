@@ -30,6 +30,7 @@ public:
     static GlobalVariable& initGlobalSettings();
     static QString getPosOfDownloadFile();
     static void setPosOfDownloadFile(const QString& dir);
+    static bool isDownloadFileExists(const QString& filename);
 
     static QString getPosOfChatRecord();
     static void setPosOfChatRecord(const QString& dir);

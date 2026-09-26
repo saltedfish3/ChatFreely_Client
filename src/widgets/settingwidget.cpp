@@ -574,7 +574,7 @@ void SettingWidget::initSystemDataWidget()
     connect(this->btn_changeFileSavePos,&QPushButton::clicked,this,[this](){
         if(GlobalInitController::getController().step() != GlobalInitController::Step::Free)
         {
-            ToastManager::getToastManager(true).error("正在初始化中，请稍后重试", this);
+            ToastManager::getToastManager(this).error("正在初始化中，请稍后重试");
             return;
         }
         QString dir = QFileDialog::getExistingDirectory(this,"请选择下载文件保存目录",GlobalVariable::getPosOfDownloadFile());
@@ -614,7 +614,7 @@ void SettingWidget::initSystemDataWidget()
     connect(this->btn_changechatRecordSavePos,&QPushButton::clicked,this,[this](){
         if(GlobalInitController::getController().step() != GlobalInitController::Step::Free)
         {
-            ToastManager::getToastManager(true).error("正在初始化中，请稍后重试", this);
+            ToastManager::getToastManager(this).error("正在初始化中，请稍后重试");
             return;
         }
         QString dir = QFileDialog::getExistingDirectory(this,"请选择聊天文件保存目录",GlobalVariable::getPosOfChatRecord());
@@ -629,7 +629,7 @@ void SettingWidget::initSystemDataWidget()
         if(isSuccess)
             this->edit_chatRecordSavePos->setText(GlobalVariable::getPosOfChatRecord());
         else
-            ToastManager::getToastManager(true).error("更改聊天文件存储位置失败，请稍后重试", this);
+            ToastManager::getToastManager(this).error("更改聊天文件存储位置失败，请稍后重试");
     });
 
     connect(&GlobalInitController::getController(), &GlobalInitController::chatRecordPathChanged, this, [this](){

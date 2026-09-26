@@ -85,9 +85,9 @@ void MainWidget::buttonColorChange(QAbstractButton* button)
 void MainWidget::handleMainState(bool isSuccess, QString info)
 {
     if(isSuccess)
-        ToastManager::getToastManager(true).success(info, this, this->stackedWidget_Chat);
+        ToastManager::getToastManager(this).success(info, this->stackedWidget_Chat);
     else
-        ToastManager::getToastManager(true).error(info, this, this->stackedWidget_Chat);
+        ToastManager::getToastManager(this).error(info, this->stackedWidget_Chat);
 }
 
 void MainWidget::initSideBar()

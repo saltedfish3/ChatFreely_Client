@@ -30,6 +30,8 @@
         <file>images/zoomOut.png</file>
         <file>images/file.png</file>
         <file>images/showFile.png</file>
+        <file>images/download.png</file>
+        <file>images/downloadSuccess.png</file>
     </qresource>
     <qresource prefix="/icon">
         <file>images/favicon.ico</file>
