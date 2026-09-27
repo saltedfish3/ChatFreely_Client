@@ -183,7 +183,7 @@ void ImagePreviewWidget::resizeEvent(QResizeEvent *event)
 ImagePreviewWidget::ImagePreviewWidget(int width, int height, QWidget *parent)
     : QWidget{parent}
 {
-    this->setMinimumSize(300, 400);
+    this->setMinimumSize(450, 500);
     this->resize(width, height);
     setWindowFlags(Qt::FramelessWindowHint);
     setAttribute(Qt::WA_TranslucentBackground);
