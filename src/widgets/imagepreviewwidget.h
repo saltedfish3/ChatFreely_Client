@@ -10,6 +10,7 @@
 #include "titlebarwidget.h"
 #include "../utils/imagecachemanager.h"
 #include "toastmanager.h"
+#include "../network/tcplongconnection.h"
 
 class ImagePreviewWidget : public QWidget
 {

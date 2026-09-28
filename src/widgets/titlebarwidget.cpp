@@ -80,6 +80,11 @@ void TitleBarWidget::initWidget()
 
     connect(this->btn_close,&QPushButton::clicked,this,&TitleBarWidget::sendClose);
     connect(this->btn_min,&QPushButton::clicked,this,&TitleBarWidget::sendMinimize);
+
+    this->label_logo->setFocusPolicy(Qt::NoFocus);
+    this->label_logoText->setFocusPolicy(Qt::NoFocus);
+    this->btn_close->setFocusPolicy(Qt::NoFocus);
+    this->btn_min->setFocusPolicy(Qt::NoFocus);
 }
 
 void TitleBarWidget::initTitleBarStyle()

@@ -6,7 +6,7 @@ VideoPreviewWidget &VideoPreviewWidget::getPreviewWidget()
     return widget;
 }
 
-void VideoPreviewWidget::setVideoUrl(const QUrl &url)
+void VideoPreviewWidget::setVideoUrl(const QUrl &url, qint64 totalSize)
 {
     if(!url.isValid() || url.isEmpty())
     {
@@ -15,11 +15,16 @@ void VideoPreviewWidget::setVideoUrl(const QUrl &url)
         return;
     }
 
+    this->currentVideoUrl = url.toString();
+    this->currentVideoSize = totalSize;
+    this->updateSaveButton();
+
     this->view_video->setVideoNativeSize(QSize());
     this->view_video->setState(VideoContentView::State::Loading);
 
     this->player->setSource(url);
     this->player->play();
+    this->view_video->setFocus(Qt::OtherFocusReason);
 }
 
 void VideoPreviewWidget::paintEvent(QPaintEvent *event)
@@ -176,6 +181,13 @@ void VideoPreviewWidget::resizeEvent(QResizeEvent *event)
     update();
 }
 
+void VideoPreviewWidget::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
+    if(this->view_video)
+        this->view_video->setFocus(Qt::OtherFocusReason);
+}
+
 VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
     : QWidget{parent}
 {
@@ -187,6 +199,10 @@ VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
 
     this->widget_titleBar = new TitleBarWidget(this->width() - 2, 40, 8, this);
     this->widget_titleBar->move(1,1);
+
+    this->btn_save = new SaveButton(this->widget_titleBar);
+    this->btn_save->resize(this->widget_titleBar->height(), this->widget_titleBar->height());
+    this->btn_save->move(this->widget_titleBar->leftLimit(), 0);
 
     this->player = new QMediaPlayer(this);
     this->output = new QAudioOutput(this);
@@ -276,9 +292,86 @@ VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
 
     connect(this->widget_titleBar, &TitleBarWidget::minimizeApp, this, &VideoPreviewWidget::showMinimized);
 
+    connect(this->btn_save, &QToolButton::clicked, this, [this](){
+        if(this->currentVideoUrl.isEmpty())
+        {
+            ToastManager::getToastManager(this).error("下载失败，请稍后重试");
+            return;
+        }
+
+        auto Status = HttpShortConnection::getHttpClient().getDownloadStatus(this->currentVideoUrl);
+        if(Status.isDownloading)
+        {
+            HttpShortConnection::getHttpClient().cancelDownloadFile(this->currentVideoUrl);
+            return;
+        }
+
+        QString savePath = getSavePath();
+        if(!savePath.isEmpty() && QFileInfo::exists(savePath))
+            return;
+
+        QString targetPath = HttpShortConnection::getHttpClient().resolveTargetPath(savePath);
+        if(targetPath.isEmpty())
+        {
+            ToastManager::getToastManager(this).error("下载失败，请稍后重试");
+            return;
+        }
+
+        HttpShortConnection::getHttpClient().downloadFile(this->currentVideoUrl, targetPath);
+    });
+
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::downloadStarted, this, [this](const QString& url){
+        if(url != this->currentVideoUrl)
+            return;
+
+        this->btn_save->setState(SaveButton::State::Downloading);
+        this->btn_save->setProgress(0);
+    });
+
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::downloadProgressChanged, this, [this](const QString& url, qint64 received, qint64 total){
+        if(url != this->currentVideoUrl)
+            return;
+
+        int percent = total > 0 ? static_cast<int>(received * 100 / total) : 0;
+        this->btn_save->setState(SaveButton::State::Downloading);
+        this->btn_save->setProgress(percent);
+    });
+
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::downloadFinished, this, [this](const QString& url, bool isSuccess, const QString& info){
+        if(url != this->currentVideoUrl)
+            return;
+
+        this->updateSaveButton();
+
+        if(isSuccess)
+            ToastManager::getToastManager(this).success(info);
+        else
+            ToastManager::getToastManager(this).error(info);
+    });
+
     this->installEventFilter(this);
     this->view_video->installEventFilter(this);
     this->view_video->viewport()->installEventFilter(this);
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, [this](){
+        if(this->player)
+            this->player->stop();
+        setVideoUrl({});
+        this->hide();
+    });
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, [this](){
+        if(this->player)
+            this->player->stop();
+        setVideoUrl({});
+        this->hide();
+    });
+
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::refreshExpiredExit, this, [this](){
+        if(this->player)
+            this->player->stop();
+        setVideoUrl({});
+        this->hide();
+    });
 }
 
 VideoPreviewWidget::Edge VideoPreviewWidget::edgeAt(const QPoint &pos)
@@ -348,6 +441,58 @@ void VideoPreviewWidget::updateCursor(Edge edge)
     }
 }
 
+void VideoPreviewWidget::updateSaveButton()
+{
+    if(!this->btn_save)
+        return;
+
+    if(this->currentVideoUrl.isEmpty())
+    {
+        this->btn_save->setState(SaveButton::State::None);
+        return;
+    }
+
+    QString savePath = getSavePath();
+    if(!savePath.isEmpty() && QFileInfo::exists(savePath))
+    {
+        this->btn_save->setState(SaveButton::State::Finished);
+        return;
+    }
+
+    auto status = HttpShortConnection::getHttpClient().getDownloadStatus(this->currentVideoUrl);
+
+    if(status.isDownloading)
+    {
+        this->btn_save->setState(SaveButton::State::Downloading);
+        this->btn_save->setProgress(status.getDownloadPercent());
+        return;
+    }
+
+    if(status.isFinished)
+    {
+        this->btn_save->setState(SaveButton::State::Finished);
+        return;
+    }
+
+    if(status.receivedSize > 0 && status.totalSize > 0)
+    {
+        this->btn_save->setState(SaveButton::State::Paused);
+        this->btn_save->setProgress(status.getDownloadPercent());
+        return;
+    }
+
+    if(!savePath.isEmpty() && QFileInfo::exists(savePath + ".part"))
+    {
+        this->btn_save->setState(SaveButton::State::Paused);
+        qint64 partSize = QFileInfo(savePath + ".part").size();
+        int percent = this->currentVideoSize > 0 ? static_cast<int>(partSize * 100 / this->currentVideoSize) : 0;
+        this->btn_save->setProgress(percent);
+        return;
+    }
+
+    this->btn_save->setState(SaveButton::State::None);
+}
+
 void VideoPreviewWidget::trySetVideoSize()
 {
     if(!this->player || !this->view_video)
@@ -362,4 +507,25 @@ void VideoPreviewWidget::trySetVideoSize()
         return;
 
     this->view_video->setVideoNativeSize(size);
+}
+
+QString VideoPreviewWidget::getSavePath()
+{
+    if(this->currentVideoUrl.isEmpty())
+        return {};
+
+    QString dir = GlobalVariable::getPosOfDownloadFile();
+    if(dir.isEmpty())
+        return QString();
+
+    QUrl url(this->currentVideoUrl);
+    QString filename = QFileInfo(url.path()).fileName();
+
+    if(filename.isEmpty())
+        return {};
+
+    if(QFileInfo(filename).suffix().isEmpty())
+        filename += ".mp4";
+
+    return QDir(dir).filePath(filename);
 }

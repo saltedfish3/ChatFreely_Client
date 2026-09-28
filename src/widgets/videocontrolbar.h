@@ -13,6 +13,7 @@
 #include <QEvent>
 #include <QMouseEvent>
 #include <QMenu>
+#include <QTimer>
 #include "ratewidget.h"
 
 class VideoControlBar : public QWidget
@@ -23,14 +24,16 @@ public:
 
 signals:
     void transAreaClicked();
+    void userActivity();
 
 protected:
-    // void mouseMoveEvent(QMouseEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
-    // void enterEvent(QEnterEvent* event) override;
     bool eventFilter(QObject* obj, QEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
+
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void enterEvent(QEnterEvent* event) override;
 
 private:
     QString formatTime(qint64 ms);
@@ -54,6 +57,7 @@ private:
     QSlider* slider_video;
     QSlider* slider_audio;
     int lastVolume = 100;
+    QTimer* timer_audioSlider;
 
     QWidget* widget_control;
 

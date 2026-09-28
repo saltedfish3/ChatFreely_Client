@@ -41,11 +41,17 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
 
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void enterEvent(QEnterEvent* event) override;
+
+    void keyPressEvent(QKeyEvent* event) override;
 
 private:
     void updateViewTransform();
     void updateMask();
     void updateControlBarGeometry();
+    void showControlBar();
+    void resetControlBarTimer();
 
     QMediaPlayer* player;
     QAudioOutput* output;
@@ -58,6 +64,7 @@ private:
     QPoint pressPos = QPoint(-1, -1);
 
     VideoControlBar* bar;
+    QTimer* timer_bar;
 };
 
 #endif // VIDEOCONTENTVIEW_H

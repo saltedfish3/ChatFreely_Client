@@ -46,9 +46,34 @@ VideoContentView::VideoContentView(QMediaPlayer* player, QAudioOutput* output, Q
         emit clicked();
     });
 
+    this->timer_bar = new QTimer(this);
+    this->timer_bar->setSingleShot(true);
+    this->timer_bar->setInterval(3000);
+
+    connect(this->timer_bar, &QTimer::timeout, this,  [this](){
+        if(!this->bar || !this->bar->isVisible())
+            return;
+
+        if(this->bar->underMouse())
+        {
+            this->timer_bar->start();
+            return;
+        }
+
+        this->bar->hide();
+    });
+
+    connect(this->bar, &VideoControlBar::userActivity, this, [this](){
+        this->showControlBar();
+        this->resetControlBarTimer();
+    });
+
     QMetaObject::invokeMethod(this, [this](){
         updateControlBarGeometry();
+        this->resetControlBarTimer();
     }, Qt::QueuedConnection);
+
+    this->setFocusPolicy(Qt::StrongFocus);
 }
 
 void VideoContentView::setState(State state)
@@ -120,12 +145,13 @@ void VideoContentView::mousePressEvent(QMouseEvent *event)
 {
     if(event->button() == Qt::LeftButton)
     {
+        this->setFocus(Qt::MouseFocusReason);
         this->pressPos = event->pos();
         event->accept();
         return;
     }
 
-    QWidget::mousePressEvent(event);
+    QGraphicsView::mousePressEvent(event);
 }
 
 void VideoContentView::mouseReleaseEvent(QMouseEvent *event)
@@ -140,7 +166,62 @@ void VideoContentView::mouseReleaseEvent(QMouseEvent *event)
         event->accept();
         return;
     }
-    QWidget::mouseReleaseEvent(event);
+    QGraphicsView::mouseReleaseEvent(event);
+}
+
+void VideoContentView::mouseMoveEvent(QMouseEvent *event)
+{
+    QGraphicsView::mouseMoveEvent(event);
+    this->showControlBar();
+    this->resetControlBarTimer();
+}
+
+void VideoContentView::enterEvent(QEnterEvent *event)
+{
+    QGraphicsView::enterEvent(event);
+    this->showControlBar();
+    this->resetControlBarTimer();
+}
+
+void VideoContentView::keyPressEvent(QKeyEvent *event)
+{
+    if(this->player && event)
+    {
+        if(event->modifiers() != Qt::NoModifier || event->isAutoRepeat())
+            return QGraphicsView::keyPressEvent(event);
+
+        switch(event->key())
+        {
+        case Qt::Key_Space:
+        {
+            if(this->player->playbackState() == QMediaPlayer::PlayingState)
+                this->player->pause();
+            else
+                this->player->play();
+            break;
+        }
+        case Qt::Key_Left:
+        {
+            this->player->setPosition(qMax<qint64>(0, this->player->position() - 5000));
+            event->accept();
+            break;
+        }
+        case Qt::Key_Right:
+        {
+            qint64 dur = this->player->duration();
+            qint64 pos = this->player->position() + 5000;
+            if(dur > 0)
+                pos = qMin(pos, dur);
+            this->player->setPosition(pos);
+            event->accept();
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    QGraphicsView::keyPressEvent(event);
 }
 
 void VideoContentView::updateViewTransform()
@@ -205,4 +286,24 @@ void VideoContentView::updateControlBarGeometry()
 
     this->bar->move(x, y);
     this->bar->raise();
+}
+
+void VideoContentView::showControlBar()
+{
+    if(!this->bar)
+        return;
+
+    if(!this->bar->isVisible())
+    {
+        this->bar->show();
+        this->bar->raise();
+        this->updateControlBarGeometry();
+    }
+}
+
+void VideoContentView::resetControlBarTimer()
+{
+    if(!this->timer_bar)
+        return;
+    this->timer_bar->start();
 }

@@ -44,16 +44,38 @@ VideoControlBar::VideoControlBar(QMediaPlayer* player, QAudioOutput* output, QWi
     this->slider_audio->setObjectName("slider_audio");
     this->slider_audio->setRange(0, 100);
     this->slider_audio->setFixedSize(20, 80);
+    this->slider_audio->hide();
 
     int value = static_cast<int>(this->output->volume() * 100);
     this->slider_audio->setValue(value);
     this->lastVolume = value > 0 ? value : 100;
+
+    this->timer_audioSlider = new QTimer(this);
+    this->timer_audioSlider->setInterval(800);
+    connect(this->timer_audioSlider, &QTimer::timeout, this, [this](){
+        if(!this->slider_audio || !this->slider_audio->isVisible())
+        {
+            this->timer_audioSlider->stop();
+            return;
+        }
+
+        QPoint pos = QCursor::pos();
+        QRect btnRect(this->btn_audio->mapToGlobal(QPoint(0, 0)), this->btn_audio->size());
+        QRect sliderRect(this->slider_audio->mapToGlobal(QPoint(0, 0)), this->slider_audio->size());
+
+        if(btnRect.contains(pos) || sliderRect.contains(pos))
+            return;
+
+        this->slider_audio->hide();
+        this->timer_audioSlider->stop();
+    });
 
     this->btn_rate = new QToolButton(this->widget_control);
     this->btn_rate->setObjectName("btn_rate");
     this->btn_rate->setText("倍速");
     this->btn_rate->setCheckable(true);
     this->btn_rate->setChecked(false);
+    this->btn_rate->setAutoRaise(true);
     this->btn_rate->setFixedWidth(54);
 
     this->menu_rate = new RateWidget(this->btn_rate, this);
@@ -142,7 +164,6 @@ VideoControlBar::VideoControlBar(QMediaPlayer* player, QAudioOutput* output, QWi
         else
             this->menu_rate->hide();
     });
-
 }
 
 void VideoControlBar::mousePressEvent(QMouseEvent *event)
@@ -175,6 +196,16 @@ void VideoControlBar::mouseReleaseEvent(QMouseEvent *event)
 
 bool VideoControlBar::eventFilter(QObject *obj, QEvent *event)
 {
+    if(obj == this->btn_audio && event->type() == QEvent::Enter)
+    {
+        updateAudioSlierPosistion();
+        this->slider_audio->show();
+        this->slider_audio->raise();
+
+        if(!this->timer_audioSlider->isActive())
+            this->timer_audioSlider->start();
+    }
+
     if(obj == this->slider_video && event->type() == QEvent::MouseButtonPress)
     {
         auto* mouse = static_cast<QMouseEvent*>(event);
@@ -202,6 +233,18 @@ void VideoControlBar::resizeEvent(QResizeEvent *event)
 
     if(this->widget_control)
         this->widget_control->setGeometry(0, this->height() - 36, this->width(), 36);
+}
+
+void VideoControlBar::mouseMoveEvent(QMouseEvent *event)
+{
+    QWidget::mouseMoveEvent(event);
+    emit userActivity();
+}
+
+void VideoControlBar::enterEvent(QEnterEvent *event)
+{
+    QWidget::enterEvent(event);
+    emit userActivity();
 }
 
 QString VideoControlBar::formatTime(qint64 ms)
@@ -331,9 +374,10 @@ void VideoControlBar::updateAudioSlierPosistion()
 {
     if(this->slider_audio && this->btn_audio)
     {
-        int y = this->height() - 36 - this->slider_audio->height() - 6;
-        int btnCenterX = this->width() - 10 - this->btn_audio->width() / 2;
-        int x = btnCenterX - this->slider_audio->width() / 2;
+        QPoint btnCenter = this->btn_audio->mapTo(this, QPoint(this->btn_audio->width() / 2, this->btn_audio->height() / 2));
+
+        int x = btnCenter.x() - this->slider_audio->width() / 2;
+        int y = btnCenter.y() - this->btn_audio->height() / 2 - this->slider_audio->height() - 6;
 
         this->slider_audio->move(qMax(0, x), qMax(0, y));
         this->slider_audio->raise();

@@ -275,6 +275,23 @@ ImagePreviewWidget::ImagePreviewWidget(int width, int height, QWidget *parent)
     connect(this->widget_titleBar, &TitleBarWidget::minimizeApp, this, &ImagePreviewWidget::showMinimized);
 
     initStyle();
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, [this](){
+        setPixmap(QPixmap());
+        setPixmapUrl({});
+        this->hide();
+    });
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, [this](){
+        setPixmap(QPixmap());
+        setPixmapUrl({});
+        this->hide();
+    });
+
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::refreshExpiredExit, this, [this](){
+        setPixmap(QPixmap());
+        setPixmapUrl({});
+        this->hide();
+    });
 }
 
 ImagePreviewWidget::Edge ImagePreviewWidget::edgeAt(const QPoint &pos)

@@ -481,7 +481,7 @@ bool ConversationDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
                 if(url.isEmpty() || !url.startsWith("http"))
                     return true;
 
-                emit previewVideoClicked(index.data(MediaUrl).toString());
+                emit previewVideoClicked(index.data(MediaUrl).toString(), index.data(MediaSize).toLongLong());
                 return true;
             }
         }

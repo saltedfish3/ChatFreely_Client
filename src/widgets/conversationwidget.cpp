@@ -367,9 +367,9 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         }
     });
 
-    connect(this->delegate, &ConversationDelegate::previewVideoClicked, this, [this](const QString& url){
+    connect(this->delegate, &ConversationDelegate::previewVideoClicked, this, [this](const QString& url, const qint64& videoSize){
+        VideoPreviewWidget::getPreviewWidget().setVideoUrl(url, videoSize);
         VideoPreviewWidget::getPreviewWidget().show();
-        VideoPreviewWidget::getPreviewWidget().setVideoUrl(url);
     });
 
     connect(this->item, &ConversationItem::finishLoadedImage, this, [this](){

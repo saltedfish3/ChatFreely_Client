@@ -261,6 +261,11 @@ void HttpShortConnection::uploadMedia(MediaType type, const QString &filePath, s
 
 void HttpShortConnection::getImage(const QString &url, size_t retryTime, std::function<void(const QByteArray&, ImageError)> onSuccess, bool failed_notice)
 {
+    if(!TcpLongConnection::getTcpClient().isConnect())
+    {
+        return;
+    }
+
     QNetworkRequest request(url);
     request.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
     QNetworkReply* reply = this->httpmanager->get(request);
@@ -329,6 +334,120 @@ void HttpShortConnection::getImage(const QString &url, size_t retryTime, std::fu
             onSuccess(data, ImageError::NoError);
         }
     });
+}
+
+void HttpShortConnection::downloadFile(const QString &url, const QString &targetPath)
+{
+    if(url.isEmpty() || targetPath.isEmpty())
+        return;
+
+    if(!TcpLongConnection::getTcpClient().isConnect())
+    {
+        emit downloadFinished(url, false, "无法连接服务器，请稍后再试");
+        return;
+    }
+
+    if(this->hash_downloadTasks.contains(url))
+    {
+        emit downloadFinished(url, false, "正在下载中");
+        return;
+    }
+
+    if(QFileInfo::exists(targetPath) && !QFileInfo::exists(targetPath + ".part"))
+    {
+        emit downloadFinished(url, false, "目标文件已存在");
+        return;
+    }
+
+    QFileInfo info(targetPath);
+    QDir dir = info.absoluteDir();
+    if(!dir.exists() && !QDir().mkpath(dir.absolutePath()))
+    {
+        emit downloadFinished(url, false, "下载失败，请稍后重试");
+        return;
+    }
+
+    auto* task = new DownloadTask;
+    task->url = url;
+    task->targetPath = targetPath;
+    task->partPath = targetPath + ".part";
+
+    this->hash_downloadTasks[url] = task;
+    emit downloadStarted(url);
+    startDownload(url);
+}
+
+void HttpShortConnection::cancelDownloadFile(const QString &url)
+{
+    auto it = this->hash_downloadTasks.find(url);
+    if(it == this->hash_downloadTasks.end())
+        return;
+
+    DownloadTask* task = it.value();
+    if(task->reply)
+        task->reply->abort();
+    else
+        finishDownload(url, false, "已取消");
+}
+
+void HttpShortConnection::cancelAllDownloads()
+{
+    const QList<QString> urls = this->hash_downloadTasks.keys();
+    for(const QString& url : std::as_const(urls))
+        cancelDownloadFile(url);
+
+    this->hash_downloadFinishedStatus.clear();
+}
+
+QString HttpShortConnection::resolveTargetPath(const QString &path)
+{
+    if(path.isEmpty())
+        return {};
+
+    if(QFileInfo::exists(path + ".part"))
+        return path;
+
+    if(!QFileInfo::exists(path))
+        return path;
+    QFileInfo info(path);
+    QString dir = info.absolutePath();
+    QString name = info.completeBaseName();
+    QString suffix = info.suffix();
+
+    for(int i = 1; i < 1000; i++)
+    {
+        QString newName;
+        if(suffix.isEmpty())
+            newName = QString("%1(%2)").arg(name).arg(i);
+        else
+            newName = QString("%1(%2).%3").arg(name).arg(i).arg(suffix);
+
+        QString total = QDir(dir).filePath(newName);
+        if(!QFileInfo::exists(total) && !QFileInfo::exists(total + ".part"))
+            return total;
+    }
+
+    return path;
+}
+
+HttpShortConnection::DownloadStatus HttpShortConnection::getDownloadStatus(const QString &url) const
+{
+    auto it = this->hash_downloadTasks.find(url);
+    if(it != this->hash_downloadTasks.end())
+    {
+        DownloadTask* task = it.value();
+        DownloadStatus status;
+        status.isDownloading = true;
+        status.receivedSize = task->receivedSize;
+        status.totalSize = task->totalSize;
+        return status;
+    }
+
+    auto it1 = this->hash_downloadFinishedStatus.find(url);
+    if(it1 != this->hash_downloadFinishedStatus.end())
+        return it1.value();
+
+    return DownloadStatus{};
 }
 
 HttpShortConnection::HttpShortConnection(QObject *parent)
@@ -713,5 +832,257 @@ void HttpShortConnection::sendComplete(const QString &objectKey, const QString &
 
         if(cb_success)
             cb_success(url);
+    });
+}
+
+void HttpShortConnection::startDownload(const QString &url)
+{
+    auto it = this->hash_downloadTasks.find(url);
+    if(it == this->hash_downloadTasks.end())
+        return;
+
+    DownloadTask* task = it.value();
+
+    qint64 existsSize = 0;
+    if(QFile::exists(task->partPath))
+        existsSize = QFileInfo(task->partPath).size();
+
+    task->receivedSize = existsSize;
+
+    QNetworkRequest req = QNetworkRequest(QUrl(url));
+    req.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
+
+    if(existsSize > 0)
+        req.setRawHeader("Range", "bytes=" + QByteArray::number(existsSize) + "-");
+
+    task->reply = this->httpmanager->get(req);
+    task->file = new QFile(task->partPath);
+
+    QIODevice::OpenMode mode = existsSize > 0 ? QIODevice::Append : QIODevice::WriteOnly;
+    if(!task->file->open(mode))
+    {
+        finishDownload(url, false, "下载失败，请稍后重试");
+        return;
+    }
+
+    connect(task->reply, &QNetworkReply::metaDataChanged, this, [this, url](){
+        auto it = this->hash_downloadTasks.find(url);
+        if(it == this->hash_downloadTasks.end())
+            return;
+
+        DownloadTask* task = it.value();
+        if(!task->reply)
+            return;
+
+
+        qint64 contentLength = task->reply->header(QNetworkRequest::ContentLengthHeader).toLongLong();
+        qint64 partSize = QFileInfo::exists(task->partPath) ? QFileInfo(task->partPath).size() : 0;
+        task->totalSize = contentLength + partSize;
+    });
+
+    connect(task->reply, &QNetworkReply::readyRead, this, [this, url](){
+        auto it = this->hash_downloadTasks.find(url);
+        if(it == this->hash_downloadTasks.end())
+            return;
+
+        DownloadTask* task = it.value();
+        if(!task->file || !task->file->isOpen() || !task->reply)
+            return;
+
+        if(task->reply->error() != QNetworkReply::NoError)
+            return;
+
+        QByteArray block = task->reply->readAll();
+        if(block.isEmpty())
+            return;
+
+        task->buffer.append(block);
+        task->receivedSize += block.size();
+        if(task->buffer.size() >= 1024 * 1024)
+        {
+            task->file->write(task->buffer);
+            task->buffer.clear();
+        }
+
+        if(!task->throttle.isValid() || task->throttle.elapsed() >= 600)
+        {
+            task->throttle.restart();
+            emit downloadProgressChanged(url, task->receivedSize, task->totalSize);
+        }
+    });
+
+    connect(task->reply, &QNetworkReply::finished, this, [this, url, existsSize](){
+        auto it = this->hash_downloadTasks.find(url);
+        if(it == this->hash_downloadTasks.end())
+            return;
+
+        DownloadTask* task = it.value();
+        QNetworkReply* reply = task->reply;
+        task->reply = nullptr;
+
+        if(!reply)
+            return;
+
+        QNetworkReply::NetworkError err = reply->error();
+        int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        reply->deleteLater();
+
+        if(err == QNetworkReply::OperationCanceledError)
+        {
+            if(task->file)
+            {
+                task->file->close();
+                delete task->file;
+                task->file = nullptr;
+            }
+
+            task->buffer.clear();
+
+            finishDownload(url, false, "已取消");
+            return;
+        }
+
+        bool needRetry = false;
+        if(err != QNetworkReply::NoError)
+        {
+            switch(err)
+            {
+            case QNetworkReply::TimeoutError:
+            case QNetworkReply::HostNotFoundError:
+            case QNetworkReply::ConnectionRefusedError:
+            case QNetworkReply::RemoteHostClosedError:
+            case QNetworkReply::TemporaryNetworkFailureError:
+            case QNetworkReply::NetworkSessionFailedError:
+            case QNetworkReply::ProxyConnectionClosedError:
+            case QNetworkReply::ProxyTimeoutError:
+                needRetry = true;
+                break;
+            default:
+                break;
+            }
+        }
+        else if(httpStatus >= 500)
+        {
+            needRetry = true;
+        }
+
+        if(needRetry && task->retryCount < 3)
+        {
+            task->retryCount++;
+            if(task->file)
+            {
+                task->file->close();
+                delete task->file;
+                task->file = nullptr;
+            }
+
+            task->buffer.clear();
+            task->throttle.invalidate();
+
+            QTimer::singleShot(2000, this, [this, url](){
+                startDownload(url);
+            });
+            return;
+        }
+
+        //重试完并且有错误
+        if(err != QNetworkReply::NoError || httpStatus >= 500)
+        {
+            if(task->file)
+            {
+                task->file->close();
+                delete task->file;
+                task->file = nullptr;
+            }
+            finishDownload(url, false, "下载失败，请稍后重试");
+            return;
+        }
+
+        if(httpStatus == 200 && existsSize > 0)
+        {
+            if(task->file)
+            {
+                task->file->close();
+                delete task->file;
+                task->file = nullptr;
+            }
+
+            task->buffer.clear();
+            task->throttle.invalidate();
+
+            QFile::remove(task->partPath);
+
+            task->retryCount++;
+            if(task->retryCount <= 3)
+            {
+                QTimer::singleShot(2000, this, [this, url](){
+                    startDownload(url);
+                });
+                return;
+            }
+
+            finishDownload(url, false, "下载失败，请稍后重试");
+            return;
+        }
+
+        //成功
+        if(task->file && !task->buffer.isEmpty())
+        {
+            task->file->write(task->buffer);
+            task->buffer.clear();
+        }
+
+        if(task->file)
+        {
+            task->file->close();
+            delete task->file;
+            task->file = nullptr;
+        }
+
+        task->buffer.clear();
+
+        if(QFile::exists(task->targetPath))
+            QFile::remove(task->targetPath);
+
+        if(!QFile::rename(task->partPath, task->targetPath))
+        {
+            finishDownload(url, false, "下载失败，请稍后重试");
+            return;
+        }
+
+        this->finishDownload(url, true, "下载成功");
+    });
+}
+
+void HttpShortConnection::finishDownload(const QString &url, bool isSuccess, const QString &info)
+{
+    auto it = this->hash_downloadTasks.find(url);
+    if(it == this->hash_downloadTasks.end())
+        return;
+
+    DownloadTask* task = it.value();
+    this->hash_downloadTasks.erase(it);
+
+    if(task->file)
+    {
+        task->file->close();
+        delete task->file;
+        task->file = nullptr;
+    }
+
+    if(task->reply)
+        task->reply->deleteLater();
+
+    DownloadStatus status;
+    status.isDownloading = false;
+    status.isFinished = isSuccess;
+    status.receivedSize = task->receivedSize;
+    status.totalSize = task->totalSize;
+    this->hash_downloadFinishedStatus[url] = status;
+
+    delete task;
+    emit downloadFinished(url, isSuccess, info);
+    QTimer::singleShot(10000, this, [this, url](){
+        this->hash_downloadFinishedStatus.remove(url);
     });
 }
