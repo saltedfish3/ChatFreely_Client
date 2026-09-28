@@ -22,7 +22,12 @@ void VideoPreviewWidget::setVideoUrl(const QUrl &url, qint64 totalSize)
     this->view_video->setVideoNativeSize(QSize());
     this->view_video->setState(VideoContentView::State::Loading);
 
-    this->player->setSource(url);
+    QUrl playUrl = url;
+    QString savePath = getSavePath();
+    if(!savePath.isEmpty() && QFileInfo::exists(savePath))
+        playUrl = QUrl::fromLocalFile(savePath);
+
+    this->player->setSource(playUrl);
     this->player->play();
     this->view_video->setFocus(Qt::OtherFocusReason);
 }
