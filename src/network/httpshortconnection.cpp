@@ -198,12 +198,12 @@ void HttpShortConnection::uploadMedia(MediaType type, const QString &filePath, s
     }
     else if(type == MediaType::File)
     {
-        if(fileSize > 1024LL * 1024 * 1024)
+        if(fileSize > 2LL * 1024 * 1024 * 1024)
         {
             if(failed_notice)
-                emit mainState(false, "文件大小要 ≤1 GB");
+                emit mainState(false, "文件大小要 ≤2 GB");
             if(cb_failed)
-                cb_failed("文件大小要 ≤1 GB");
+                cb_failed("文件大小要 ≤2 GB");
             return;
         }
 

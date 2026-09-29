@@ -230,9 +230,50 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
     }
     else if(type == ContentType::File)
     {
-        painter->setBrush(QColor(240, 240, 240));
+        painter->setBrush(QColor(229, 231, 235));
         painter->setPen(QPen(QColor(209, 213, 219), 1));
         painter->drawRoundedRect(textRegionRect, 8, 8);
+
+        //绘制图标
+        const int padding = 5;
+        const QSize iconSize(46, 46);
+        int textX = padding + 10;
+        int rightMargin = padding + 10;
+        int textWidth = textRegionRect.width() - textX - rightMargin - iconSize.width();
+
+        QFont font = painter->font();
+        font.setPointSize(9);
+        font.setBold(true);
+        painter->setFont(font);
+        painter->setPen(QColor(55, 65, 81));
+
+        QFontMetrics fm(font);
+        QString showName = fm.elidedText(index.data(FileName).toString(), Qt::ElideMiddle, textWidth);
+        painter->drawText(QRect((textRegionRect.topLeft() + QPoint(textX, 8)), QSize(textWidth, 20)), Qt::AlignVCenter | Qt::AlignLeft, showName);
+
+        QString sizeText;
+        qint64 fileSize = index.data(MediaSize).toLongLong();
+        if(fileSize < 1024)
+            sizeText = QString::number(fileSize) + " B";
+        else if(fileSize < 1024 * 1024)
+            sizeText = QString::number(fileSize / 1024.0, 'f', 2) + " KB";
+        else if(fileSize < 1024LL * 1024 * 1024)
+            sizeText = QString::number(fileSize / 1024.0 / 1024.0, 'f', 2) + " MB";
+        else
+            sizeText = QString::number(fileSize / 1024.0 / 1024.0 / 1024.0, 'f', 2) + " GB";
+
+        font.setBold(false);
+        font.setPointSize(8);
+        painter->setFont(font);
+        painter->setPen(QColor(107, 114, 128));
+        painter->drawText(QRectF((textRegionRect.topLeft() + QPoint(textX, textRegionRect.height() - 26)), QSize(textWidth, 18)), Qt::AlignVCenter | Qt::AlignLeft, sizeText);
+
+        QPixmap icon(":/default/images/showFile.png");
+        icon = icon.scaled(iconSize * dpr, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        icon.setDevicePixelRatio(dpr);
+
+        QRect iconRect(textRegionRect.topLeft() + QPoint(textX + textWidth, (textRegionRect.height() - iconSize.height()) / 2), iconSize);
+        painter->drawPixmap(iconRect, icon);
     }
     else
     {
@@ -389,7 +430,7 @@ QSize ConversationDelegate::sizeHint(const QStyleOptionViewItem &option, const Q
     else if(type == ContentType::File)
     {
         int maxWidth = qMax(20, static_cast<int>((rectWidth - 60) * 0.5));
-        int maxHeight = 100;
+        int maxHeight = 60;
 
         QSize fileSize(maxWidth, maxHeight);
 
@@ -633,7 +674,7 @@ void ConversationDelegate::getLayout(const QStyleOptionViewItem &option, const Q
     else if(type == ContentType::File)
     {
         int maxWidth = qMax(20, static_cast<int>((rectWidth - 20 - avatarSize.width()) * 0.5));
-        int maxHeight = 100;
+        int maxHeight = 60;
 
         QSize fileSize(maxWidth, maxHeight);
 

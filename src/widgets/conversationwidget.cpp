@@ -161,7 +161,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         QString filePath = QFileDialog::getOpenFileName(this, "选择文件", QStandardPaths::writableLocation(QStandardPaths::PicturesLocation), "所有文件 (*)");
         if(filePath.isEmpty())
             return;
-        qDebug()<<filePath;
+
         QString suffix = QFileInfo(filePath).suffix().toLower();
         if(suffix == "jpg" || suffix == "jpeg" || suffix == "png")
         {
