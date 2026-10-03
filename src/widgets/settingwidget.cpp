@@ -583,7 +583,6 @@ void SettingWidget::initSystemDataWidget()
             return;
         GlobalVariable::setPosOfDownloadFile(dir);
         this->edit_fileSavePos->setText(dir);
-        //文件转移
     });
 
     this->label_bigTitle_chatRecord = new QLabel("聊天记录",this->widget_systemData);

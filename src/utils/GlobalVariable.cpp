@@ -69,7 +69,8 @@ QString GlobalVariable::getPosOfDownloadFile()
 void GlobalVariable::setPosOfDownloadFile(const QString &dir)
 {
     QSettings settings(pos_ini,QSettings::IniFormat);
-    settings.setValue("pos_downloadFile",pos_downloadFile);
+    settings.setValue("pos_downloadFile", dir);
+    pos_downloadFile = dir;
 }
 
 bool GlobalVariable::isDownloadFileExists(const QString &filename)
