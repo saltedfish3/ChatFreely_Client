@@ -24,6 +24,7 @@ public:
     void updateMessageContent(const QString& tempMsgID, const QString& content);
     void loadHistoryMessages(int limit = 20);
 
+    bool cancelUpload(const QString& tempMsgID);
     void reloadImage(const QString& msgID);
 
     bool isActive() const;

@@ -215,7 +215,20 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
             msg.content = block.content;
 
             if(msg.contentType != ContentType::Text)
+            {
                 msg.info.url = content;
+                QJsonObject obj;
+                obj["Url"] = block.content;
+
+                if(msg.contentType == ContentType::Image)
+                {
+                    obj["ThumbnailUrl"] = block.thumbnailUrl;
+                    msg.info.thumbnailUrl = block.thumbnailUrl;
+                }
+
+                msg.content = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+                msg.info.url = block.content;
+            }
 
             this->item->addNewMessage(msg);
             this->loadingCount++;
@@ -292,52 +305,17 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
                 this->timer_loading->start(30);
         });
 
-        if(msg.contentType == ContentType::Text)
+        if(msg.contentType == ContentType::Text || msg.info.url.startsWith("http"))
             TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), msg.content, msg.tempMsgID, msg.contentType);
-        else if(msg.contentType == ContentType::Image)
+        else
         {
-            if(msg.content.startsWith("local://"))
-            {
-                ChatTextEdit::MessageBlock block;
-                block.type = ContentType::Image;
-                block.tempID = msg.tempMsgID;
-                block.content = msg.content;
+            ChatTextEdit::MessageBlock block;
+            block.type = msg.contentType;
+            block.tempID = msg.tempMsgID;
+            block.content = msg.content;
 
-                this->edit_message->getAllBlocks().append(block);
-                handleNextBlock();
-            }
-            else if(msg.content.startsWith("{"))
-                TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), msg.content, msg.tempMsgID, ContentType::Image);
-        }
-        else if(msg.contentType == ContentType::Video)
-        {
-            if(msg.content.startsWith("{"))
-                TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), msg.content, msg.tempMsgID, ContentType::Video);
-            else
-            {
-                ChatTextEdit::MessageBlock block;
-                block.type = ContentType::Video;
-                block.tempID = msg.tempMsgID;
-                block.content = msg.content;
-
-                this->edit_message->getAllBlocks().append(block);
-                handleNextBlock();
-            }
-        }
-        else if(msg.contentType == ContentType::File)
-        {
-            if(msg.content.startsWith("{"))
-                TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), msg.content, msg.tempMsgID, ContentType::File);
-            else
-            {
-                ChatTextEdit::MessageBlock block;
-                block.type = ContentType::File;
-                block.tempID = msg.tempMsgID;
-                block.content = msg.content;
-
-                this->edit_message->getAllBlocks().append(block);
-                handleNextBlock();
-            }
+            this->edit_message->getAllBlocks().append(block);
+            handleNextBlock();
         }
         this->listView_messages->scrollToBottom();
     });
@@ -347,7 +325,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     });
 
     connect(this->delegate, &ConversationDelegate::previewImageClicked, this, [this](const QString& url){
-        QPixmap pix = ImageCacheManager::getManager().fastLoadImage(url, -1, 0, 0, QSize());
+        QPixmap pix = ImageCacheManager::getManager().fastLoadImage(url, 0, 0, QSize());
         if(!pix.isNull())
         {
             ImagePreviewWidget::getPreviewWidget().setPixmapUrl(url);
@@ -363,13 +341,25 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
                 ImagePreviewWidget::getPreviewWidget().setPixmapUrl(url);
                 ImagePreviewWidget::getPreviewWidget().setPixmap(pix);
                 ImagePreviewWidget::getPreviewWidget().show();
-            }, false, -1, 0, 0, QSize());
+            }, false, 0, 0, QSize());
         }
     });
 
     connect(this->delegate, &ConversationDelegate::previewVideoClicked, this, [this](const QString& url, const qint64& videoSize){
         VideoPreviewWidget::getPreviewWidget().setVideoUrl(url, videoSize);
         VideoPreviewWidget::getPreviewWidget().show();
+    });
+
+    connect(this->delegate, &ConversationDelegate::CancelUploadClicked, this, [this](const QString& tempMsgID){
+        int index = this->item->getMessagesManager().indexOfMsg(tempMsgID);
+        if(index < 0)
+            return;
+
+        const Message& msg = this->item->getMessagesManager().getMessages().at(index);
+        QString filePath = msg.info.url;
+
+        if(this->item->cancelUpload(tempMsgID))
+            HttpShortConnection::getHttpClient().cancelUpload(filePath);
     });
 
     connect(this->item, &ConversationItem::finishLoadedImage, this, [this](){
@@ -691,46 +681,79 @@ void ConversationWidget::handleNextBlock()
     }
     else if(block.type == ContentType::Image)
     {
-        if(!block.content.startsWith("local://"))
-        {
-            TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), content, block.tempID, ContentType::Image);
-            handleNextBlock();
-        }
+        QString url = block.content;
+        QString contentJson = block.content;
+
+        if(block.content.startsWith("{"))
+            url = QJsonDocument::fromJson(block.content.toUtf8()).object()["Url"].toString();
         else
         {
-            QString filePath = ImageCacheManager::getManager().getCacheFilePath(content);
-            if(filePath.isEmpty())
-            {
-                this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
-                handleNextBlock();
-                return;
-            }
-            HttpShortConnection::getHttpClient().uploadMedia(HttpShortConnection::MediaType::Image, filePath, [this, block, content, filePath](const QString& url){
-                QImageReader reader(filePath);
-                QSize size = reader.size();
-                int width = size.width();
-                int height = size.height();
-
-                QJsonObject obj;
-                obj["Url"] = url;
-                obj["Width"] = QString::number(width);
-                obj["Height"] = QString::number(height);
-                QString contentJson = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
-
-                ImageCacheManager::getManager().migrateCache(content, url);
-                this->item->updateMessageContent(block.tempID, contentJson);
-                TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), contentJson, block.tempID, ContentType::Image);
-                handleNextBlock();
-            }, false, [this, block](const QString& info){
-                this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
-                handleNextBlock();
-            });
+            QJsonObject obj;
+            obj["Url"] = url;
+            contentJson = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
         }
+        if(url.startsWith("http"))
+        {
+            TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), contentJson, block.tempID, ContentType::Image);
+            handleNextBlock();
+            return;
+        }
+
+        QString filePath = ImageCacheManager::getManager().getCacheFilePath(url);
+        if(filePath.isEmpty())
+        {
+            this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
+            handleNextBlock();
+            return;
+        }
+
+        QImage img(filePath);
+
+        HttpShortConnection::getHttpClient().uploadMedia(HttpShortConnection::MediaType::Image, filePath, [this, block, filePath](const HttpShortConnection::UploadResult& result){
+            QImageReader reader(filePath);
+            QSize size = reader.size();
+            int width = size.width();
+            int height = size.height();
+
+            QJsonObject obj;
+            obj["Url"] = result.url;
+            obj["Width"] = QString::number(width);
+            obj["Height"] = QString::number(height);
+            obj["ThumbnailUrl"] = result.thumbnailUrl;
+            QString newJson = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+
+            if(!result.thumbnailUrl.isEmpty())
+                ImageCacheManager::getManager().migrateThumbnail(block.thumbnailUrl, result.thumbnailUrl);
+
+            this->item->updateMessageContent(block.tempID, newJson);
+            TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), newJson, block.tempID, ContentType::Image);
+            handleNextBlock();
+        }, true, [this, block](const QString& info){
+            this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
+            handleNextBlock();
+        });
     }
     else if(block.type == Video)
     {
-        QString filePath = block.content;
+        QString url = block.content;
+        QString contentJson = block.content;
+        if(block.content.startsWith("{"))
+            url = QJsonDocument::fromJson(block.content.toUtf8()).object()["Url"].toString();
+        else
+        {
+            QJsonObject obj;
+            obj["Url"] = url;
+            contentJson = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+        }
 
+        if(url.startsWith("http"))
+        {
+            TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), contentJson, block.tempID, ContentType::Video);
+            handleNextBlock();
+            return;
+        }
+
+        QString filePath = url;
         if(!QFile::exists(filePath))
         {
             this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
@@ -738,31 +761,60 @@ void ConversationWidget::handleNextBlock()
             return;
         }
 
-        VideoUtils::extractAsync(filePath, [this, block, filePath](const VideoUtils::VideoInfo& info){
+        this->item->getMessagesManager().registerUpload(block.tempID, filePath);
+        VideoUtils::extractAsync(filePath, [this, block, filePath, contentJson](const VideoUtils::VideoInfo& info){
+            int index = this->item->getMessagesManager().indexOfMsg(block.tempID);
+            if(index < 0)
+                return;
+            if(this->item->getMessagesManager().getMessages().at(index).status != Sending)
+            {
+                this->item->getMessagesManager().unregisterUpload(block.tempID);
+                handleNextBlock();
+                return;
+            }
+
             if(!info.valid)
             {
+                this->item->getMessagesManager().unregisterUpload(block.tempID);
                 this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
                 handleNextBlock();
                 return;
             }
 
+            QString tempUrl = "local://" + QUuid::createUuid().toString();
+            ImageCacheManager::getManager().insertThumbnail(tempUrl, QPixmap::fromImage(info.thumbnail));
+
+            QJsonObject obj = QJsonDocument::fromJson(contentJson.toUtf8()).object();
+            obj["Url"] = filePath;
+            obj["Width"] = QString::number(info.width);
+            obj["Height"] = QString::number(info.height);
+            obj["ThumbnailUrl"] = tempUrl;
+            obj["Duration"] = QString::number(info.duration);
+            obj["Size"] = QString::number(QFileInfo(filePath).size());
+
+            QString qJson = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+            this->item->updateMessageContent(block.tempID, qJson);
+
             //上传视频
-            HttpShortConnection::getHttpClient().uploadMedia(HttpShortConnection::MediaType::Video, filePath, [=](const QString& url){
-                QString tempUrl = "local://" + QUuid::createUuid().toString();
-                ImageCacheManager::getManager().insertCache(tempUrl, info.thumbnail);
+            HttpShortConnection::getHttpClient().uploadMedia(HttpShortConnection::MediaType::Video, filePath, [=](const HttpShortConnection::UploadResult& result){
+                int index = this->item->getMessagesManager().indexOfMsg(block.tempID);
+                if(index < 0)
+                    return;
+                if(this->item->getMessagesManager().getMessages().at(index).status != Sending)
+                {
+                    this->item->getMessagesManager().unregisterUpload(block.tempID);
+                    handleNextBlock();
+                    return;
+                }
+
+                this->item->getMessagesManager().unregisterUpload(block.tempID);
+                QJsonObject newObj = obj;
+                newObj["Url"] = result.url;
+
                 QString thumFilePath = ImageCacheManager::getManager().getCacheFilePath(tempUrl);
-
-                QJsonObject obj;
-                obj["Url"] = url;
-                obj["Width"] = QString::number(info.width);
-                obj["Height"] = QString::number(info.height);
-                obj["ThumbnailUrl"] = "";
-                obj["Duration"] = QString::number(info.duration);
-                obj["Size"] = QString::number(QFileInfo(filePath).size());
-
                 if(thumFilePath.isEmpty())
                 {
-                    QString contentJson = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+                    QString contentJson = QString::fromUtf8(QJsonDocument(newObj).toJson(QJsonDocument::Compact));
 
                     this->item->updateMessageContent(block.tempID, contentJson);
                     TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), contentJson, block.tempID, block.type);
@@ -771,32 +823,82 @@ void ConversationWidget::handleNextBlock()
                 }
 
                 //上传缩略图
-                HttpShortConnection::getHttpClient().uploadMedia(HttpShortConnection::MediaType::Image, thumFilePath, [=](const QString& url){
-                    QJsonObject newObj = obj;
-                    ImageCacheManager::getManager().migrateCache(tempUrl, url);
-                    newObj["ThumbnailUrl"] = url;
-                    QString contentJson = QString::fromUtf8(QJsonDocument(newObj).toJson(QJsonDocument::Compact));
+                HttpShortConnection::getHttpClient().uploadMedia(HttpShortConnection::MediaType::Image, thumFilePath, [=](const HttpShortConnection::UploadResult& result){
+                    int index = this->item->getMessagesManager().indexOfMsg(block.tempID);
+                    if(index < 0)
+                        return;
+                    if(this->item->getMessagesManager().getMessages().at(index).status != Sending)
+                    {
+                        handleNextBlock();
+                        return;
+                    }
+
+                    QJsonObject newObj1 = newObj;
+                    ImageCacheManager::getManager().migrateThumbnail(tempUrl, result.url);
+
+                    newObj1["ThumbnailUrl"] = result.url;
+                    QString contentJson = QString::fromUtf8(QJsonDocument(newObj1).toJson(QJsonDocument::Compact));
 
                     this->item->updateMessageContent(block.tempID, contentJson);
                     TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), contentJson, block.tempID, block.type);
                     handleNextBlock();
                 }, false, [=](const QString&){
-                    QString contentJson = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+                    int index = this->item->getMessagesManager().indexOfMsg(block.tempID);
+                    if(index < 0)
+                        return;
+                    if(this->item->getMessagesManager().getMessages().at(index).status != Sending)
+                    {
+                        handleNextBlock();
+                        return;
+                    }
+
+                    QJsonObject newObj1 = newObj;
+                    newObj1["ThumbnailUrl"] = "";
+                    QString contentJson = QString::fromUtf8(QJsonDocument(newObj1).toJson(QJsonDocument::Compact));
 
                     this->item->updateMessageContent(block.tempID, contentJson);
                     TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), contentJson, block.tempID, block.type);
                     handleNextBlock();
-                });
-            }, false, [=](const QString&){
+                }, false);
+            }, true, [=](const QString&){
+                int index = this->item->getMessagesManager().indexOfMsg(block.tempID);
+                if(index < 0)
+                    return;
+                if(this->item->getMessagesManager().getMessages().at(index).status != Sending)
+                {
+                    handleNextBlock();
+                    return;
+                }
+
+                this->item->getMessagesManager().unregisterUpload(block.tempID);
                 this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
                 handleNextBlock();
-            });
+            }, false);
         });
+        handleNextBlock();
+        return;
     }
     else if(block.type == File)
     {
-        QString filePath = block.content;
+        QString url = block.content;
+        QString contentJson = block.content;
+        if(block.content.startsWith("{"))
+            url = QJsonDocument::fromJson(block.content.toUtf8()).object()["Url"].toString();
+        else
+        {
+            QJsonObject obj;
+            obj["Url"] = url;
+            contentJson = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+        }
 
+        if(url.startsWith("http"))
+        {
+            TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), contentJson, block.tempID, ContentType::File);
+            handleNextBlock();
+            return;
+        }
+
+        QString filePath = url;
         if(!QFile::exists(filePath))
         {
             this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
@@ -804,19 +906,22 @@ void ConversationWidget::handleNextBlock()
             return;
         }
 
-        HttpShortConnection::getHttpClient().uploadMedia(HttpShortConnection::MediaType::File, filePath, [this, block, filePath](const QString& url){
-            QJsonObject obj;
-            obj["Url"] = url;
+        this->item->getMessagesManager().registerUpload(block.tempID, filePath);
+        HttpShortConnection::getHttpClient().uploadMedia(HttpShortConnection::MediaType::File, filePath, [this, block, filePath, contentJson](const HttpShortConnection::UploadResult& result){
+            QJsonObject obj = QJsonDocument::fromJson(contentJson.toUtf8()).object();
+            obj["Url"] = result.url;
             obj["Name"] = QFileInfo(filePath).fileName();
             obj["Size"] = QString::number(QFileInfo(filePath).size());
-            QString contentJson = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+            QString newJson = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 
-            this->item->updateMessageContent(block.tempID, contentJson);
-            TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), contentJson, block.tempID, block.type);
+            this->item->getMessagesManager().unregisterUpload(block.tempID);
+            this->item->updateMessageContent(block.tempID, newJson);
+            TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), newJson, block.tempID, block.type);
             handleNextBlock();
-        }, false, [this, block](const QString& info){
+        }, false, [this, block, filePath](const QString& info){
+            this->item->getMessagesManager().unregisterUpload(block.tempID);
             this->item->updateMessageStatus(false, block.tempID, QString(), -1, -1);
             handleNextBlock();
-        });
+        }, false);
     }
 }

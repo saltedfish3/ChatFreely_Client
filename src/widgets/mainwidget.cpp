@@ -101,13 +101,13 @@ void MainWidget::initSideBar()
     this->label_avatar->setObjectName("label_avatar");
     this->label_avatar->resize(40,40);
 
-    QPixmap defaultAvatar = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", -1, 0, 0, QSize(128, 128));
+    QPixmap defaultAvatar = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", 0, 0, QSize(128, 128));
     if(defaultAvatar.isNull())
     {
         ImageCacheManager::getManager().loadImage(":/default/images/defaultAvatar.png", [this](const QPixmap& pix){
             QPixmap p_ = pix;
             setRadius(p_, this->label_avatar, 20);
-        }, false, -1, 0, 0, QSize(40, 40));
+        }, false, 0, 0, QSize(40, 40));
     }
     else
         setRadius(defaultAvatar, this->label_avatar, 20);
@@ -318,9 +318,10 @@ void MainWidget::setRadius(QPixmap& pix, QLabel *label, int radius)
     if(pix.isNull())
         return;
 
-    QPixmap rounded(label->size() * pix.devicePixelRatioF());
+    qreal dpr = label->devicePixelRatioF();
+    QPixmap rounded(label->size() * dpr);
     rounded.fill(Qt::transparent);
-    rounded.setDevicePixelRatio(pix.devicePixelRatioF());
+    rounded.setDevicePixelRatio(dpr);
 
     QPainter painter(&rounded);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);

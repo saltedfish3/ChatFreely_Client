@@ -7,22 +7,20 @@ ImageCacheManager &ImageCacheManager::getManager()
 }
 
 void ImageCacheManager::loadImage(const QString &url, std::function<void (const QPixmap &)> callback, bool failed_notice,
-                                  qreal dpr, int radius, int padding, QSize size)
+                                  int radius, int padding, QSize size)
 {
-    dpr = dpr == -1 ? GlobalVariable::getMaxDevicePixelRatio() : dpr;
-
     //从内存加载
     QPixmap cache;
-    if(loadCacheFromMemory(url, cache, dpr, radius, padding, size))
+    if(loadCacheFromMemory(url, cache, radius, padding, size))
     {
         if(callback)
             invokeCallbacks({callback}, cache);
         return;
     }
 
-    this->threadPool.start(new FunctionRunnable([this, callback, failed_notice, dpr, radius, padding, size, url](){
+    this->threadPool.start(new FunctionRunnable([this, callback, failed_notice, radius, padding, size, url](){
         QPixmap cache;
-        if(loadCacheFromMemory(url, cache, dpr, radius, padding, size))
+        if(loadCacheFromMemory(url, cache, radius, padding, size))
         {
             if(callback)
                 invokeCallbacks({callback}, cache);
@@ -34,17 +32,15 @@ void ImageCacheManager::loadImage(const QString &url, std::function<void (const 
             QImage img(url);
             if(img.isNull())
             {
-                QString key = getUrlKey(url, dpr, radius, padding, size);
                 invokeCallbacks({callback}, QPixmap("qrc:/default/images/defaultAvatar.png"));
                 return;
             }
 
             QPixmap pix = QPixmap::fromImage(img);
-            if(radius != 0 || padding != 0 || dpr != 1.0 || !size.isEmpty())
+            if(radius != 0 || padding != 0 || !size.isEmpty())
             {
                 imageTask task;
                 task.callback = callback;
-                task.dpr = dpr;
                 task.radius = radius;
                 task.padding = padding;
                 task.size = size;
@@ -53,16 +49,27 @@ void ImageCacheManager::loadImage(const QString &url, std::function<void (const 
             }
             else
             {
-                insertCache(url, pix, dpr, radius, padding, size);
+                insertCache(url, pix, radius, padding, size);
                 invokeCallbacks({callback}, pix);
             }
             return;
         }
+
         //内存没有磁盘没有直接标不存在
         if(url.startsWith("local://"))
         {
+            QPixmap diskPix;
+            if(loadCacheFromDisk(url, diskPix, radius, padding, size))
             {
-                QString key = getUrlKey(url, dpr, radius, padding, size);
+                if(radius != 0 || padding != 0 || !size.isEmpty())
+                    handleRounded(url, diskPix, {radius, padding, size, callback});
+                else
+                    invokeCallbacks({callback}, diskPix);
+                return;
+            }
+
+            {
+                QString key = getUrlKey(url, radius, padding, size);
                 QWriteLocker locker(&(this->rwLock));
                 this->hash_imageState[key] = ImageState::NotExist;
             }
@@ -76,14 +83,13 @@ void ImageCacheManager::loadImage(const QString &url, std::function<void (const 
         if(tryLoadOriginalFromCache(url, pix))
         {
             //处理圆角并且调用回调
-            handleRounded(url, pix, {dpr, radius, padding, size, callback});
+            handleRounded(url, pix, {radius, padding, size, callback});
             return;
         }
 
         //未命中缓存
         imageTask task;
         task.callback = callback;
-        task.dpr = dpr;
         task.radius = radius;
         task.padding = padding;
         task.size = size;
@@ -93,35 +99,84 @@ void ImageCacheManager::loadImage(const QString &url, std::function<void (const 
     }));
 }
 
-void ImageCacheManager::insertCache(const QString &url, const QImage &img, qreal dpr, int radius, int padding, QSize size)
+void ImageCacheManager::loadThumbnail(const QString &url, std::function<void (const QPixmap &)> callback)
 {
-    dpr = dpr == -1 ? GlobalVariable::getMaxDevicePixelRatio() : dpr;
+    if(url.isEmpty())
+    {
+        if(callback)
+            callback(QPixmap());
+        return;
+    }
+
+    QPixmap thumbnail = fastLoadThumbnail(url);
+    if(!thumbnail.isNull())
+    {
+        if(callback)
+            callback(thumbnail);
+        return;
+    }
+
+    loadImage(url, [this, url, callback](const QPixmap& pix){
+        if(pix.isNull())
+        {
+            if(callback)
+                callback(pix);
+            return;
+        }
+
+        insertThumbnail(url, pix);
+
+        if(callback)
+            callback(pix);
+    }, false, 0, 0, QSize());
+}
+
+void ImageCacheManager::insertCache(const QString &url, const QImage &img, int radius, int padding, QSize size)
+{
     QByteArray data;
     QBuffer buffer(&data);
     buffer.open(QIODevice::WriteOnly);
-    img.save(&buffer, "PNG");
+
+    if(img.hasAlphaChannel())
+        img.save(&buffer, "PNG");
+    else
+        img.save(&buffer, "JPEG", 80);
     buffer.close();
 
-    insertCache(url, data, dpr, radius, padding, size);
+    if(data.isEmpty())
+    {
+        qWarning() << "insertCache: save pixmap error:" << url;
+        return;
+    }
+
+    insertCache(url, data, radius, padding, size);
 }
 
-void ImageCacheManager::insertCache(const QString &url, const QPixmap &pix, qreal dpr, int radius, int padding, QSize size)
+void ImageCacheManager::insertCache(const QString &url, const QPixmap &pix, int radius, int padding, QSize size)
 {
-    dpr = dpr == -1 ? GlobalVariable::getMaxDevicePixelRatio() : dpr;
     QByteArray data;
     QBuffer buffer(&data);
     buffer.open(QIODevice::WriteOnly);
-    pix.save(&buffer, "PNG");
+
+    if(pix.hasAlphaChannel())
+        pix.save(&buffer, "PNG");
+    else
+        pix.save(&buffer, "JPEG", 80);
     buffer.close();
 
-    insertCache(url, data, dpr, radius, padding, size);
+    if(data.isEmpty())
+    {
+        qWarning() << "insertCache: save pixmap error:" << url;
+        return;
+    }
+
+    insertCache(url, data, radius, padding, size);
 }
 
-void ImageCacheManager::insertCache(const QString &url, const QByteArray &data, qreal dpr, int radius, int padding, QSize size)
+void ImageCacheManager::insertCache(const QString &url, const QByteArray &data, int radius, int padding, QSize size)
 {
-    dpr = dpr == -1 ? GlobalVariable::getMaxDevicePixelRatio() : dpr;
     QDir().mkpath(this->pos_imageCache);
-    QString key = getUrlKey(url, dpr, radius, padding, size);
+    QString key = getUrlKey(url, radius, padding, size);
 
     QFile file(getFilePathFromKey(key));
     if(file.open(QIODevice::WriteOnly))
@@ -135,7 +190,6 @@ void ImageCacheManager::insertCache(const QString &url, const QByteArray &data, 
     QPixmap pix;
     if(pix.loadFromData(data))
     {
-        pix.setDevicePixelRatio(dpr);
         QPixmap* ptr = new QPixmap(pix);
         int cost = pix.toImage().sizeInBytes();
         if(cost < 1)
@@ -147,11 +201,35 @@ void ImageCacheManager::insertCache(const QString &url, const QByteArray &data, 
     }
 }
 
-void ImageCacheManager::migrateCache(const QString &oldUrl, const QString &newUrl, qreal dpr, int radius, int padding, QSize size)
+void ImageCacheManager::insertThumbnail(const QString &url, const QPixmap &pix)
 {
-    dpr = dpr == -1 ? GlobalVariable::getMaxDevicePixelRatio() : dpr;
-    QString oldKey = getUrlKey(oldUrl, dpr, radius, padding, size);
-    QString newKey = getUrlKey(newUrl, dpr, radius, padding, size);
+    if(url.isEmpty() || pix.isNull())
+        return;
+
+    putThumbnail(url, pix);
+
+    QByteArray data;
+    QBuffer buffer(&data);
+    buffer.open(QIODevice::WriteOnly);
+    pix.save(&buffer, pix.hasAlphaChannel() ? "PNG" : "JPEG", 80);
+    buffer.close();
+
+    if(data.isEmpty())
+        return;
+
+    QDir().mkpath(this->pos_imageCache);
+    QFile file(this->getFilePathFromKey(getUrlKey(url)));
+    if(file.open(QIODevice::WriteOnly))
+    {
+        file.write(data);
+        file.close();
+    }
+}
+
+void ImageCacheManager::migrateCache(const QString &oldUrl, const QString &newUrl, int radius, int padding, QSize size)
+{
+    QString oldKey = getUrlKey(oldUrl, radius, padding, size);
+    QString newKey = getUrlKey(newUrl, radius, padding, size);
 
     QString oldPath = getFilePathFromKey(oldKey);
     QString newPath = getFilePathFromKey(newKey);
@@ -178,10 +256,10 @@ void ImageCacheManager::migrateCache(const QString &oldUrl, const QString &newUr
     else
     {
         QPixmap pix;
-        if(!loadCacheFromMemory(oldUrl, pix, dpr, radius, padding, size) && !loadCacheFromDisk(oldUrl, pix, dpr, radius, padding, size))
+        if(!loadCacheFromMemory(oldUrl, pix, radius, padding, size) && !loadCacheFromDisk(oldUrl, pix, radius, padding, size))
             return;
 
-        insertCache(newUrl, pix, dpr, radius, padding, size);
+        insertCache(newUrl, pix, radius, padding, size);
         QFile::remove(oldPath);
     }
 
@@ -190,10 +268,39 @@ void ImageCacheManager::migrateCache(const QString &oldUrl, const QString &newUr
     this->hash_imageState.remove(oldKey);
 }
 
-void ImageCacheManager::removeCache(const QString &url, qreal dpr, int radius, int padding, QSize size)
+void ImageCacheManager::migrateThumbnail(const QString &oldThumbnailUrl, const QString &newThumbnailUrl)
 {
-    dpr = dpr == -1 ? GlobalVariable::getMaxDevicePixelRatio() : dpr;
-    QString key = getUrlKey(url, dpr, radius, padding, size);
+    if(oldThumbnailUrl.isEmpty() || newThumbnailUrl.isEmpty() || oldThumbnailUrl == newThumbnailUrl)
+        return;
+
+    {
+        QWriteLocker locker(&(this->rwLock));
+        auto it = this->hash_thumbnails.find(oldThumbnailUrl);
+        if(it != this->hash_thumbnails.end())
+        {
+            QPixmap pix = it.value();
+            this->hash_thumbnails.erase(it);
+            this->list_thumbLRU.removeAll(oldThumbnailUrl);
+
+            this->hash_thumbnails[newThumbnailUrl] = pix;
+            this->list_thumbLRU.append(newThumbnailUrl);
+        }
+    }
+
+    QString oldPath = getFilePathFromKey(getUrlKey(oldThumbnailUrl));
+    QString newPath = getFilePathFromKey(getUrlKey(newThumbnailUrl));
+
+    if(QFile::exists(oldPath))
+    {
+        if(QFile::exists(newPath))
+            QFile::remove(newPath);
+        QFile::rename(oldPath, newPath);
+    }
+}
+
+void ImageCacheManager::removeCache(const QString &url, int radius, int padding, QSize size)
+{
+    QString key = getUrlKey(url, radius, padding, size);
     {
         QWriteLocker locker(&(this->rwLock));
         this->cache_memoryCache.remove(key);
@@ -202,10 +309,9 @@ void ImageCacheManager::removeCache(const QString &url, qreal dpr, int radius, i
     QFile::remove(getFilePathFromKey(key));
 }
 
-QString ImageCacheManager::getCacheFilePath(const QString &url, qreal dpr, int radius, int padding, QSize size) const
+QString ImageCacheManager::getCacheFilePath(const QString &url, int radius, int padding, QSize size) const
 {
-    dpr = dpr == -1 ? GlobalVariable::getMaxDevicePixelRatio() : dpr;
-    QString key = getUrlKey(url, dpr, radius, padding, size);
+    QString key = getUrlKey(url, radius, padding, size);
     QString filePath = getFilePathFromKey(key);
     if(QFile::exists(filePath))
         return filePath;
@@ -213,10 +319,9 @@ QString ImageCacheManager::getCacheFilePath(const QString &url, qreal dpr, int r
     return QString();
 }
 
-QString ImageCacheManager::getFilenameFromUrl(const QString &url, qreal dpr, int radius, int padding, QSize size) const
+QString ImageCacheManager::getFilenameFromUrl(const QString &url, int radius, int padding, QSize size) const
 {
-    dpr = dpr == -1 ? GlobalVariable::getMaxDevicePixelRatio() : dpr;
-    QString key = getUrlKey(url, dpr, radius, padding, size);
+    QString key = getUrlKey(url, radius, padding, size);
     return QString(QCryptographicHash::hash(key.toUtf8(), QCryptographicHash::Md5).toHex()) + ".png";
 }
 
@@ -225,11 +330,11 @@ bool ImageCacheManager::saveTo(const QString &url, const QString &targetDir)
     if(url.isEmpty() || targetDir.isEmpty())
         return false;
 
-    QString cachePath = getCacheFilePath(url, 1.0);
+    QString cachePath = getCacheFilePath(url);
     if(cachePath.isEmpty())
         return false;
 
-    QString filename = getFilenameFromUrl(url, 1.0);
+    QString filename = getFilenameFromUrl(url);
     if(filename.isEmpty())
         return false;
 
@@ -243,19 +348,65 @@ bool ImageCacheManager::saveTo(const QString &url, const QString &targetDir)
     return QFile::copy(cachePath, dir.filePath(filename));
 }
 
-QPixmap ImageCacheManager::fastLoadImage(const QString &url, qreal dpr, int radius, int padding, QSize size)
+QPixmap ImageCacheManager::fastLoadImage(const QString &url,int radius, int padding, QSize size)
 {
-    dpr = dpr == -1 ? GlobalVariable::getMaxDevicePixelRatio() : dpr;
     QPixmap pix;
-    if(!loadCacheFromMemory(url, pix, dpr, radius, padding, size))
+    if(!loadCacheFromMemory(url, pix, radius, padding, size))
         return QPixmap();
+
     return pix;
 }
 
-ImageCacheManager::ImageState ImageCacheManager::getImageState(const QString &url, qreal dpr, int radius, int padding, QSize size)
+QPixmap ImageCacheManager::fastLoadThumbnail(const QString &url)
 {
-    dpr = dpr == -1 ? GlobalVariable::getMaxDevicePixelRatio() : dpr;
-    QString key = getUrlKey(url, dpr, radius, padding, size);
+    if(url.isEmpty())
+        return QPixmap();
+
+    QWriteLocker locker(&(this->rwLock));
+    auto it = this->hash_thumbnails.find(url);
+    if(it == this->hash_thumbnails.end())
+        return QPixmap();
+
+    this->list_thumbLRU.removeAll(url);
+    this->list_thumbLRU.append(url);
+    return it.value();
+}
+
+void ImageCacheManager::putThumbnail(const QString &url, const QPixmap &pix)
+{
+    if(pix.isNull() || url.isEmpty())
+        return;
+
+    QWriteLocker locker(&(this->rwLock));
+    if(this->hash_thumbnails.contains(url))
+    {
+        this->hash_thumbnails[url] = pix;
+        this->list_thumbLRU.removeAll(url);
+        this->list_thumbLRU.append(url);
+        return;
+    }
+
+    while(this->list_thumbLRU.size() >= 3000)
+    {
+        QString older = this->list_thumbLRU.takeFirst();
+        this->hash_thumbnails.remove(older);
+    }
+
+    this->hash_thumbnails[url] = pix;
+    this->list_thumbLRU.append(url);
+}
+
+void ImageCacheManager::removeThumbnail(const QString &url)
+{
+    QWriteLocker locker(&(this->rwLock));
+
+    if(this->hash_thumbnails.remove(url))
+        this->list_thumbLRU.removeAll(url);
+}
+
+ImageCacheManager::ImageState ImageCacheManager::getImageState(const QString &url, int radius, int padding, QSize size)
+{
+    QString key = getUrlKey(url, radius, padding, size);
     QReadLocker locker(&(this->rwLock));
     if(this->hash_imageState.contains(key))
     {
@@ -271,16 +422,19 @@ ImageCacheManager::ImageCacheManager(QObject *parent)
     this->pos_imageCache = GlobalVariable::getPosOfImageCache();
     this->cache_memoryCache.setMaxCost(100 * 1024 * 1024);//100MB
     this->threadPool.setMaxThreadCount(4);
+
+    this->hash_thumbnails.reserve(3000);
+    this->list_thumbLRU.reserve(3000);
 }
 
 bool ImageCacheManager::tryLoadOriginalFromCache(const QString &url, QPixmap &outPixmap)
 {
-    return loadCacheFromMemory(url, outPixmap, 1.0, 0, 0, QSize()) || loadCacheFromDisk(url, outPixmap, 1.0, 0, 0, QSize());
+    return loadCacheFromMemory(url, outPixmap, 0, 0, QSize()) || loadCacheFromDisk(url, outPixmap, 0, 0, QSize());
 }
 
-bool ImageCacheManager::loadCacheFromMemory(const QString &url, QPixmap &outPixmap, qreal dpr, int radius, int padding, QSize size)
+bool ImageCacheManager::loadCacheFromMemory(const QString &url, QPixmap &outPixmap, int radius, int padding, QSize size)
 {
-    QString key = getUrlKey(url, dpr, radius, padding, size);
+    QString key = getUrlKey(url, radius, padding, size);
     QReadLocker locker(&(this->rwLock));
     if(this->cache_memoryCache.contains(key))
     {
@@ -290,19 +444,19 @@ bool ImageCacheManager::loadCacheFromMemory(const QString &url, QPixmap &outPixm
     return false;
 }
 
-bool ImageCacheManager::loadCacheFromDisk(const QString &url, QPixmap &outPixmap, qreal dpr, int radius, int padding, QSize size)
+bool ImageCacheManager::loadCacheFromDisk(const QString &url, QPixmap &outPixmap, int radius, int padding, QSize size)
 {
-    QString key = getUrlKey(url, dpr, radius, padding, size);
+    QString key = getUrlKey(url, radius, padding, size);
     QString path = getFilePathFromKey(key);
     if(QFile::exists(path))
     {
         QPixmap pix;
         if(!pix.load(path))
         {
-            QFile::remove(path);
+            qWarning() << "loadCacheFromDisk failed:" << path;
             return false;
         }
-        pix.setDevicePixelRatio(dpr);
+
         outPixmap = pix;
 
         QPixmap* ptr(new QPixmap(pix));
@@ -340,7 +494,7 @@ void ImageCacheManager::loadCacheFromServer(const QString &url, imageTask task, 
 
             connect(timer, &QTimer::timeout, this, [this, url, task](){
                 {
-                    QString key = getUrlKey(url, task.dpr, task.radius, task.padding, task.size);
+                    QString key = getUrlKey(url, task.radius, task.padding, task.size);
                     QWriteLocker locker(&(this->rwLock));
                     this->hash_imageState[key] = ImageState::Failed;
                 }
@@ -356,7 +510,7 @@ void ImageCacheManager::loadCacheFromServer(const QString &url, imageTask task, 
 
     if(needDownload)
     {
-        QString key = getUrlKey(url, task.dpr, task.radius, task.padding, task.size);
+        QString key = getUrlKey(url, task.radius, task.padding, task.size);
         {
             QWriteLocker locker(&(this->rwLock));
             this->hash_imageState[key] = ImageState::Loading;
@@ -365,7 +519,7 @@ void ImageCacheManager::loadCacheFromServer(const QString &url, imageTask task, 
         HttpShortConnection::getHttpClient().getImage(url, 3, [this, url, task](const QByteArray& data, HttpShortConnection::ImageError error){
             if(error == HttpShortConnection::ImageError::NotFound)
             {
-                QString key = getUrlKey(url, task.dpr, task.radius, task.padding, task.size);
+                QString key = getUrlKey(url, task.radius, task.padding, task.size);
                 QWriteLocker locker(&(this->rwLock));
                 this->hash_imageState[key] = ImageState::NotExist;
             }
@@ -400,7 +554,7 @@ void ImageCacheManager::handleDownloadFinished(const QString &url, const QByteAr
 
     this->threadPool.start(new FunctionRunnable([this, isVaild, url, data, tasks, originalImage](){
         if(isVaild)
-            insertCache(url, data, 1.0, 0, 0, QSize());//默认标准图
+            insertCache(url, data, 0, 0, QSize());//默认标准图
 
         for(const auto& task : std::as_const(tasks))
         {
@@ -409,7 +563,7 @@ void ImageCacheManager::handleDownloadFinished(const QString &url, const QByteAr
                 invokeCallbacks({task.callback}, QPixmap());
                 continue;
             }
-            if(task.radius == 0 && task.padding == 0 && task.dpr == 1.0 && task.size.isEmpty())
+            if(task.radius == 0 && task.padding == 0 && task.size.isEmpty())
                 invokeCallbacks({task.callback}, QPixmap::fromImage(originalImage));
             else
                 handleRounded(url, QPixmap::fromImage(originalImage), task);//开始异步画圆角
@@ -417,11 +571,10 @@ void ImageCacheManager::handleDownloadFinished(const QString &url, const QByteAr
     }));
 }
 
-QString ImageCacheManager::getUrlKey(const QString &url, qreal dpr, int radius, int padding, QSize size) const
+QString ImageCacheManager::getUrlKey(const QString &url, int radius, int padding, QSize size) const
 {
-    dpr = dpr == -1 ? GlobalVariable::getMaxDevicePixelRatio() : dpr;
     QString sizeStr = size.isValid() && !size.isEmpty() ? QString("%1x%2").arg(size.width()).arg(size.height()) : QStringLiteral("orig");
-    return QString("%1rounded%2_p%3_d%4_s%5").arg(url).arg(radius).arg(padding).arg(dpr, 0, 'f', 3).arg(sizeStr);
+    return QString("%1rounded%2_p%3_s%4").arg(url).arg(radius).arg(padding).arg(sizeStr);
 }
 
 QString ImageCacheManager::getFilePathFromKey(const QString& key) const
@@ -454,7 +607,7 @@ void ImageCacheManager::invokeCallbacks(const QList<std::function<void (const QP
 
 void ImageCacheManager::handleRounded(const QString &url, const QPixmap &pix, imageTask task)
 {
-    QString key = getUrlKey(url, task.dpr, task.radius, task.padding, task.size);
+    QString key = getUrlKey(url, task.radius, task.padding, task.size);
     {
         QWriteLocker locker(&(this->rwLock));
         if(this->set_handleRounded.contains(key))
@@ -468,9 +621,8 @@ void ImageCacheManager::handleRounded(const QString &url, const QPixmap &pix, im
 
     QImage image = pix.toImage();
 
-    QImage result = addRoundedAndPadding(image, task.radius, task.padding, task.dpr, task.size);
+    QImage result = addRoundedAndPadding(image, task.radius, task.padding, GlobalVariable::getMaxDevicePixelRatio(), task.size);
     QPixmap resultPix = QPixmap::fromImage(result);
-    resultPix.setDevicePixelRatio(task.dpr);
 
     QList<std::function<void(const QPixmap&)>> callbacks;
     {
@@ -478,7 +630,7 @@ void ImageCacheManager::handleRounded(const QString &url, const QPixmap &pix, im
         this->set_handleRounded.remove(key);
         callbacks = this->hash_roundedCallback.take(key);
     }
-    insertCache(url, result, task.dpr, task.radius, task.padding, task.size);
+    insertCache(url, result, task.radius, task.padding, task.size);
     invokeCallbacks(callbacks, resultPix);
 }
 
@@ -533,6 +685,5 @@ QImage ImageCacheManager::addRoundedAndPadding(const QImage &image, int radius, 
     painter.drawImage(0, 0, mask);
     painter.end();
 
-    result.setDevicePixelRatio(actualDpr);
     return result;
 }

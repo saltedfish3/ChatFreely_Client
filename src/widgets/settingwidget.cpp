@@ -40,9 +40,10 @@ void SettingWidget::setRadius(QPixmap& pix, AvatarView* view, int radius)
     if(pix.isNull())
         return;
 
-    QPixmap rounded(view->size() * pix.devicePixelRatioF());
+    qreal dpr = view->devicePixelRatioF();
+    QPixmap rounded(view->size() * dpr);
     rounded.fill(Qt::transparent);
-    rounded.setDevicePixelRatio(pix.devicePixelRatioF());
+    rounded.setDevicePixelRatio(dpr);
 
     QPainter painter(&rounded);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
@@ -416,13 +417,13 @@ void SettingWidget::initPersonalDataWidget()
     this->view_avatar = new AvatarView(0.95, this->widget_personalData);
     this->view_avatar->setObjectName("view_avatar");
     this->view_avatar->resize(88,88);
-    QPixmap defaultAvatar = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", -1, 0, 0, QSize(88, 88));
+    QPixmap defaultAvatar = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", 0, 0, QSize(88, 88));
     if(defaultAvatar.isNull())
     {
         ImageCacheManager::getManager().loadImage(":/default/images/defaultAvatar.png", [this](const QPixmap& pix){
             QPixmap p_ = pix;
             setRadius(p_, this->view_avatar, 44);
-        }, false, -1, 0, 0, QSize(88, 88));
+        }, false, 0, 0, QSize(88, 88));
     }
     else
         setRadius(defaultAvatar, this->view_avatar, 44);

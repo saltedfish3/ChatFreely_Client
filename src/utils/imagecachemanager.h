@@ -35,27 +35,32 @@ public:
     ImageCacheManager(const ImageCacheManager&) = delete;
 
     void loadImage(const QString& url, std::function<void(const QPixmap&)> callback, bool failed_notice = false,
-                   qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize());
-    void insertCache(const QString& url, const QImage& img, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize());
-    void insertCache(const QString& url, const QPixmap& pix, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize());
-    void insertCache(const QString& url, const QByteArray& data, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize());
-    void migrateCache(const QString& oldUrl, const QString& newUrl, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize());
-    void removeCache(const QString& url, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize());
-    QString getCacheFilePath(const QString& url, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize()) const;
-    QString getFilenameFromUrl(const QString& url, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize()) const;
+                int radius = 0, int padding = 0, QSize size = QSize());
+    void loadThumbnail(const QString& url, std::function<void(const QPixmap&)> callback);
+
+    void insertCache(const QString& url, const QImage& img, int radius = 0, int padding = 0, QSize size = QSize());
+    void insertCache(const QString& url, const QPixmap& pix, int radius = 0, int padding = 0, QSize size = QSize());
+    void insertCache(const QString& url, const QByteArray& data, int radius = 0, int padding = 0, QSize size = QSize());
+    void insertThumbnail(const QString& url, const QPixmap& pix);
+
+    void migrateCache(const QString& oldUrl, const QString& newUrl, int radius = 0, int padding = 0, QSize size = QSize());
+    void migrateThumbnail(const QString& oldThumbnailUrl, const QString& newThumbnailUrl);
+    void removeCache(const QString& url, int radius = 0, int padding = 0, QSize size = QSize());
+    QString getCacheFilePath(const QString& url, int radius = 0, int padding = 0, QSize size = QSize()) const;
+    QString getFilenameFromUrl(const QString& url, int radius = 0, int padding = 0, QSize size = QSize()) const;
 
     bool saveTo(const QString& url, const QString& targetDir);
 
-    QPixmap fastLoadImage(const QString& url, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize());
+    QPixmap fastLoadImage(const QString& url, int radius = 0, int padding = 0, QSize size = QSize());
+    QPixmap fastLoadThumbnail(const QString& url);
 
-    ImageState getImageState(const QString& url, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize());
+    ImageState getImageState(const QString& url, int radius = 0, int padding = 0, QSize size = QSize());
 
 signals:
 
 private:
     struct imageTask
     {
-        qreal dpr;
         int radius;
         int padding;
         QSize size;
@@ -65,12 +70,15 @@ private:
     explicit ImageCacheManager(QObject *parent = nullptr);
     //加载图片
     bool tryLoadOriginalFromCache(const QString& url, QPixmap& outPixmap);
-    bool loadCacheFromMemory(const QString& url, QPixmap& outPixmap, qreal dpr, int radius, int padding, QSize size);
-    bool loadCacheFromDisk(const QString& url, QPixmap& outPixmap, qreal dpr, int radius, int padding, QSize size);
+    bool loadCacheFromMemory(const QString& url, QPixmap& outPixmap, int radius, int padding, QSize size);
+    bool loadCacheFromDisk(const QString& url, QPixmap& outPixmap, int radius, int padding, QSize size);
     void loadCacheFromServer(const QString& url, imageTask task, bool failed_notice);
 
+    void putThumbnail(const QString& url, const QPixmap& pix);
+    void removeThumbnail(const QString& url);
+
     void handleDownloadFinished(const QString& url, const QByteArray& data);
-    QString getUrlKey(const QString& url, qreal dpr = -1, int radius = 0, int padding = 0, QSize size = QSize()) const;
+    QString getUrlKey(const QString& url, int radius = 0, int padding = 0, QSize size = QSize()) const;
     QString getFilePathFromKey(const QString& key) const;
     void invokeCallbacks(const QList<std::function<void(const QPixmap&)>>& callbacks, const QPixmap& pic);
 
@@ -93,6 +101,10 @@ private:
     //圆角绘制任务去重
     QSet<QString> set_handleRounded;
     QHash<QString, QList<std::function<void(const QPixmap&)>>> hash_roundedCallback;
+
+    //缩略图
+    QHash<QString, QPixmap> hash_thumbnails;//url - pixmap
+    QList<QString> list_thumbLRU;
 
     QReadWriteLock rwLock;
 };

@@ -41,6 +41,7 @@ void ChatTextEdit::saveBlocks()
 
                 MessageBlock b;
                 b.type = type;
+                b.thumbnailUrl = imgFmt.property(ThumbnailUrlPro).toString();
                 b.content = url;
                 this->blocks.append(b);
             }
@@ -76,8 +77,16 @@ void ChatTextEdit::insertFileToEdit(const QString &filePath, ContentType type)
             return;
 
         QString filename = "local://" + QUuid::createUuid().toString();
-        ImageCacheManager::getManager().insertCache(filename, QPixmap::fromImage(image), 1.0);
-        insertImageToEdit(image, filename);
+        QString fileThumbnail = filename + "_thumbnail";
+        ImageCacheManager::getManager().insertCache(filename, QPixmap::fromImage(image));
+
+        qreal dpr = GlobalVariable::getMaxDevicePixelRatio();
+        QImage thumb = image;
+        if(thumb.width() > 200 * dpr || thumb.height() > 200 * dpr)
+            thumb = thumb.scaled(qRound(200 * dpr), qRound(200 * dpr), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+        ImageCacheManager::getManager().insertThumbnail(fileThumbnail, QPixmap::fromImage(thumb));
+        insertImageToEdit(image, filename, fileThumbnail);
         return;
     }
 
@@ -188,15 +197,22 @@ void ChatTextEdit::insertFromMimeData(const QMimeData *source)
 
         //载入缓存
         QString filename = "local://" + QUuid::createUuid().toString();
-        ImageCacheManager::getManager().insertCache(filename, QPixmap::fromImage(image), 1.0);
+        QString fileThumbnail = filename + "_thumbnail";
+        ImageCacheManager::getManager().insertCache(filename, QPixmap::fromImage(image));
 
-        insertImageToEdit(image, filename);
+        qreal dpr = GlobalVariable::getMaxDevicePixelRatio();
+        QImage thumb = image;
+        if(thumb.width() > 200 * dpr || thumb.height() > 200 * dpr)
+            thumb = thumb.scaled(qRound(200 * dpr), qRound(200 * dpr), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        ImageCacheManager::getManager().insertThumbnail(fileThumbnail, QPixmap::fromImage(thumb));
+
+        insertImageToEdit(image, filename, fileThumbnail);
     }
     else
         QTextEdit::insertFromMimeData(source);
 }
 
-void ChatTextEdit::insertImageToEdit(const QImage& image, const QString& url)
+void ChatTextEdit::insertImageToEdit(const QImage& image, const QString& url, const QString& thumbnailUrl)
 {
     const int maxWidth = this->width() * 0.5;
     const int maxHeight = this->height() * 0.7;
@@ -225,6 +241,7 @@ void ChatTextEdit::insertImageToEdit(const QImage& image, const QString& url)
 
     format.setProperty(UrlPro, url);
     format.setProperty(TypePro, static_cast<int>(Image));
+    format.setProperty(ThumbnailUrlPro, thumbnailUrl);
 
     cursor.insertImage(format);
 }

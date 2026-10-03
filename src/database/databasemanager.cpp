@@ -285,6 +285,10 @@ void DatabaseManager::loadAllConversationsList(std::function<void (const QList<C
                             info.lastMsg = q.value(3).toString();
                         else if(type == ContentType::Image)
                             info.lastMsg = "[图片]";
+                        else if(type == ContentType::Video)
+                            info.lastMsg = "[视频]";
+                        else if(type == ContentType::File)
+                            info.lastMsg = "[文件]";
                         info.lastTimestamp = q.value(4).toLongLong();
                         list.append(info);
                     }

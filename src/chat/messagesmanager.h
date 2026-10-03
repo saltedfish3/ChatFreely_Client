@@ -6,6 +6,7 @@
 #include "message.h"
 #include "../database/databasemanager.h"
 #include "../utils/imagecachemanager.h"
+#include "../utils/videoutils.h"
 
 class MessagesManager : public QObject
 {
@@ -28,8 +29,16 @@ public:
     void removeOfIndex(int index);
 
     void retryMessage(int index);
+    bool cancelUpload(const QString& tempMsgID);
     void reLoadImage(int index);
     qint64 getNextConvSeq();
+
+    //上传进度
+    void registerUpload(const QString& tempID, const QString& filePath);
+    void unregisterUpload(const QString& tempID);
+    int getUploadProgres(const QString& filePath) const;
+
+    bool isMediaExpired(const QString& url) const;
 
 signals:
     void messageAdd(int row);
@@ -39,6 +48,9 @@ signals:
     void messageRemove(int row);
     void messageMove(int oldRow, int newRow);
     void resetModel();
+    void uploadProgressUpdate(const QString& tempID, const QString& filePath, int percent);
+    void mediaExpired(const QString& url);
+    void mediaAvailable(const QString& url);
 
     //通知item
     void startLoadingImage();
@@ -51,11 +63,20 @@ private:
     QString conversationID;
     qint64 lastConvSeq = 0;
 
+    QHash<QString, QString> hash_tempIDToFilePath;//tempID - filePath
+    QHash<QString, QList<QString>> hash_registerUploadID;//filePath - [tempID]
+    QHash<QString, int> hash_uploadProgress;//filePath - percent
+
+    QSet<QString> set_expiredMediaUrl;
+    QSet<QString> set_checkingMediaUrl;
+
     int findInsertIndex(qint64 convSeq) const;
     void saveMoveMessage(int row);
     void calcShowTimestamp(int row);
     void addIndex(const Message& msg, int index);
     void rebuildIndex();
+
+    void checkMediaExpiredStatus(const Message& msg);
 };
 
 #endif // MESSAGESMANAGER_H

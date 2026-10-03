@@ -48,17 +48,17 @@ void HttpShortConnection::uploadAvatar(const QString &filePath)
         return;
     }
 
-    uploadMedia(MediaType::Image, cacheFilePath, [this, localUrl](const QString& url){
-        ImageCacheManager::getManager().migrateCache(localUrl, url);
-        UserInfo::getUserInfo().setAvatarUrl(url);
-        TcpLongConnection::getTcpClient().sendUpadteAvatar(url);
+    uploadMedia(MediaType::Image, cacheFilePath, [this, localUrl](const UploadResult& result){
+        ImageCacheManager::getManager().migrateCache(localUrl, result.url);
+        UserInfo::getUserInfo().setAvatarUrl(result.url);
+        TcpLongConnection::getTcpClient().sendUpadteAvatar(result.url);
     }, true, [this, localUrl](const QString& info){
         ImageCacheManager::getManager().removeCache(localUrl);
         emit mainState(false, info);
-    });
+    }, false);
 }
 
-void HttpShortConnection::uploadMedia(MediaType type, const QString &filePath, std::function<void (const QString &)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed)
+void HttpShortConnection::uploadMedia(MediaType type, const QString &filePath, std::function<void (const UploadResult&)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed, bool needServerThumbnail)
 {
     if(!TcpLongConnection::getTcpClient().isConnect())
     {
@@ -75,6 +75,22 @@ void HttpShortConnection::uploadMedia(MediaType type, const QString &filePath, s
             emit mainState(false, "无法连接服务器，请稍后再试");
         if(cb_failed)
             cb_failed("无法连接服务器，请稍后再试");
+        return;
+    }
+
+    if(type != MediaType::Image && needServerThumbnail)
+    {
+        qWarning() << "uploadMedia: needServerThumbnail只对Image生效";
+        needServerThumbnail = false;
+    }
+
+    if(this->hash_uploadTasks.contains(filePath))
+    {
+        UploadTask* task = this->hash_uploadTasks.value(filePath);
+        if(cb_success)
+            task->successCallbacks.append(cb_success);
+        if(cb_failed)
+            task->failedCallbacks.append(cb_failed);
         return;
     }
 
@@ -142,7 +158,24 @@ void HttpShortConnection::uploadMedia(MediaType type, const QString &filePath, s
         mimeType = (format == "JPEG") ? "image/jpeg" : "image/png";
         suffix = (format == "JPEG" ? "jpg" : "png");
         QByteArray md5 = QCryptographicHash::hash(fileData, QCryptographicHash::Md5).toHex();
-        sendUploadInit(type, filePath, fileSize, md5, suffix, mimeType, fileData, cb_success, failed_notice, cb_failed);
+
+        auto* task = new UploadTask;
+        task->filePath = filePath;
+        task->totalSize = fileSize;
+        if(cb_success)
+            task->successCallbacks.append(cb_success);
+        if(cb_failed)
+            task->failedCallbacks.append(cb_failed);
+        this->hash_uploadTasks[filePath] = task;
+
+        cb_success = [this, filePath](const UploadResult& result){
+            finishUpload(filePath, result);
+        };
+        cb_failed = [this, filePath](const QString& info){
+            finishUpload(filePath, info);
+        };
+
+        sendUploadInit(type, filePath, fileSize, md5, suffix, mimeType, fileData, cb_success, failed_notice, cb_failed, needServerThumbnail);
         return;
     }
     else if(type == MediaType::Video)
@@ -220,6 +253,22 @@ void HttpShortConnection::uploadMedia(MediaType type, const QString &filePath, s
         return;
     }
 
+    auto* task = new UploadTask;
+    task->filePath = filePath;
+    task->totalSize = fileSize;
+    if(cb_success)
+        task->successCallbacks.append(cb_success);
+    if(cb_failed)
+        task->failedCallbacks.append(cb_failed);
+    this->hash_uploadTasks[filePath] = task;
+
+    cb_success = [this, filePath](const UploadResult& result){
+        finishUpload(filePath, result);
+    };
+    cb_failed = [this, filePath](const QString& info){
+        finishUpload(filePath, info);
+    };
+
     QPointer<HttpShortConnection> self(this);
 
     auto future = QtConcurrent::run([=](){
@@ -230,6 +279,9 @@ void HttpShortConnection::uploadMedia(MediaType type, const QString &filePath, s
             QMetaObject::invokeMethod(self, [=](){
                 if(!self)
                     return;
+                if(!self->hash_uploadTasks.contains(filePath))
+                    return;
+
                 if(failed_notice)
                     emit self->mainState(false, "上传失败，请稍后再试");
                 if(cb_failed)
@@ -254,7 +306,11 @@ void HttpShortConnection::uploadMedia(MediaType type, const QString &filePath, s
         QMetaObject::invokeMethod(self, [=](){
             if(!self)
                 return;
-            self->sendUploadInit(type, filePath, fileSize, md5, suffix, mimeType, QByteArray(), cb_success, failed_notice, cb_failed);
+
+            if(!self->hash_uploadTasks.contains(filePath))
+                return;
+
+            self->sendUploadInit(type, filePath, fileSize, md5, suffix, mimeType, QByteArray(), cb_success, failed_notice, cb_failed, needServerThumbnail);
         }, Qt::QueuedConnection);
     });
 }
@@ -399,6 +455,30 @@ void HttpShortConnection::cancelAllDownloads()
     this->hash_downloadFinishedStatus.clear();
 }
 
+void HttpShortConnection::cancelUpload(const QString &filePath)
+{
+    auto it = this->hash_uploadTasks.find(filePath);
+    if(it == this->hash_uploadTasks.end())
+        return;
+
+    UploadTask* task = it.value();
+    this->hash_uploadTasks.erase(it);
+    delete task;
+
+    auto rit = this->hash_uploadReply.find(filePath);
+    if(rit != this->hash_uploadReply.end())
+    {
+        QList<QNetworkReply*> replies = rit.value().values();
+        this->hash_uploadReply.erase(rit);
+
+        for(QNetworkReply* reply : std::as_const(replies))
+        {
+            if(reply)
+                reply->abort();
+        }
+    }
+}
+
 QString HttpShortConnection::resolveTargetPath(const QString &path)
 {
     if(path.isEmpty())
@@ -430,6 +510,38 @@ QString HttpShortConnection::resolveTargetPath(const QString &path)
     return path;
 }
 
+void HttpShortConnection::checkUrlExists(const QString &url, std::function<void (bool)> callback)
+{
+    if(url.isEmpty())
+    {
+        if(callback)
+            callback(true);
+        return;
+    }
+
+    qint64 sendMs = QDateTime::currentMSecsSinceEpoch();
+    QNetworkRequest req = QNetworkRequest(QUrl(url));
+    QNetworkReply* reply = this->httpmanager->head(req);
+
+    connect(reply, &QNetworkReply::finished, this, [this, callback, reply, sendMs, url](){
+        reply->deleteLater();
+
+        qint64 recvMs = QDateTime::currentMSecsSinceEpoch();
+        int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        auto err = reply->error();
+
+        if(!callback)
+            return;
+
+        if(err == QNetworkReply::NoError && status == 200)
+            callback(true);
+        else if(err == QNetworkReply::ContentNotFoundError && status == 404)
+            callback(false);
+        else
+            callback(true);
+    });
+}
+
 HttpShortConnection::DownloadStatus HttpShortConnection::getDownloadStatus(const QString &url) const
 {
     auto it = this->hash_downloadTasks.find(url);
@@ -454,6 +566,18 @@ HttpShortConnection::HttpShortConnection(QObject *parent)
     : QObject{parent}
 {
     httpmanager = new QNetworkAccessManager(this);
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, [this](){
+        cleanALL();
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, [this](){
+        cleanALL();
+    });
+
+    connect(this, &HttpShortConnection::refreshExpiredExit, this, [this](){
+        cleanALL();
+    });
 }
 
 QByteArray HttpShortConnection::getImageFormat(const QByteArray &data) const
@@ -492,7 +616,7 @@ QString HttpShortConnection::isVideo(const QByteArray &data) const
     return "";
 }
 
-void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath, qint64 fileSize, const QByteArray &md5, const QString &suffix, const QString &mimeType, const QByteArray &fileData, std::function<void (const QString &)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed)
+void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath, qint64 fileSize, const QByteArray &md5, const QString &suffix, const QString &mimeType, const QByteArray &fileData, std::function<void (const UploadResult&)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed, bool needServerThumbnail)
 {
     QNetworkRequest request(QUrl("http://192.168.153.128:9003/upload/init"));
     request.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
@@ -502,11 +626,28 @@ void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath
     obj["Md5"] = QString::fromLatin1(md5);
     obj["Suffix"] = suffix;
     obj["Size"] = QString::number(fileSize);
+    if(!needServerThumbnail)
+        obj["SkipThumbnail"] = "1";
 
     QNetworkReply* reply = this->httpmanager->post(request, QJsonDocument(obj).toJson());
+    this->hash_uploadReply[filePath].insert(reply);
+
+    connect(reply, &QObject::destroyed, this, [this, reply, filePath](){
+        auto it = this->hash_uploadReply.find(filePath);
+        if(it == this->hash_uploadReply.end())
+            return;
+
+        it.value().remove(reply);
+        if(it.value().isEmpty())
+            this->hash_uploadReply.erase(it);
+    });
 
     connect(reply, &QNetworkReply::finished, this, [=](){
         reply->deleteLater();
+
+        if(reply->error() == QNetworkReply::OperationCanceledError)
+            return;
+
         if(reply->error() == QNetworkReply::AuthenticationRequiredError)
         {
             TcpLongConnection::getTcpClient().sendRefreshToken([=](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
@@ -515,7 +656,7 @@ void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath
                     if(!newAccessToken.isEmpty())
                     {
                         UserInfo::getUserInfo().setAccessToken(newAccessToken);
-                        sendUploadInit(type, filePath, fileSize, md5, suffix, mimeType, fileData, cb_success, failed_notice, cb_failed);
+                        sendUploadInit(type, filePath, fileSize, md5, suffix, mimeType, fileData, cb_success, failed_notice, cb_failed, needServerThumbnail);
                     }
                     else
                         emit refreshExpiredExit();
@@ -543,7 +684,7 @@ void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath
 
         if(reply->error() != QNetworkReply::NoError)
         {
-            if(failed_notice)
+            if(failed_notice && !this->isCleaning)
                 emit mainState(false, "上传失败，请稍后再试");
             if(cb_failed)
                 cb_failed("上传失败，请稍后再试");
@@ -562,7 +703,8 @@ void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath
 
         QJsonObject resp = doc.object();
         bool isExists = resp.value("Exists").toBool();
-        QString url = doc.object().value("Url").toString();
+        QString url = resp.value("Url").toString();
+        QString thumbnailUrl = resp.value("ThumbnailUrl").toString();
         if(url.isEmpty())
         {
             if(failed_notice)
@@ -574,8 +716,11 @@ void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath
 
         if(isExists)
         {
+            UploadResult result;
+            result.url = url;
+            result.thumbnailUrl = thumbnailUrl;
             if(cb_success)
-                cb_success(url);
+                cb_success(result);
             return;
         }
 
@@ -598,6 +743,7 @@ void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath
         }
 
         QString uploadUrl = resp.value("UploadUrl").toString();
+        qDebug() << uploadUrl;
         if(uploadUrl.isEmpty())
         {
             if(failed_notice)
@@ -609,6 +755,7 @@ void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath
 
         QNetworkRequest putReq(uploadUrl);
         putReq.setHeader(QNetworkRequest::ContentTypeHeader, mimeType);
+        putReq.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
 
         QNetworkReply* reply_upload = nullptr;
         QFile* uploadFile = nullptr;
@@ -621,6 +768,7 @@ void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath
             if(!uploadFile->open(QIODevice::ReadOnly))
             {
                 uploadFile->deleteLater();
+                qDebug()<<"打开文件失败";
                 if(failed_notice)
                     emit mainState(false, "上传失败，请稍后再试");
                 if(cb_failed)
@@ -630,27 +778,97 @@ void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath
             reply_upload = this->httpmanager->put(putReq, uploadFile);
         }
 
-        connect(reply_upload, &QNetworkReply::finished, this, [this, reply_upload, cb_success, cb_failed, failed_notice, url, uploadFile](){
+        this->hash_uploadReply[filePath].insert(reply_upload);
+        connect(reply_upload, &QObject::destroyed, this, [this, reply_upload, filePath](){
+            auto it = this->hash_uploadReply.find(filePath);
+            if(it == this->hash_uploadReply.end())
+                return;
+
+            it.value().remove(reply_upload);
+            if(it.value().isEmpty())
+                this->hash_uploadReply.erase(it);
+        });
+
+        connect(reply_upload, &QNetworkReply::uploadProgress, this, [this, filePath](qint64 bytesSent, qint64 bytesTotal){
+            handleUploadProgress(filePath, bytesSent);
+        });
+
+        connect(reply_upload, &QNetworkReply::finished, this, [this, reply_upload, cb_success, cb_failed, failed_notice, url, uploadFile, thumbnailUrl](){
             reply_upload->deleteLater();
             if(uploadFile)
                 uploadFile->deleteLater();
 
+            if(reply_upload->error() == QNetworkReply::OperationCanceledError)
+                return;
+
             if(reply_upload->error() != QNetworkReply::NoError)
             {
-                if(failed_notice)
+                if(failed_notice && !this->isCleaning)
                     emit mainState(false, "上传失败，请稍后再试");
                 if(cb_failed)
                     cb_failed("上传失败，请稍后再试");
                 return;
             }
 
+            QByteArray respData = reply_upload->readAll();
+            QString respUrl;
+            QString respThumb;
+            if(!respData.isEmpty())
+            {
+                QJsonDocument doc = QJsonDocument::fromJson(respData);
+                respUrl = doc.object().value("Url").toString();
+                respThumb = doc.object().value("ThumbnailUrl").toString();
+            }
+
+            UploadResult result;
+            result.url = respUrl.isEmpty() ? url : respUrl;
+            result.thumbnailUrl = respThumb.isEmpty() ? thumbnailUrl : respThumb;
             if(cb_success)
-                cb_success(url);
+                cb_success(result);
         });
     });
 }
 
-void HttpShortConnection::multipartUpload(const QString &filePath, qint64 everyPartSize, const QString &objectKey, const QString &uploadId, const QString &finalUrl, std::function<void (const QString &)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed)
+void HttpShortConnection::finishUpload(const QString &filePath, const QString &info)
+{
+    auto it = this->hash_uploadTasks.find(filePath);
+    if(it == this->hash_uploadTasks.end())
+        return;
+
+    UploadTask* task = it.value();
+    this->hash_uploadTasks.erase(it);
+
+    for(auto& cb : task->failedCallbacks)
+    {
+        if(cb)
+            cb(info);
+    }
+
+    delete task;
+}
+
+void HttpShortConnection::finishUpload(const QString &filePath, const UploadResult &result)
+{
+    auto it = this->hash_uploadTasks.find(filePath);
+    if(it == this->hash_uploadTasks.end())
+        return;
+
+    UploadTask* task = it.value();
+    this->hash_uploadTasks.erase(it);
+
+    if(task->totalSize > 0 && task->lastPercent < 100)
+        emit uploadProgressChanged(filePath, task->totalSize, task->totalSize, 100);
+
+    for(auto& cb : task->successCallbacks)
+    {
+        if(cb)
+            cb(result);
+    }
+
+    delete task;
+}
+
+void HttpShortConnection::multipartUpload(const QString &filePath, qint64 everyPartSize, const QString &objectKey, const QString &uploadId, const QString &finalUrl, std::function<void (const UploadResult&)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed)
 {
     QFileInfo info(filePath);
     if(!info.exists())
@@ -667,10 +885,13 @@ void HttpShortConnection::multipartUpload(const QString &filePath, qint64 everyP
     auto next = QSharedPointer<std::function<void()>>::create();
 
     *next = [=](){
+        if(!this->hash_uploadTasks.contains(filePath))
+            return;
+
         int currentPart = parts->size() + 1;
         if(currentPart > totalParts)
         {
-            sendComplete(objectKey, uploadId, *parts, finalUrl, cb_success, failed_notice, cb_failed);
+            sendComplete(filePath, objectKey, uploadId, *parts, finalUrl, cb_success, failed_notice, cb_failed);
             return;
         }
 
@@ -680,7 +901,7 @@ void HttpShortConnection::multipartUpload(const QString &filePath, qint64 everyP
     (*next)();
 }
 
-void HttpShortConnection::uploadOnePart(const QString &filePath, qint64 partSize, const QString &objectKey, const QString &uploadId, int partNumber, int totalParts, QSharedPointer<QJsonArray> parts, QSharedPointer<std::function<void ()> > next, const QString &finalUrl, std::function<void (const QString &)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed)
+void HttpShortConnection::uploadOnePart(const QString &filePath, qint64 partSize, const QString &objectKey, const QString &uploadId, int partNumber, int totalParts, QSharedPointer<QJsonArray> parts, QSharedPointer<std::function<void ()> > next, const QString &finalUrl, std::function<void (const UploadResult&)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed)
 {
     qint64 offset = static_cast<qint64>(partNumber - 1) * partSize;
 
@@ -708,9 +929,33 @@ void HttpShortConnection::uploadOnePart(const QString &filePath, qint64 partSize
     req.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
 
+    qint64 alreadySend = 0;
+    auto it = this->hash_uploadTasks.find(filePath);
+    if(it != this->hash_uploadTasks.end())
+        alreadySend = it.value()->sendSize;
+
     QNetworkReply* reply = this->httpmanager->post(req, partData);
+
+    this->hash_uploadReply[filePath].insert(reply);
+    connect(reply, &QObject::destroyed, this, [this, reply, filePath](){
+        auto it = this->hash_uploadReply.find(filePath);
+        if(it == this->hash_uploadReply.end())
+            return;
+
+        it.value().remove(reply);
+        if(it.value().isEmpty())
+            this->hash_uploadReply.erase(it);
+    });
+
+    connect(reply, &QNetworkReply::uploadProgress, this, [this, filePath, alreadySend](qint64 bytesSent, qint64 bytesTotal){
+        handleUploadProgress(filePath, alreadySend + bytesSent);
+    });
+
     connect(reply, &QNetworkReply::finished, this, [=](){
         reply->deleteLater();
+
+        if(reply->error() == QNetworkReply::OperationCanceledError)
+            return;
 
         if(reply->error() == QNetworkReply::AuthenticationRequiredError)
         {
@@ -740,7 +985,7 @@ void HttpShortConnection::uploadOnePart(const QString &filePath, qint64 partSize
 
         if(reply->error() != QNetworkReply::NoError)
         {
-            if(failed_notice)
+            if(failed_notice && !this->isCleaning)
                 emit mainState(false, "上传失败，请稍后再试");
             if(cb_failed)
                 cb_failed("上传失败，请稍后再试");
@@ -763,11 +1008,13 @@ void HttpShortConnection::uploadOnePart(const QString &filePath, qint64 partSize
         part["ETag"] = etag;
         parts->append(part);
 
+        this->handleUploadProgress(filePath, alreadySend + partData.size());
+
         (*next)();
     });
 }
 
-void HttpShortConnection::sendComplete(const QString &objectKey, const QString &uploadId, const QJsonArray &parts, const QString &finalUrl, std::function<void (const QString &)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed)
+void HttpShortConnection::sendComplete(const QString& filePath, const QString &objectKey, const QString &uploadId, const QJsonArray &parts, const QString &finalUrl, std::function<void (const UploadResult&)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed)
 {
     QNetworkRequest req(QUrl("http://192.168.153.128:9003/upload/complete"));
     req.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
@@ -780,8 +1027,22 @@ void HttpShortConnection::sendComplete(const QString &objectKey, const QString &
 
     QNetworkReply* reply = this->httpmanager->post(req, QJsonDocument(obj).toJson());
 
+    this->hash_uploadReply[filePath].insert(reply);
+    connect(reply, &QObject::destroyed, this, [this, reply, filePath](){
+        auto it = this->hash_uploadReply.find(filePath);
+        if(it == this->hash_uploadReply.end())
+            return;
+
+        it.value().remove(reply);
+        if(it.value().isEmpty())
+            this->hash_uploadReply.erase(it);
+    });
+
     connect(reply, &QNetworkReply::finished, this, [=](){
         reply->deleteLater();
+
+        if(reply->error() == QNetworkReply::OperationCanceledError)
+            return;
 
         if(reply->error() == QNetworkReply::AuthenticationRequiredError)
         {
@@ -791,7 +1052,7 @@ void HttpShortConnection::sendComplete(const QString &objectKey, const QString &
                     if(!newAccessToken.isEmpty())
                     {
                         UserInfo::getUserInfo().setAccessToken(newAccessToken);
-                        sendComplete(objectKey, uploadId, parts, finalUrl, cb_success, failed_notice, cb_failed);
+                        sendComplete(filePath, objectKey, uploadId, parts, finalUrl, cb_success, failed_notice, cb_failed);
                     }
                     else
                     {
@@ -818,7 +1079,7 @@ void HttpShortConnection::sendComplete(const QString &objectKey, const QString &
 
         if(reply->error() != QNetworkReply::NoError)
         {
-            if(failed_notice)
+            if(failed_notice && !this->isCleaning)
                 emit mainState(false, "上传失败，请稍后再试");
             if(cb_failed)
                 cb_failed("上传失败，请稍后再试");
@@ -827,12 +1088,41 @@ void HttpShortConnection::sendComplete(const QString &objectKey, const QString &
 
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
         QString url = doc.object().value("Url").toString();
+        QString thumbnailUrl = doc.object()["ThumbnailUrl"].toString();
         if(url.isEmpty())
             url = finalUrl;
 
+        UploadResult result;
+        result.url = url;
+        result.thumbnailUrl = thumbnailUrl;
         if(cb_success)
-            cb_success(url);
+            cb_success(result);
     });
+}
+
+void HttpShortConnection::handleUploadProgress(const QString &filePath, qint64 alreadySend)
+{
+    auto it = this->hash_uploadTasks.find(filePath);
+    if(it == this->hash_uploadTasks.end())
+        return;
+
+    UploadTask* task = it.value();
+    if(task->totalSize <= 0)
+        return;
+
+    task->sendSize = alreadySend;
+
+    int percent = task->getPercent();
+    if(percent <= task->lastPercent)
+        return;
+
+    if(task->throttle.isValid() && task->throttle.elapsed() < 200)
+        return;
+
+    task->lastPercent = percent;
+    task->throttle.restart();
+
+    emit uploadProgressChanged(filePath, task->sendSize, task->totalSize, percent);
 }
 
 void HttpShortConnection::startDownload(const QString &url)
@@ -1084,5 +1374,44 @@ void HttpShortConnection::finishDownload(const QString &url, bool isSuccess, con
     emit downloadFinished(url, isSuccess, info);
     QTimer::singleShot(10000, this, [this, url](){
         this->hash_downloadFinishedStatus.remove(url);
+    });
+}
+
+void HttpShortConnection::cleanALL()
+{
+    if(this->isCleaning)
+        return;
+    this->isCleaning = true;
+    cancelAllDownloads();
+
+    const QList<QString> filePaths = this->hash_uploadTasks.keys();
+    for(const QString& filePath : std::as_const(filePaths))
+    {
+        auto it = this->hash_uploadTasks.find(filePath);
+        if(it == this->hash_uploadTasks.end())
+            continue;
+
+        UploadTask* task = it.value();
+        this->hash_uploadTasks.erase(it);
+
+        delete task;
+    }
+
+    QList<QNetworkReply*> allReplies;
+    for(auto it = this->hash_uploadReply.begin(); it != this->hash_uploadReply.end(); it++)
+    {
+        for(QNetworkReply* reply : it.value())
+            allReplies.append(reply);
+    }
+    this->hash_uploadReply.clear();
+
+    for(QNetworkReply* reply : allReplies)
+    {
+        if(reply)
+            reply->abort();
+    }
+
+    QTimer::singleShot(0, this, [this](){
+        this->isCleaning = false;
     });
 }

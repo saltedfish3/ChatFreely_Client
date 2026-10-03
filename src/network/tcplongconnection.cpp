@@ -1612,7 +1612,6 @@ void TcpLongConnection::handlePushFriendAvatar(QJsonObject obj)
 
 void TcpLongConnection::handleSendMessageResp(QJsonObject obj)
 {
-
     if(!obj.contains("Result") || !obj.value("Result").isBool() ||
         !obj.contains("TempMsgID") || !obj.value("TempMsgID").isString() ||
         !obj.contains("ReceiverUID") || !obj.value("ReceiverUID").isString())

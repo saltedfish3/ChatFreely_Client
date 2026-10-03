@@ -8,7 +8,10 @@ ImagePreviewWidget &ImagePreviewWidget::getPreviewWidget()
 
 void ImagePreviewWidget::setPixmap(const QPixmap &pix)
 {
-    this->view->setPixmap(pix);
+    QPixmap p = pix;
+    if(const QWidget* w = this->window())
+        p.setDevicePixelRatio(w->devicePixelRatioF());
+    this->view->setPixmap(p);
 }
 
 void ImagePreviewWidget::setPixmapUrl(const QString &url)
@@ -354,7 +357,7 @@ void ImagePreviewWidget::updateCursor(Edge edge)
 
 void ImagePreviewWidget::updateSaveButton()
 {
-    QString filename = ImageCacheManager::getManager().getFilenameFromUrl(this->pixmapUrl, 1.0);
+    QString filename = ImageCacheManager::getManager().getFilenameFromUrl(this->pixmapUrl);
     if(filename.isEmpty())
     {
         this->btn_save->setIcon(QIcon(":/default/images/download.png"));

@@ -10,7 +10,8 @@ enum Status
 {
     Sending = 0,
     Success,
-    Failed
+    Failed,
+    Cancelled
 };
 
 enum ContentType
@@ -74,6 +75,7 @@ inline void Message::parseMedia()
     if(contentType == Image)
     {
         info.url = obj["Url"].toString();
+        info.thumbnailUrl = obj["ThumbnailUrl"].toString();
         info.width = obj["Width"].toString().toInt();
         info.height = obj["Height"].toString().toInt();
     }

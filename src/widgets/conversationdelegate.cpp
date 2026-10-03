@@ -61,13 +61,13 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
     {
         ImageCacheManager::ImageState state = static_cast<ImageCacheManager::ImageState>(index.data(ImageStateRole).toInt());
         QPixmap pix = index.data(ImageRole).value<QPixmap>();
-        if(state == ImageCacheManager::ImageState::Success && !pix.isNull())
+        if(!pix.isNull())
         {
             int originalWidth = qRound(pix.width()*static_cast<double>(textRegionRect.height()) / pix.height());
             QSize drawSize(qMax(originalWidth, textRegionRect.width()), textRegionRect.height());
 
-            QPixmap scaled = pix.scaled(drawSize * pix.devicePixelRatio(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
-            scaled.setDevicePixelRatio(pix.devicePixelRatio());
+            QPixmap scaled = pix.scaled(drawSize * dpr, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            scaled.setDevicePixelRatio(dpr);
 
             int x = textRegionRect.center().x() - scaled.deviceIndependentSize().toSize().width() / 2;
             int y = textRegionRect.center().y() - scaled.deviceIndependentSize().toSize().height() / 2;
@@ -142,8 +142,8 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
             int originalWidth = qRound(thumbnail.width()*static_cast<double>(textRegionRect.height()) / thumbnail.height());
             QSize drawSize(qMax(originalWidth, textRegionRect.width()), textRegionRect.height());
 
-            QPixmap scaled = thumbnail.scaled(drawSize * thumbnail.devicePixelRatio(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
-            scaled.setDevicePixelRatio(thumbnail.devicePixelRatio());
+            QPixmap scaled = thumbnail.scaled(drawSize * dpr, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            scaled.setDevicePixelRatio(dpr);
 
             int x = textRegionRect.center().x() - scaled.deviceIndependentSize().toSize().width() / 2;
             int y = textRegionRect.center().y() - scaled.deviceIndependentSize().toSize().height() / 2;
@@ -168,65 +168,120 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
             painter->drawRoundedRect(textRegionRect, 8, 8);
         }
 
-        painter->save();
-        painter->setBrush(Qt::NoBrush);
-        painter->setPen(QPen(QColor(209, 213, 219), 2));
+        int uploadPercent = index.data(MediaUploadProgress).toInt();
+        bool isUploading = uploadPercent >= 0;
+        Status status = static_cast<Status>(index.data(MessageStatusRole).toInt());
 
-        QSize playSize(60, 60);
-        QRect playIcon(textRegionRect.topLeft() + QPoint((textRegionRect.width() - playSize.width()) / 2, (textRegionRect.height() - playSize.height()) / 2), playSize);
+        QSize centerSize(60, 60);
+        QPointF centerPoint(textRegionRect.x() + (textRegionRect.width()  - centerSize.width())  / 2.0, textRegionRect.y() + (textRegionRect.height() - centerSize.height()) / 2.0);
+        QRectF centerRect(centerPoint, centerSize);
 
-        painter->drawRoundedRect(playIcon, playSize.width() / 2, playSize.width() / 2);
-
-        int lineWidth = playSize.height() / 2;
-
-        QPoint triangleCenter = playIcon.center();
-
-        int padding = qCeil(std::sqrt(lineWidth*lineWidth - (lineWidth / 2) * (lineWidth / 2))) / 2;
-        int margin = 4;
-
-        QPoint point1 = triangleCenter - QPoint(padding - margin, lineWidth / 2);
-        QPoint point2 = triangleCenter + QPoint(padding + margin, 0);
-        QPoint point3 = point1 + QPoint(0, lineWidth);
-
-        painter->drawLine(point1, point2);
-        painter->drawLine(point2, point3);
-        painter->drawLine(point1, point3);
-
-        QPolygon triangle;
-        triangle << point1 << point2 << point3;
-        painter->setBrush(QColor(209, 213, 219));
-        painter->setPen(Qt::NoPen);
-        painter->drawPolygon(triangle);
-
-        painter->setBrush(Qt::NoBrush);
-        if(!thumbnail.isNull())
-            painter->setPen(Qt::white);
-        else
-            painter->setPen(QColor(107, 114, 128));
-
-        qint64 duration = index.data(VideoDuration).toLongLong();
-        if(duration > 0)
+        if(isUploading)
         {
-            font.setPointSize(9);
-            painter->setFont(font);
-            QRect durationRect(textRegionRect.bottomLeft() - QPoint(-15, 30), QSize(textRegionRect.width(), 30));
-            qint64 totalSec = duration / 1000;
-            qint64 hours = totalSec / 3600;
-            qint64 minutes = (totalSec % 3600) / 60;
-            qint64 seconds = totalSec % 60;
+            QRectF arcRect = centerRect.adjusted(4, 4, -4, -4);
+            painter->save();
+            painter->setBrush(Qt::NoBrush);
+            painter->setPen(QPen(QColor(255, 255, 255, 60), 3, Qt::SolidLine, Qt::RoundCap));
+            painter->drawArc(arcRect, 0, 360 * 16);
 
-            QString durationText;
-            if(hours > 0)
-                durationText = QString("%1:%2:%3").arg(hours, 2, 10, QChar('0'))
-                                   .arg(minutes, 2, 10, QChar('0'))
-                                   .arg(seconds, 2, 10, QChar('0'));
-            else
-                durationText = QString("%1:%2").arg(minutes, 2, 10, QChar('0')).arg(seconds, 2, 10, QChar('0'));
+            if(uploadPercent > 0)
+            {
+                painter->setPen(QPen(QColor(91, 155, 213), 3, Qt::SolidLine, Qt::RoundCap));
+                painter->drawArc(arcRect, 90 * 16, -uploadPercent * 360 * 16 /100);
+            }
 
-            painter->drawText(durationRect, Qt::AlignVCenter | Qt::AlignLeft, durationText);
+            qreal radius = arcRect.width() * 0.15;
+            QPointF center = arcRect.center();
+            painter->setPen(QPen(QColor(255, 255, 255, 220), 2, Qt::SolidLine, Qt::RoundCap));
+            painter->drawLine(QPointF(center.x() - radius, center.y() - radius), QPointF(center.x() + radius, center.y() + radius));
+            painter->drawLine(QPointF(center.x() - radius, center.y() + radius), QPointF(center.x() + radius, center.y() - radius));
+
+            painter->restore();
         }
+        else if(status == Cancelled || status == Failed)
+        {
+            QSize iconSize(32, 32);
+            QPixmap icon(":/default/images/fresh.png");
+            if(!icon.isNull())
+            {
+                icon = icon.scaled(iconSize * dpr, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+                icon.setDevicePixelRatio(dpr);
 
-        painter->restore();
+                QSize logicalSize = icon.deviceIndependentSize().toSize();
+                int x = centerRect.center().x() - logicalSize.width() / 2;
+                int y = centerRect.center().y() - logicalSize.height() / 2;
+                painter->drawPixmap(x, y, icon);
+            }
+        }
+        else if(index.data(MediaExpired).toBool())
+        {
+            painter->save();
+            painter->setPen(QColor(160, 160, 160));
+            font.setPointSize(10);
+            font.setBold(false);
+            painter->setFont(font);
+            painter->drawText(textRegionRect, Qt::AlignCenter, "视频已过期");
+            painter->restore();
+        }
+        else
+        {
+            painter->save();
+            painter->setBrush(Qt::NoBrush);
+            painter->setPen(QPen(QColor(209, 213, 219), 2));
+
+            painter->drawRoundedRect(centerRect, centerSize.width() / 2, centerSize.width() / 2);
+
+            int lineWidth = centerSize.height() / 2;
+
+            QPointF triangleCenter = centerRect.center();
+
+            int padding = qCeil(std::sqrt(lineWidth*lineWidth - (lineWidth / 2) * (lineWidth / 2))) / 2;
+            int margin = 4;
+
+            QPointF point1 = triangleCenter - QPointF(padding - margin, lineWidth / 2);
+            QPointF point2 = triangleCenter + QPointF(padding + margin, 0);
+            QPointF point3 = point1 + QPointF(0, lineWidth);
+
+            painter->drawLine(point1, point2);
+            painter->drawLine(point2, point3);
+            painter->drawLine(point1, point3);
+
+            QPolygonF triangle;
+            triangle << point1 << point2 << point3;
+            painter->setBrush(QColor(209, 213, 219));
+            painter->setPen(Qt::NoPen);
+            painter->drawPolygon(triangle);
+
+            painter->setBrush(Qt::NoBrush);
+            if(!thumbnail.isNull())
+                painter->setPen(Qt::white);
+            else
+                painter->setPen(QColor(107, 114, 128));
+
+            qint64 duration = index.data(VideoDuration).toLongLong();
+            if(duration > 0)
+            {
+                font.setPointSize(9);
+                painter->setFont(font);
+                QRect durationRect(textRegionRect.bottomLeft() - QPoint(-15, 30), QSize(textRegionRect.width(), 30));
+                qint64 totalSec = duration / 1000;
+                qint64 hours = totalSec / 3600;
+                qint64 minutes = (totalSec % 3600) / 60;
+                qint64 seconds = totalSec % 60;
+
+                QString durationText;
+                if(hours > 0)
+                    durationText = QString("%1:%2:%3").arg(hours, 2, 10, QChar('0'))
+                                       .arg(minutes, 2, 10, QChar('0'))
+                                       .arg(seconds, 2, 10, QChar('0'));
+                else
+                    durationText = QString("%1:%2").arg(minutes, 2, 10, QChar('0')).arg(seconds, 2, 10, QChar('0'));
+
+                painter->drawText(durationRect, Qt::AlignVCenter | Qt::AlignLeft, durationText);
+            }
+
+            painter->restore();
+        }
     }
     else if(type == ContentType::File)
     {
@@ -328,31 +383,38 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
 
     if(isSelf)
     {
-        painter->save();
-        if(index.data(MessageStatusRole).toInt() == Sending)
-        {
-            QPen pen(QColor(100, 100, 100), 1.5, Qt::SolidLine, Qt::RoundCap);
-            painter->setPen(pen);
-            painter->setBrush(Qt::NoBrush);
+        int uploadProgress = index.data(MediaUploadProgress).toInt();
+        bool isVideoUploading = (type == ContentType::Video && uploadProgress >= 0);
+        bool isVideoFailed = type == ContentType::Video && (index.data(MessageStatusRole).toInt() == Cancelled || index.data(MessageStatusRole).toInt() == Failed);
 
-            QRect arcRect = statusRect.adjusted(2, 2, -2, -2);
-            int startAngle = (*(this->loadingAngle)) * 16;
-            int spanAngle = 240 * 16;
-            painter->drawArc(arcRect, startAngle, spanAngle);
-        }
-        else if(index.data(MessageStatusRole).toInt() == Failed)
+        if(!isVideoUploading && !isVideoFailed)
         {
-            painter->setBrush(Qt::red);
-            painter->setPen(Qt::NoPen);
-            painter->drawRoundedRect(statusRect, statusSize.width()/2, statusSize.height()/2);
+            painter->save();
+            if(index.data(MessageStatusRole).toInt() == Sending)
+            {
+                QPen pen(QColor(100, 100, 100), 1.5, Qt::SolidLine, Qt::RoundCap);
+                painter->setPen(pen);
+                painter->setBrush(Qt::NoBrush);
 
-            painter->setPen(Qt::white);
-            font.setPointSize(8);
-            font.setBold(true);
-            painter->setFont(font);
-            painter->drawText(statusRect, Qt::AlignCenter, "!");
+                QRect arcRect = statusRect.adjusted(2, 2, -2, -2);
+                int startAngle = (*(this->loadingAngle)) * 16;
+                int spanAngle = 240 * 16;
+                painter->drawArc(arcRect, startAngle, spanAngle);
+            }
+            else if(index.data(MessageStatusRole).toInt() == Failed)
+            {
+                painter->setBrush(Qt::red);
+                painter->setPen(Qt::NoPen);
+                painter->drawRoundedRect(statusRect, statusSize.width()/2, statusSize.height()/2);
+
+                painter->setPen(Qt::white);
+                font.setPointSize(8);
+                font.setBold(true);
+                painter->setFont(font);
+                painter->drawText(statusRect, Qt::AlignCenter, "!");
+            }
+            painter->restore();
         }
-        painter->restore();
     }
     painter->restore();
 }
@@ -495,26 +557,57 @@ bool ConversationDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
         getLayout(option, index, TimeStamp, contain, avatarRect, textRegionRect, statusRect, textTotalHeight);
 
         Status status = static_cast<Status>(index.data(MessageStatusRole).toInt());
-        if(statusRect.contains(mouse->pos()) && isSelf && status == Failed)
+        ContentType type = static_cast<ContentType>(index.data(ContentTypeRole).toInt());
+        if(isSelf && type == ContentType::Video)
+        {
+            QSize centerSize(60, 60);
+            QPointF centerPoint(textRegionRect.x() + (textRegionRect.width()  - centerSize.width())  / 2.0, textRegionRect.y() + (textRegionRect.height() - centerSize.height()) / 2.0);
+            QRectF centerRect(centerPoint, centerSize);
+            int uploadPercent = index.data(MediaUploadProgress).toInt();
+            bool isUploading = uploadPercent >= 0;
+
+            if(isUploading && centerRect.contains(mouse->pos()))
+            {
+                emit CancelUploadClicked(index.data(MessageIDRole).toString());
+                return true;
+            }
+            if((status == Cancelled || status == Failed) && centerRect.contains(mouse->pos()))
+            {
+                emit ReSendClicked(index.data(MessageIDRole).toString());
+                return true;
+            }
+        }
+        if(type == ContentType::Video && textRegionRect.contains(mouse->pos()))
+        {
+            if(index.data(MediaExpired).toBool())
+                return true;
+        }
+
+        if(statusRect.contains(mouse->pos()) && isSelf && status == Failed && type != ContentType::Video)
         {
             emit ReSendClicked(index.data(MessageIDRole).toString());
             return true;
         }
         else if(textRegionRect.contains(mouse->pos()) && status == Success)
         {
-            ContentType type = static_cast<ContentType>(index.data(ContentTypeRole).toInt());
             if(type == ContentType::Image)
             {
+                QPixmap pix = index.data(ImageRole).value<QPixmap>();
+                if(!pix.isNull())
+                {
+                    emit previewImageClicked(index.data(MediaUrl).toString());
+                    return true;
+                }
                 if(static_cast<ImageCacheManager::ImageState>(index.data(ImageStateRole).toInt()) == ImageCacheManager::ImageState::Failed)
                 {
                     emit ReloadImageClicked(index.data(MessageIDRole).toString());
                     return true;
                 }
-                else if(static_cast<ImageCacheManager::ImageState>(index.data(ImageStateRole).toInt()) == ImageCacheManager::ImageState::Success)
-                {
-                    emit previewImageClicked(index.data(MediaUrl).toString());
-                    return true;
-                }
+                // else if(static_cast<ImageCacheManager::ImageState>(index.data(ImageStateRole).toInt()) == ImageCacheManager::ImageState::Success)
+                // {
+                //     emit previewImageClicked(index.data(MediaUrl).toString());
+                //     return true;
+                // }
             }
             else if(type == ContentType::Video && status == Success)
             {

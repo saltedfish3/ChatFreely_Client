@@ -29,6 +29,8 @@ public:
         MediaWidth,
         MediaHeight,
         MediaSize,
+        MediaUploadProgress,
+        MediaExpired,
         VideoThumbnail,
         VideoDuration,
         FileName
@@ -50,6 +52,8 @@ public slots:
     void onMessageFriendAvatarUpdate(const QString& uid, const QPixmap& avatar, const QSize& size);
     void onMessageMyselfAvatarUpdate(const QPixmap& avatar, const QSize& size);
     void onResetModel();
+    void onUploadProgressUpdate(const QString& tempID, const QString& filePath, int percent);
+    void onMediaExpired(const QString& url);
 
 signals:
 

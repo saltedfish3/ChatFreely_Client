@@ -18,6 +18,7 @@
 #include "videocontentview.h"
 #include "savebutton.h"
 #include "toastmanager.h"
+#include "../utils/videoutils.h"
 #include "../network/httpshortconnection.h"
 #include "../network/tcplongconnection.h"
 

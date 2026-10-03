@@ -78,6 +78,13 @@ void ConversationItem::loadHistoryMessages(int limit)
     });
 }
 
+bool ConversationItem::cancelUpload(const QString &tempMsgID)
+{
+    bool result = this->msgManager.cancelUpload(tempMsgID);
+    emit messageStatusChange();
+    return result;
+}
+
 void ConversationItem::reloadImage(const QString &msgID)
 {
     int index = this->msgManager.indexOfMsg(msgID);

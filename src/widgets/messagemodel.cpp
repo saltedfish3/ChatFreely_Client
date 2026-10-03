@@ -12,6 +12,9 @@ MessageModel::MessageModel(MessagesManager* manager, QObject *parent)
     connect(manager, &MessagesManager::resetModel, this, &MessageModel::onResetModel);
     connect(&FriendManage::getFriendManage(), &FriendManage::friendAvatarUpdate, this, &MessageModel::onMessageFriendAvatarUpdate);
     connect(&UserInfo::getUserInfo(), &UserInfo::updateAvatar, this, &MessageModel::onMessageMyselfAvatarUpdate);
+    connect(manager, &MessagesManager::uploadProgressUpdate, this, &MessageModel::onUploadProgressUpdate);
+    connect(manager, &MessagesManager::mediaExpired, this, &MessageModel::onMediaExpired);
+    connect(manager, &MessagesManager::mediaAvailable, this, &MessageModel::onMediaExpired);
 }
 
 int MessageModel::rowCount(const QModelIndex &parent) const
@@ -46,11 +49,19 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
     case MessageIDRole:
         return msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID;
     case ImageRole:
+    {
+        if(!msg.info.thumbnailUrl.isEmpty())
+        {
+            QPixmap pix = ImageCacheManager::getManager().fastLoadThumbnail(msg.info.thumbnailUrl);
+            if(!pix.isNull())
+                return pix;
+        }
         return ImageCacheManager::getManager().fastLoadImage(msg.info.url);
+    }
     case ContentTypeRole:
         return static_cast<int>(msg.contentType);
     case ImageStateRole:
-        return static_cast<int>(ImageCacheManager::getManager().getImageState(msg.info.url));
+        return static_cast<int>(ImageCacheManager::getManager().getImageState(msg.info.thumbnailUrl.isEmpty() ? msg.info.url : msg.info.thumbnailUrl));
     case MediaUrl:
         return msg.info.url;
     case MediaWidth:
@@ -60,11 +71,17 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
     case MediaSize:
         return msg.info.size;
     case VideoThumbnail:
-        return ImageCacheManager::getManager().fastLoadImage(msg.info.thumbnailUrl);
+        return ImageCacheManager::getManager().fastLoadThumbnail(msg.info.thumbnailUrl);
     case VideoDuration:
         return msg.info.duration;
     case FileName:
         return msg.info.name;
+    case MediaUploadProgress:
+        if(msg.status != Sending)
+            return -1;
+        return this->manager->getUploadProgres(msg.info.url);
+    case MediaExpired:
+        return this->manager->isMediaExpired(msg.info.url);
     default:
         return {};
     }
@@ -75,6 +92,25 @@ void MessageModel::onResetModel()
 {
     beginResetModel();
     endResetModel();
+}
+
+void MessageModel::onUploadProgressUpdate(const QString &tempID, const QString &filePath, int percent)
+{
+    int row = this->manager->indexOfMsg(tempID);
+    if(row < 0)
+        return;
+
+    emit dataChanged(index(row), index(row), {MediaUploadProgress});
+}
+
+void MessageModel::onMediaExpired(const QString &url)
+{
+    for(int i = 0; i < rowCount(); i++)
+    {
+        const Message& msg = this->manager->getMessages().at(i);
+        if((msg.contentType == Video || msg.contentType == File) && msg.info.url == url)
+            emit dataChanged(index(i), index(i), {MediaExpired});
+    }
 }
 
 void MessageModel::onMessageAdd(int row)

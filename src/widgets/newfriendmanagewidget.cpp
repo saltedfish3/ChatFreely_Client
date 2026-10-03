@@ -41,9 +41,9 @@ void NewFriendManageWidget::addRequestsItem(QString uid, QString sid, QString us
                 return;
             if(modelPtr && index.isValid())
                  modelPtr->setData(index, pix, FriendApplyDelegate::AvatarRole);
-        }, false, -1, 0, 0, QSize(48, 48));
+        }, false, 0, 0, QSize(48, 48));
 
-    }, false, -1, 0, 0, QSize(48, 48));
+    }, false, 0, 0, QSize(48, 48));
 
     emit RequestsNumberChange(this->model->rowCount());
 }

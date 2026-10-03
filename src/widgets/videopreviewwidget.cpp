@@ -519,18 +519,5 @@ QString VideoPreviewWidget::getSavePath()
     if(this->currentVideoUrl.isEmpty())
         return {};
 
-    QString dir = GlobalVariable::getPosOfDownloadFile();
-    if(dir.isEmpty())
-        return QString();
-
-    QUrl url(this->currentVideoUrl);
-    QString filename = QFileInfo(url.path()).fileName();
-
-    if(filename.isEmpty())
-        return {};
-
-    if(QFileInfo(filename).suffix().isEmpty())
-        filename += ".mp4";
-
-    return QDir(dir).filePath(filename);
+    return VideoUtils::getLocalUrlPath(this->currentVideoUrl);
 }

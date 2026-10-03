@@ -10,6 +10,8 @@
 #include <QImage>
 #include <QVideoFrame>
 
+class GlobalVariable;
+
 class VideoUtils : public QObject
 {
     Q_OBJECT
@@ -28,6 +30,7 @@ public:
         }
     };
     static void extractAsync(const QString& filePath, std::function<void(const VideoInfo&)> callback, qint64 posistionMs = 1000, int timeoutMs = 15000);
+    static QString getLocalUrlPath(const QString& url);
 
 signals:
 };

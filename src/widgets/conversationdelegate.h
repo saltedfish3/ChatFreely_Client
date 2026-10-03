@@ -37,6 +37,8 @@ public:
         MediaWidth,
         MediaHeight,
         MediaSize,
+        MediaUploadProgress,
+        MediaExpired,
         VideoThumbnail,
         VideoDuration,
         FileName
@@ -54,12 +56,14 @@ public:
     {
         Sending = 0,
         Success,
-        Failed
+        Failed,
+        Cancelled
     };
 
 signals:
     void ReSendClicked(const QString& tempMsgID);
     void ReloadImageClicked(const QString& msgID);
+    void CancelUploadClicked(const QString& tempMsgID);
     void previewImageClicked(const QString& url);
     void previewVideoClicked(const QString& url, const qint64& videoSize);
 

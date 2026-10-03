@@ -23,13 +23,15 @@ public:
     {
         UrlPro = QTextFormat::UserProperty + 1,
         TypePro,
-        SizePro
+        SizePro,
+        ThumbnailUrlPro
     };
 
     struct MessageBlock
     {
         ContentType type;
         QString content;
+        QString thumbnailUrl;
         QString tempID;
     };
 
@@ -48,7 +50,7 @@ protected:
 signals:
 
 private:
-    void insertImageToEdit(const QImage& image, const QString& url);
+    void insertImageToEdit(const QImage& image, const QString& url, const QString& thumbnailUrl);
     QImage addRoundedAndPadding(const QImage& pic, int radius, int padding, qreal dpr);
 
     QList<MessageBlock> blocks;

@@ -1,4 +1,5 @@
 #include "videoutils.h"
+#include "GlobalVariable.h"
 
 namespace
 {
@@ -11,7 +12,7 @@ namespace
 
         QString filePath;
         qint64 positionMs = 1000;
-        std::function<void(VideoUtils::VideoInfo)> callback;
+        QList<std::function<void(VideoUtils::VideoInfo)>> callbacks;
         bool isFinished = false;
 
         void finish(VideoUtils::VideoInfo info)
@@ -23,12 +24,17 @@ namespace
             if(timeout && timeout->isActive())
                 timeout->stop();
 
-            if(callback)
-                callback(info);
+            for(auto& cb : callbacks)
+            {
+                if(cb)
+                    cb(info);
+            }
 
             this->deleteLater();
         }
     };
+
+    QHash<QString, Context*> waitingContexts;
 }
 
 void VideoUtils::extractAsync(const QString &filePath, std::function<void (const VideoInfo &)> callback, qint64 posistionMs, int timeoutMs)
@@ -42,10 +48,17 @@ void VideoUtils::extractAsync(const QString &filePath, std::function<void (const
         return;
     }
 
+    auto it = waitingContexts.find(filePath);
+    if(it != waitingContexts.end())
+    {
+        it.value()->callbacks.append(callback);
+        return;
+    }
+
     auto* arg = new Context();
     arg->filePath = filePath;
     arg->positionMs = posistionMs;
-    arg->callback = callback;
+    arg->callbacks.append(callback);
     arg->player = new QMediaPlayer(arg);
     arg->audio = new QAudioOutput(arg);
     arg->sink = new QVideoSink(arg);
@@ -59,6 +72,7 @@ void VideoUtils::extractAsync(const QString &filePath, std::function<void (const
 
     QObject::connect(arg->timeout, &QTimer::timeout, arg->timeout, [arg](){
         qWarning() << "获取视频帧数据超时:" << arg->filePath;
+        waitingContexts.remove(arg->filePath);
         arg->finish({});
     });
 
@@ -77,9 +91,15 @@ void VideoUtils::extractAsync(const QString &filePath, std::function<void (const
         info.width = image.width();
         info.height = image.height();
         info.duration = arg->player->duration();
+
+        if(image.width() > 200 || image.height() > 200)
+            image = image.scaled(200, 200, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+        image = image.convertToFormat(QImage::Format_RGB888);
         info.thumbnail = image;
 
         arg->player->pause();
+        waitingContexts.remove(arg->filePath);
         arg->finish(info);
     });
 
@@ -101,6 +121,7 @@ void VideoUtils::extractAsync(const QString &filePath, std::function<void (const
         else if(status == QMediaPlayer::InvalidMedia)
         {
             qWarning()<< "播放错误:" << arg->player->errorString();
+            waitingContexts.remove(arg->filePath);
             arg->finish({});
         }
     });
@@ -109,9 +130,32 @@ void VideoUtils::extractAsync(const QString &filePath, std::function<void (const
         if(arg->isFinished)
             return;
         qWarning() << "播放错误:" << err << errStr;
+        waitingContexts.remove(arg->filePath);
         arg->finish({});
     });
 
+    waitingContexts[filePath] = arg;
     arg->timeout->start();
     arg->player->setSource(QUrl::fromLocalFile(filePath));
+}
+
+QString VideoUtils::getLocalUrlPath(const QString &url)
+{
+    if(url.isEmpty())
+        return {};
+
+    QString dir = GlobalVariable::getPosOfDownloadFile();
+    if(dir.isEmpty())
+        return QString();
+
+    QUrl url_(url);
+    QString filename = QFileInfo(url_.path()).fileName();
+
+    if(filename.isEmpty())
+        return {};
+
+    if(QFileInfo(filename).suffix().isEmpty())
+        filename += ".mp4";
+
+    return QDir(dir).filePath(filename);
 }

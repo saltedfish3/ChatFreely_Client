@@ -3,6 +3,15 @@
 MessagesManager::MessagesManager(const QString& conversationID, QObject* parent)
     : QObject(parent), conversationID(conversationID)
 {
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::uploadProgressChanged, this, [this](const QString& filePath, qint64 sendsize, qint64 totalsize, int percent){
+        if(!this->hash_registerUploadID.contains(filePath))
+            return;
+
+        this->hash_uploadProgress[filePath] = percent;
+
+        for(const QString& tempID : this->hash_registerUploadID.value(filePath))
+            emit uploadProgressUpdate(tempID, filePath, percent);
+    });
 }
 
 void MessagesManager::addMessage(const Message &msg, bool isStoreDB)
@@ -31,15 +40,25 @@ void MessagesManager::addMessage(const Message &msg, bool isStoreDB)
     if(msg.contentType == Image)
     {
         emit startLoadingImage();
-        ImageCacheManager::getManager().loadImage(msg.info.url, [this, msg](const QPixmap&){
-            emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
-            emit finishLoadedImage();
-        });
+        if(!msg.info.thumbnailUrl.isEmpty())
+        {
+            ImageCacheManager::getManager().loadThumbnail(msg.info.thumbnailUrl, [this, msg](const QPixmap&){
+                emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
+                emit finishLoadedImage();
+            });
+        }
+        else
+        {
+            ImageCacheManager::getManager().loadImage(msg.info.url, [this, msg](const QPixmap&){
+                emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
+                emit finishLoadedImage();
+            });
+        }
     }
     else if(msg.contentType == Video && !msg.info.thumbnailUrl.isEmpty())
     {
         emit startLoadingImage();
-        ImageCacheManager::getManager().loadImage(msg.info.thumbnailUrl, [this, msg](const QPixmap&){
+        ImageCacheManager::getManager().loadThumbnail(msg.info.thumbnailUrl, [this, msg](const QPixmap&){
             emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
             emit finishLoadedImage();
         });
@@ -51,6 +70,8 @@ void MessagesManager::addMessage(const Message &msg, bool isStoreDB)
     emit messageAdd(index);
     if(isStoreDB)
         DatabaseManager::getDatabaseManager().addInsertMessageTask(this->conversationID, this->messages.at(index));
+
+    checkMediaExpiredStatus(msg);
 }
 
 void MessagesManager::addMessages(const QList<Message> &msgs, bool isStoreDB)
@@ -91,6 +112,9 @@ void MessagesManager::addMessages(const QList<Message> &msgs, bool isStoreDB)
     }
     rebuildIndex();
 
+    for(const auto& msg : validMsgs)
+        checkMediaExpiredStatus(msg);
+
     if(isStoreDB)
     {
         for(const auto& msg : validMsgs)
@@ -122,15 +146,25 @@ void MessagesManager::addMessages(const QList<Message> &msgs, bool isStoreDB)
         if(msg.contentType == Image)
         {
             emit startLoadingImage();
-            ImageCacheManager::getManager().loadImage(msg.info.url, [this, msg](const QPixmap&){
-                emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
-                emit finishLoadedImage();
-            });
+            if(!msg.info.thumbnailUrl.isEmpty())
+            {
+                ImageCacheManager::getManager().loadThumbnail(msg.info.thumbnailUrl, [this, msg](const QPixmap&){
+                    emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
+                    emit finishLoadedImage();
+                });
+            }
+            else
+            {
+                ImageCacheManager::getManager().loadImage(msg.info.url, [this, msg](const QPixmap&){
+                    emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
+                    emit finishLoadedImage();
+                });
+            }
         }
         else if(msg.contentType == Video && !msg.info.thumbnailUrl.isEmpty())
         {
             emit startLoadingImage();
-            ImageCacheManager::getManager().loadImage(msg.info.thumbnailUrl, [this, msg](const QPixmap&){
+            ImageCacheManager::getManager().loadThumbnail(msg.info.thumbnailUrl, [this, msg](const QPixmap&){
                 emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
                 emit finishLoadedImage();
             });
@@ -218,12 +252,37 @@ bool MessagesManager::updateMessageContent(const QString &tempMsgID, const QStri
     msg.content = content;
     msg.parseMedia();
 
+    if(msg.contentType == Image)
+    {
+        emit startLoadingImage();
+        if(!msg.info.thumbnailUrl.isEmpty())
+        {
+            ImageCacheManager::getManager().loadThumbnail(msg.info.thumbnailUrl, [this, msg](const QPixmap&){
+                emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
+                emit finishLoadedImage();
+            });
+        }
+        else
+        {
+            ImageCacheManager::getManager().loadImage(msg.info.url, [this, msg](const QPixmap&){
+                emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
+                emit finishLoadedImage();
+            });
+        }
+    }
+
+    if(msg.contentType == Video && msg.info.url.startsWith("http"))
+    {
+        if(this->set_expiredMediaUrl.remove(msg.info.url))
+            emit mediaAvailable(msg.info.url);
+    }
+
     if(msg.contentType == Video)
     {
         if(content.startsWith("{") && !msg.info.thumbnailUrl.isEmpty())
         {
             emit startLoadingImage();
-            ImageCacheManager::getManager().loadImage(msg.info.thumbnailUrl, [this, msg](const QPixmap&){
+            ImageCacheManager::getManager().loadThumbnail(msg.info.thumbnailUrl, [this, msg](const QPixmap&){
                 emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
                 emit finishLoadedImage();
             });
@@ -319,17 +378,41 @@ void MessagesManager::retryMessage(int index)
     }
 }
 
+bool MessagesManager::cancelUpload(const QString &tempMsgID)
+{
+    QString filePath = this->hash_tempIDToFilePath.value(tempMsgID);
+    if(filePath.isEmpty())
+        return false;
+
+    updateMessageStatus(tempMsgID, QString(), Cancelled, -1, -1);
+    unregisterUpload(tempMsgID);
+    return !this->hash_registerUploadID.contains(filePath);
+}
+
 void MessagesManager::reLoadImage(int index)
 {
     if(this->messages.isEmpty() || index < 0 || index >= this->messages.size())
         return;
 
     Message& msg = this->messages[index];
-    emit startLoadingImage();
-    ImageCacheManager::getManager().loadImage(msg.info.url, [this, msg](const QPixmap& pix){
-        emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
-        emit finishLoadedImage();
-    });
+    if(msg.contentType == Image)
+    {
+        emit startLoadingImage();
+        if(!msg.info.thumbnailUrl.isEmpty())
+        {
+            ImageCacheManager::getManager().loadThumbnail(msg.info.thumbnailUrl, [this, msg](const QPixmap&){
+                emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
+                emit finishLoadedImage();
+            });
+        }
+        else
+        {
+            ImageCacheManager::getManager().loadImage(msg.info.url, [this, msg](const QPixmap&){
+                emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
+                emit finishLoadedImage();
+            });
+        }
+    }
 }
 
 qint64 MessagesManager::getNextConvSeq()
@@ -344,6 +427,53 @@ qint64 MessagesManager::getNextConvSeq()
             this->lastConvSeq = last.convSeq;
     }
     return this->lastConvSeq + 1;
+}
+
+void MessagesManager::registerUpload(const QString &tempID, const QString &filePath)
+{
+    auto& list = this->hash_registerUploadID[filePath];
+    if(!list.contains(tempID))
+        list.append(tempID);
+
+    this->hash_tempIDToFilePath[tempID] = filePath;
+
+    if(!this->hash_uploadProgress.contains(filePath))
+        this->hash_uploadProgress[filePath] = 0;
+}
+
+void MessagesManager::unregisterUpload(const QString &tempID)
+{
+    QString filePath = this->hash_tempIDToFilePath.take(tempID);
+    if(filePath.isEmpty())
+        return;
+
+    auto it = this->hash_registerUploadID.find(filePath);
+    if(it == this->hash_registerUploadID.end())
+        return;
+
+    it.value().removeAll(tempID);
+    if(it.value().isEmpty())
+    {
+        this->hash_registerUploadID.erase(it);
+        this->hash_uploadProgress.remove(filePath);
+    }
+}
+
+int MessagesManager::getUploadProgres(const QString &filePath) const
+{
+    if(filePath.isEmpty())
+        return -1;
+
+    auto it = this->hash_uploadProgress.find(filePath);
+    if(it == this->hash_uploadProgress.end())
+        return -1;
+
+    return it.value();
+}
+
+bool MessagesManager::isMediaExpired(const QString &url) const
+{
+    return this->set_expiredMediaUrl.contains(url);
 }
 
 int MessagesManager::findInsertIndex(qint64 convSeq) const
@@ -408,4 +538,32 @@ void MessagesManager::rebuildIndex()
         const Message& msg = this->messages[i];
         addIndex(msg, i);
     }
+}
+
+void MessagesManager::checkMediaExpiredStatus(const Message &msg)
+{
+    if(msg.contentType != Video && msg.contentType != File)
+        return;
+
+    const QString& url = msg.info.url;
+    if(url.isEmpty() || !url.startsWith("http"))
+        return;
+
+    if(this->set_expiredMediaUrl.contains(url) || this->set_checkingMediaUrl.contains(url))
+        return;
+
+    QString localPath = VideoUtils::getLocalUrlPath(url);
+    if(!localPath.isEmpty() && QFile::exists(localPath))
+        return;
+
+    this->set_checkingMediaUrl.insert(url);
+
+    HttpShortConnection::getHttpClient().checkUrlExists(url, [this, url](bool isExists){
+        this->set_checkingMediaUrl.remove(url);
+        if(!isExists)
+        {
+            this->set_expiredMediaUrl.insert(url);
+            emit mediaExpired(url);
+        }
+    });
 }

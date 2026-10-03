@@ -78,13 +78,13 @@ void ContactsInfoWidget::init()
     this->label_avatar->resize(136,136);
     this->label_avatar->setObjectName("label_avatar");
     this->label_avatar->move((this->width() - this->label_avatar->width())/2,64);
-    QPixmap defaultAvatar = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", -1, 0, 0, QSize(128, 128));
+    QPixmap defaultAvatar = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", 0, 0, QSize(128, 128));
     if(defaultAvatar.isNull())
     {
         ImageCacheManager::getManager().loadImage(":/default/images/defaultAvatar.png", [this](const QPixmap& pix){
             QPixmap p_ = pix;
             setRadius(p_, this->label_avatar, 64);
-        }, false, -1, 0, 0, QSize(128, 128));
+        }, false, 0, 0, QSize(128, 128));
     }
     else
         setRadius(defaultAvatar, this->label_avatar, 64);
@@ -267,9 +267,10 @@ void ContactsInfoWidget::setRadius(QPixmap& pix, QLabel *label, int radius)
     if(pix.isNull())
         return;
 
-    QPixmap rounded(label->size() * pix.devicePixelRatioF());
+    qreal dpr = label->devicePixelRatioF();
+    QPixmap rounded(label->size() * dpr);
     rounded.fill(Qt::transparent);
-    rounded.setDevicePixelRatio(pix.devicePixelRatioF());
+    rounded.setDevicePixelRatio(dpr);
 
     QPainter painter(&rounded);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);

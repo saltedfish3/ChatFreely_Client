@@ -29,11 +29,11 @@ QPixmap FriendManage::getFriendAvatar(const QString &uid, const QSize &wantedSiz
     QString key = uid + QString("_%1x%2_%3").arg(wantedSize.width()).arg(wantedSize.height()).arg(loadUrl);
 
     //查询头像是否已存在
-    QPixmap pix = ImageCacheManager::getManager().fastLoadImage(loadUrl, -1, 0, 0, wantedSize);
+    QPixmap pix = ImageCacheManager::getManager().fastLoadImage(loadUrl, 0, 0, wantedSize);
     if(!pix.isNull())
         return pix;
 
-    pix = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", -1, 0, 0, wantedSize);
+    pix = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", 0, 0, wantedSize);
 
     //任务去重
     {
@@ -61,7 +61,7 @@ QPixmap FriendManage::getFriendAvatar(const QString &uid, const QSize &wantedSiz
                 }
                 if(currentUrl == url)
                     emit friendAvatarUpdate(uid, pix, wantedSize);
-            }, false, -1, 0, 0, wantedSize);
+            }, false, 0, 0, wantedSize);
 
             return original;
         }
@@ -90,12 +90,12 @@ QPixmap FriendManage::getFriendAvatar(const QString &uid, const QSize &wantedSiz
                     {
                         emit friendAvatarUpdate(uid, pix, wantedSize);
                     }
-                }, false, -1, 0, 0, wantedSize);
+                }, false, 0, 0, wantedSize);
                 return;
             }
             emit friendAvatarUpdate(uid, pix, wantedSize);
         }
-    }, false, -1, 0, 0, wantedSize);
+    }, false, 0, 0, wantedSize);
 
     if(!pix.isNull())
         return pix;
