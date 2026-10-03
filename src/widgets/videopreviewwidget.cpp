@@ -196,6 +196,7 @@ void VideoPreviewWidget::showEvent(QShowEvent *event)
 VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
     : QWidget{parent}
 {
+    ToastManager::registerAnchor(this);
     this->setMinimumSize(400, 300);
     this->resize(width, height);
     setWindowFlags(Qt::FramelessWindowHint);
@@ -300,7 +301,7 @@ VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
     connect(this->btn_save, &QToolButton::clicked, this, [this](){
         if(this->currentVideoUrl.isEmpty())
         {
-            ToastManager::getToastManager(this).error("下载失败，请稍后重试");
+            ToastManager::getToastManager(this).error("下载失败，请稍后重试", this->view_video);
             return;
         }
 
@@ -318,7 +319,7 @@ VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
         QString targetPath = HttpShortConnection::getHttpClient().resolveTargetPath(savePath);
         if(targetPath.isEmpty())
         {
-            ToastManager::getToastManager(this).error("下载失败，请稍后重试");
+            ToastManager::getToastManager(this).error("下载失败，请稍后重试", this->view_video);
             return;
         }
 
@@ -349,9 +350,9 @@ VideoPreviewWidget::VideoPreviewWidget(int width, int height, QWidget *parent)
         this->updateSaveButton();
 
         if(isSuccess)
-            ToastManager::getToastManager(this).success(info);
+            ToastManager::getToastManager(this).success(info, this->view_video);
         else
-            ToastManager::getToastManager(this).error(info);
+            ToastManager::getToastManager(this).error(info, this->view_video);
     });
 
     this->installEventFilter(this);

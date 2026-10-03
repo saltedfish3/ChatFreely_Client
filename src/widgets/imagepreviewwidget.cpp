@@ -186,6 +186,7 @@ void ImagePreviewWidget::resizeEvent(QResizeEvent *event)
 ImagePreviewWidget::ImagePreviewWidget(int width, int height, QWidget *parent)
     : QWidget{parent}
 {
+    ToastManager::registerAnchor(this);
     this->setMinimumSize(450, 500);
     this->resize(width, height);
     setWindowFlags(Qt::FramelessWindowHint);
@@ -252,7 +253,7 @@ ImagePreviewWidget::ImagePreviewWidget(int width, int height, QWidget *parent)
 
         if(this->pixmapUrl.isEmpty())
         {
-            ToastManager::getToastManager(this).success("保存失败，请稍后重试");
+            ToastManager::getToastManager(this).success("保存失败，请稍后重试", this->view);
             return;
         }
 
@@ -260,7 +261,7 @@ ImagePreviewWidget::ImagePreviewWidget(int width, int height, QWidget *parent)
             return;
 
         this->updateSaveButton();
-        ToastManager::getToastManager(this).success("保存成功");
+        ToastManager::getToastManager(this).success("保存成功", this->view);
     });
 
     this->view = new ImageView(this);

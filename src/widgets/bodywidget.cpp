@@ -3,6 +3,7 @@
 BodyWidget::BodyWidget(int width, int height, int radius, QWidget* parent)
     : QWidget(parent), radius(radius), pos_widget(QPoint())
 {
+    ToastManager::registerAnchor(this);
     //默认窗口数据
     if (width <= 0)
         width = 300;
