@@ -135,7 +135,7 @@ private:
     void finishUpload(const QString& filePath, const QString& info);//失败
     void finishUpload(const QString& filePath, const UploadResult& result);//成功
     void multipartUpload(const QString& filePath, qint64 everyPartSize, const QString& objectKey, const QString& uploadId,
-                         const QString& finalUrl, std::function<void(const UploadResult&)> cb_success, bool failed_notice, std::function<void(const QString&)> cb_failed);
+                         const QString& finalUrl, const QJsonArray& initialParts, std::function<void(const UploadResult&)> cb_success, bool failed_notice, std::function<void(const QString&)> cb_failed);
     void uploadOnePart(const QString& filePath, qint64 partSize, const QString& objectKey, const QString& uploadId, int partNumber, int totalParts,
                        QSharedPointer<QJsonArray> parts, QSharedPointer<std::function<void()>> next, const QString& finalUrl,
                        std::function<void(const UploadResult&)> cb_success, bool failed_notice, std::function<void(const QString&)> cb_failed);

@@ -729,6 +729,7 @@ void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath
             QString objectKey = resp.value("ObjectKey").toString();
             QString uploadId = resp.value("UploadId").toString();
             qint64 partSize = resp.value("PartSize").toString().toLongLong();
+            QJsonArray uploadedParts = resp.value("UploadedParts").toArray();
 
             if(objectKey.isEmpty() || uploadId.isEmpty() || partSize <= 0)
             {
@@ -738,7 +739,7 @@ void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath
                     cb_failed("上传失败，请稍后再试");
                 return;
             }
-            multipartUpload(filePath, partSize, objectKey, uploadId, url, cb_success, failed_notice, cb_failed);
+            multipartUpload(filePath, partSize, objectKey, uploadId, url, uploadedParts, cb_success, failed_notice, cb_failed);
             return;
         }
 
@@ -871,7 +872,7 @@ void HttpShortConnection::finishUpload(const QString &filePath, const UploadResu
     delete task;
 }
 
-void HttpShortConnection::multipartUpload(const QString &filePath, qint64 everyPartSize, const QString &objectKey, const QString &uploadId, const QString &finalUrl, std::function<void (const UploadResult&)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed)
+void HttpShortConnection::multipartUpload(const QString &filePath, qint64 everyPartSize, const QString &objectKey, const QString &uploadId, const QString &finalUrl, const QJsonArray& initialParts, std::function<void (const UploadResult&)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed)
 {
     QFileInfo info(filePath);
     if(!info.exists())
@@ -885,7 +886,25 @@ void HttpShortConnection::multipartUpload(const QString &filePath, qint64 everyP
 
     int totalParts = static_cast<int>((info.size() + everyPartSize - 1) / everyPartSize);
     auto parts = QSharedPointer<QJsonArray>::create();
+    *parts = initialParts;
     auto next = QSharedPointer<std::function<void()>>::create();
+
+    {
+        auto it = this->hash_uploadTasks.find(filePath);
+        if(it != this->hash_uploadTasks.end())
+        {
+            qint64 sendBytes = 0;
+            for(const auto& p : initialParts)
+            {
+                int partNumber = p.toObject().value("PartNumber").toString().toInt();
+                if(partNumber == totalParts)
+                    sendBytes += info.size() - static_cast<qint64>(totalParts - 1) * everyPartSize;
+                else
+                    sendBytes += everyPartSize;
+            }
+            it.value()->sendSize = sendBytes;
+        }
+    }
 
     *next = [=](){
         if(!this->hash_uploadTasks.contains(filePath))
