@@ -15,6 +15,7 @@ MessageModel::MessageModel(MessagesManager* manager, QObject *parent)
     connect(manager, &MessagesManager::uploadProgressUpdate, this, &MessageModel::onUploadProgressUpdate);
     connect(manager, &MessagesManager::mediaExpired, this, &MessageModel::onMediaExpired);
     connect(manager, &MessagesManager::mediaAvailable, this, &MessageModel::onMediaExpired);
+    connect(manager, &MessagesManager::updateDownloadStatus, this, &MessageModel::onUpdateDownloadStatus);
 }
 
 int MessageModel::rowCount(const QModelIndex &parent) const
@@ -82,6 +83,12 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
         return this->manager->getUploadProgres(msg.info.url);
     case MediaExpired:
         return this->manager->isMediaExpired(msg.info.url);
+    case FileDownloadProgress:
+        if(msg.status != Success)
+            return -1;
+        return this->manager->getDownloadProgress(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID);
+    case FileDownloadStatus:
+        return this->manager->isDownloaded(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID);
     default:
         return {};
     }
@@ -110,6 +117,25 @@ void MessageModel::onMediaExpired(const QString &url)
         const Message& msg = this->manager->getMessages().at(i);
         if((msg.contentType == Video || msg.contentType == File) && msg.info.url == url)
             emit dataChanged(index(i), index(i), {MediaExpired});
+    }
+}
+
+void MessageModel::onDownloadProgressUpdate(const QString &msgID, const QString &url, int percent)
+{
+    int row = this->manager->indexOfMsg(msgID);
+    if(row < 0)
+        return;
+
+    emit dataChanged(index(row), index(row), {FileDownloadProgress, FileDownloadStatus});
+}
+
+void MessageModel::onUpdateDownloadStatus(const QString &url)
+{
+    for(int i = 0; i < this->manager->getMessages().size(); i++)
+    {
+        const Message& msg = this->manager->getMessages().at(i);
+        if(msg.contentType == File && msg.info.url == url)
+            emit dataChanged(index(i), index(i), {FileDownloadProgress, FileDownloadStatus});
     }
 }
 

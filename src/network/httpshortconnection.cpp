@@ -755,7 +755,10 @@ void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath
 
         QNetworkRequest putReq(uploadUrl);
         putReq.setHeader(QNetworkRequest::ContentTypeHeader, mimeType);
-        putReq.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
+
+        QUrl putUrl(uploadUrl);
+        if(putUrl.path().startsWith("/upload/"))
+            putReq.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
 
         QNetworkReply* reply_upload = nullptr;
         QFile* uploadFile = nullptr;
@@ -1087,8 +1090,9 @@ void HttpShortConnection::sendComplete(const QString& filePath, const QString &o
         }
 
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-        QString url = doc.object().value("Url").toString();
-        QString thumbnailUrl = doc.object()["ThumbnailUrl"].toString();
+        QJsonObject obj = doc.object();
+        QString url = obj.value("Url").toString();
+        QString thumbnailUrl = obj.value("ThumbnailUrl").toString();
         if(url.isEmpty())
             url = finalUrl;
 

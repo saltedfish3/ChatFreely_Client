@@ -33,7 +33,9 @@ public:
         MediaExpired,
         VideoThumbnail,
         VideoDuration,
-        FileName
+        FileName,
+        FileDownloadStatus,
+        FileDownloadProgress
     };
 
     explicit MessageModel(MessagesManager* manager, QObject *parent = nullptr);
@@ -54,12 +56,13 @@ public slots:
     void onResetModel();
     void onUploadProgressUpdate(const QString& tempID, const QString& filePath, int percent);
     void onMediaExpired(const QString& url);
+    void onDownloadProgressUpdate(const QString& msgID, const QString& url, int percent);
+    void onUpdateDownloadStatus(const QString& url);
 
 signals:
 
 private:
     MessagesManager* manager;
-
 };
 
 #endif // MESSAGEMODEL_H

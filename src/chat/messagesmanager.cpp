@@ -12,6 +12,47 @@ MessagesManager::MessagesManager(const QString& conversationID, QObject* parent)
         for(const QString& tempID : this->hash_registerUploadID.value(filePath))
             emit uploadProgressUpdate(tempID, filePath, percent);
     });
+
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::downloadStarted, [this](const QString& url){
+        if(!this->hash_registerDownloadID.contains(url))
+            return;
+
+        this->hash_downloadProgress[url] = 0;
+
+        for(const QString& msgID : this->hash_registerDownloadID.value(url))
+            emit downloadProgressUpdate(msgID, url, 0);
+    });
+
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::downloadProgressChanged, [this](const QString& url, qint64 received, qint64 total){
+        if(!this->hash_registerDownloadID.contains(url))
+            return;
+
+        int percent = total > 0 ? static_cast<int>(received * 100 / total) : 0;
+        this->hash_downloadProgress[url] = percent;
+
+        for(const QString& msgID : this->hash_registerDownloadID.value(url))
+            emit downloadProgressUpdate(msgID, url, percent);
+    });
+
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::downloadFinished, [this](const QString& url, bool isSuccess, const QString& info){
+        if(!this->hash_registerDownloadID.contains(url))
+            return;
+
+        const QList<QString> msgIDs = this->hash_registerDownloadID.take(url);
+        this->hash_downloadProgress.remove(url);
+
+        if(isSuccess)
+        {
+            this->set_downloadFileExists.insert(url);
+            emit updateDownloadStatus(url);
+        }
+
+        for(const QString& msgID : msgIDs)
+        {
+            this->hash_tempIDToDownloadUrl.remove(msgID);
+            emit downloadProgressUpdate(msgID, url, isSuccess ? 100 : -1);
+        }
+    });
 }
 
 void MessagesManager::addMessage(const Message &msg, bool isStoreDB)
@@ -62,6 +103,12 @@ void MessagesManager::addMessage(const Message &msg, bool isStoreDB)
             emit messageUpdate(indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID));
             emit finishLoadedImage();
         });
+    }
+
+    if((msg.contentType == Video || msg.contentType == File) && msg.info.url.startsWith("http"))
+    {
+        if(this->set_expiredMediaUrl.remove(msg.info.url))
+            emit mediaAvailable(msg.info.url);
     }
 
     if(isStoreDB)
@@ -169,6 +216,12 @@ void MessagesManager::addMessages(const QList<Message> &msgs, bool isStoreDB)
                 emit finishLoadedImage();
             });
         }
+
+        if((msg.contentType == Video || msg.contentType == File) && msg.info.url.startsWith("http"))
+        {
+            if(this->set_expiredMediaUrl.remove(msg.info.url))
+                emit mediaAvailable(msg.info.url);
+        }
     }
 }
 
@@ -271,7 +324,7 @@ bool MessagesManager::updateMessageContent(const QString &tempMsgID, const QStri
         }
     }
 
-    if(msg.contentType == Video && msg.info.url.startsWith("http"))
+    if((msg.contentType == Video || msg.contentType == File) && msg.info.url.startsWith("http"))
     {
         if(this->set_expiredMediaUrl.remove(msg.info.url))
             emit mediaAvailable(msg.info.url);
@@ -389,6 +442,16 @@ bool MessagesManager::cancelUpload(const QString &tempMsgID)
     return !this->hash_registerUploadID.contains(filePath);
 }
 
+bool MessagesManager::cancelDownload(const QString &msgID)
+{
+    QString url = this->hash_tempIDToDownloadUrl.value(msgID);
+    if(url.isEmpty())
+        return false;
+
+    unregisterDownload(msgID);
+    return !this->hash_registerDownloadID.contains(url);
+}
+
 void MessagesManager::reLoadImage(int index)
 {
     if(this->messages.isEmpty() || index < 0 || index >= this->messages.size())
@@ -469,6 +532,107 @@ int MessagesManager::getUploadProgres(const QString &filePath) const
         return -1;
 
     return it.value();
+}
+
+void MessagesManager::registerDownload(const QString &msgID, const QString &url)
+{
+    auto& list = this->hash_registerDownloadID[url];
+    bool isNew = false;
+    if(!list.contains(msgID))
+    {
+        list.append(msgID);
+        isNew = true;
+    }
+
+    this->hash_tempIDToDownloadUrl[msgID] = url;
+
+    if(!this->hash_downloadProgress.contains(url))
+        this->hash_downloadProgress[url] = 0;
+
+    if(isNew)
+        emit downloadProgressUpdate(msgID, url, this->hash_downloadProgress.value(url));
+}
+
+void MessagesManager::unregisterDownload(const QString &msgID)
+{
+    QString url = this->hash_tempIDToDownloadUrl.take(msgID);
+    if(url.isEmpty())
+        return;
+
+    auto it = this->hash_registerDownloadID.find(url);
+    if(it == this->hash_registerDownloadID.end())
+        return;
+
+    it.value().removeAll(msgID);
+    if(it.value().isEmpty())
+    {
+        this->hash_registerDownloadID.erase(it);
+        this->hash_downloadProgress.remove(url);
+    }
+}
+
+int MessagesManager::getDownloadProgress(const QString &msgID) const
+{
+    if(msgID.isEmpty())
+        return -1;
+
+    auto it = this->hash_tempIDToDownloadUrl.find(msgID);
+    if(it == this->hash_tempIDToDownloadUrl.end())
+        return -1;
+
+    auto it1 = this->hash_downloadProgress.find(it.value());
+    if(it1 == this->hash_downloadProgress.end())
+        return -1;
+
+    return it1.value();
+}
+
+bool MessagesManager::isDownloaded(const QString &msgID)
+{
+    int index = indexOfMsg(msgID);
+    if(index < 0)
+        return false;
+
+    const Message& msg = this->messages.at(index);
+    if(msg.info.name.isEmpty() || !msg.info.url.startsWith("http"))
+        return false;
+
+    if(this->set_downloadFileExists.contains(msg.info.url))
+        return true;
+
+    bool isExists = GlobalVariable::isDownloadFileExists(msg.info.name);
+    if(isExists)
+        this->set_downloadFileExists.insert(msg.info.url);
+    return isExists;
+}
+
+bool MessagesManager::isDownloading(const QString &url) const
+{
+    auto it = this->hash_downloadProgress.find(url);
+    if(it == this->hash_downloadProgress.end())
+        return false;
+    return true;
+}
+
+void MessagesManager::setDownloadExists(const QString &url, bool exists)
+{
+    bool isChanged = false;
+    if(exists)
+    {
+        if(!this->set_downloadFileExists.contains(url))
+        {
+            this->set_downloadFileExists.insert(url);
+            isChanged = true;
+        }
+    }
+    else
+    {
+        if(this->set_downloadFileExists.remove(url))
+            isChanged = true;
+    }
+
+    if(isChanged)
+        emit updateDownloadStatus(url);
 }
 
 bool MessagesManager::isMediaExpired(const QString &url) const

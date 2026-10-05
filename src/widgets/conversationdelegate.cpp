@@ -328,7 +328,92 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
         icon.setDevicePixelRatio(dpr);
 
         QRect iconRect(textRegionRect.topLeft() + QPoint(textX + textWidth, (textRegionRect.height() - iconSize.height()) / 2), iconSize);
-        painter->drawPixmap(iconRect, icon);
+
+        int uploadPercent = index.data(MediaUploadProgress).toInt();
+        bool isUploading = uploadPercent >= 0;
+        Status status = static_cast<Status>(index.data(MessageStatusRole).toInt());
+
+        if(isUploading)
+        {
+            QRectF arcRect = iconRect.adjusted(4, 4, -4, -4);
+            painter->save();
+            painter->setBrush(Qt::NoBrush);
+            painter->setPen(QPen(QColor(255, 255, 255, 60), 3, Qt::SolidLine, Qt::RoundCap));
+            painter->drawArc(arcRect, 0, 360 * 16);
+
+            if(uploadPercent > 0)
+            {
+                painter->setPen(QPen(QColor(91, 155, 213), 3, Qt::SolidLine, Qt::RoundCap));
+                painter->drawArc(arcRect, 90 * 16, -uploadPercent * 360 * 16 /100);
+            }
+
+            qreal radius = arcRect.width() * 0.15;
+            QPointF center = arcRect.center();
+            painter->setPen(QPen(QColor(255, 255, 255, 220), 2, Qt::SolidLine, Qt::RoundCap));
+            painter->drawLine(QPointF(center.x() - radius, center.y() - radius), QPointF(center.x() + radius, center.y() + radius));
+            painter->drawLine(QPointF(center.x() - radius, center.y() + radius), QPointF(center.x() + radius, center.y() - radius));
+
+            painter->restore();
+        }
+        else if(status == Cancelled || status == Failed)
+        {
+            QSize iconSize(32, 32);
+            QPixmap icon(":/default/images/fresh.png");
+            if(!icon.isNull())
+            {
+                icon = icon.scaled(iconSize * dpr, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+                icon.setDevicePixelRatio(dpr);
+
+                QSize logicalSize = icon.deviceIndependentSize().toSize();
+                int x = iconRect.center().x() - logicalSize.width() / 2;
+                int y = iconRect.center().y() - logicalSize.height() / 2;
+                painter->drawPixmap(x, y, icon);
+            }
+        }
+        else if(index.data(MediaExpired).toBool())
+        {
+            painter->save();
+            painter->setPen(Qt::red);
+            font.setPointSize(7);
+            font.setBold(false);
+            painter->setFont(font);
+            painter->drawText(iconRect, Qt::AlignCenter, "文件已过期");
+            painter->restore();
+        }
+        else if(status == Success)
+        {
+            int downloadPercent = index.data(FileDownloadProgress).toInt();
+            bool isDownloaded = index.data(FileDownloadStatus).toBool();
+
+            if(downloadPercent >= 0)
+            {
+                QRectF arcRect = iconRect.adjusted(4, 4, -4, -4);
+                painter->save();
+                painter->setBrush(Qt::NoBrush);
+                painter->setPen(QPen(QColor(255, 255, 255, 60), 3, Qt::SolidLine, Qt::RoundCap));
+                painter->drawArc(arcRect, 0, 360 * 16);
+
+                if(downloadPercent > 0)
+                {
+                    painter->setPen(QPen(QColor(91, 155, 213), 3, Qt::SolidLine, Qt::RoundCap));
+                    painter->drawArc(arcRect, 90 * 16, -downloadPercent * 360 * 16 / 100);
+                }
+
+                qreal radius = arcRect.width() * 0.15;
+                QPointF center = arcRect.center();
+                painter->setPen(QPen(QColor(255, 255, 255, 220), 2, Qt::SolidLine, Qt::RoundCap));
+                painter->drawLine(QPointF(center.x() - radius, center.y() - radius), QPointF(center.x() + radius, center.y() + radius));
+                painter->drawLine(QPointF(center.x() - radius, center.y() + radius), QPointF(center.x() + radius, center.y() - radius));
+                painter->restore();
+            }
+            else if(!isDownloaded)
+            {
+                QRect downloadRect = iconRect.adjusted(8, 8, -8, -8);
+                painter->drawPixmap(downloadRect, QPixmap(":/default/images/download.png"));
+            }
+            else
+                painter->drawPixmap(iconRect, icon);
+        }
     }
     else
     {
@@ -384,10 +469,10 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
     if(isSelf)
     {
         int uploadProgress = index.data(MediaUploadProgress).toInt();
-        bool isVideoUploading = (type == ContentType::Video && uploadProgress >= 0);
-        bool isVideoFailed = type == ContentType::Video && (index.data(MessageStatusRole).toInt() == Cancelled || index.data(MessageStatusRole).toInt() == Failed);
+        bool isMediaUploading = ((type == ContentType::Video || type == ContentType::File) && uploadProgress >= 0);
+        bool isMediaFailed = type == ContentType::Video && (index.data(MessageStatusRole).toInt() == Cancelled || index.data(MessageStatusRole).toInt() == Failed);
 
-        if(!isVideoUploading && !isVideoFailed)
+        if(!isMediaUploading && !isMediaFailed)
         {
             painter->save();
             if(index.data(MessageStatusRole).toInt() == Sending)
@@ -577,13 +662,50 @@ bool ConversationDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
                 return true;
             }
         }
-        if(type == ContentType::Video && textRegionRect.contains(mouse->pos()))
+        else if(isSelf && type == ContentType::File)
+        {
+            const int padding = 5;
+            const QSize iconSize(46, 46);
+            int textX = padding + 10;
+            int rightMargin = padding + 10;
+            int textWidth = textRegionRect.width() - textX - rightMargin - iconSize.width();
+            QRect iconRect(textRegionRect.topLeft() + QPoint(textX + textWidth, (textRegionRect.height() - iconSize.height()) / 2), iconSize);
+
+            int uploadPercent = index.data(MediaUploadProgress).toInt();
+            bool isUploading = uploadPercent >= 0;
+
+            if(isUploading && iconRect.contains(mouse->pos()))
+            {
+                emit CancelUploadClicked(index.data(MessageIDRole).toString());
+                return true;
+            }
+            if((status == Cancelled || status == Failed) && iconRect.contains(mouse->pos()))
+            {
+                emit ReSendClicked(index.data(MessageIDRole).toString());
+                return true;
+            }
+        }
+
+        if((type == ContentType::Video || type == ContentType::File) && textRegionRect.contains(mouse->pos()))
         {
             if(index.data(MediaExpired).toBool())
                 return true;
         }
 
-        if(statusRect.contains(mouse->pos()) && isSelf && status == Failed && type != ContentType::Video)
+        if(type == ContentType::File && status == Success)
+        {
+            int downloadPercent = index.data(FileDownloadProgress).toInt();
+            if(textRegionRect.contains(mouse->pos()))
+            {
+                if(downloadPercent >= 0)
+                    emit cancelDownloadClicked(index.data(MessageIDRole).toString());
+                else
+                    emit fileDownloadClicked(index.data(MessageIDRole).toString());
+                return true;
+            }
+        }
+
+        if(statusRect.contains(mouse->pos()) && isSelf && status == Failed && type != ContentType::Video && type != ContentType::File)
         {
             emit ReSendClicked(index.data(MessageIDRole).toString());
             return true;
@@ -603,13 +725,8 @@ bool ConversationDelegate::editorEvent(QEvent *event, QAbstractItemModel *model,
                     emit ReloadImageClicked(index.data(MessageIDRole).toString());
                     return true;
                 }
-                // else if(static_cast<ImageCacheManager::ImageState>(index.data(ImageStateRole).toInt()) == ImageCacheManager::ImageState::Success)
-                // {
-                //     emit previewImageClicked(index.data(MediaUrl).toString());
-                //     return true;
-                // }
             }
-            else if(type == ContentType::Video && status == Success)
+            else if(type == ContentType::Video)
             {
                 QString url = index.data(MediaUrl).toString();
                 if(url.isEmpty() || !url.startsWith("http"))

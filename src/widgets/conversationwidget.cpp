@@ -225,6 +225,17 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
                     obj["ThumbnailUrl"] = block.thumbnailUrl;
                     msg.info.thumbnailUrl = block.thumbnailUrl;
                 }
+                else if(msg.contentType == ContentType::File)
+                {
+                    QFileInfo info(block.content);
+                    if(info.exists())
+                    {
+                        obj["Name"] = info.fileName();
+                        obj["Size"] = QString::number(info.size());
+                        msg.info.name = info.fileName();
+                        msg.info.size = info.size();
+                    }
+                }
 
                 msg.content = QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
                 msg.info.url = block.content;
@@ -360,6 +371,52 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
 
         if(this->item->cancelUpload(tempMsgID))
             HttpShortConnection::getHttpClient().cancelUpload(filePath);
+    });
+
+    connect(this->delegate, &ConversationDelegate::fileDownloadClicked, this, [this](const QString& msgID){
+        int index = this->item->getMessagesManager().indexOfMsg(msgID);
+        if(index < 0)
+            return;
+        const Message msg = this->item->getMessagesManager().getMessages().at(index);
+
+        if(msg.info.url.isEmpty() || !msg.info.url.startsWith("http"))
+            return;
+
+        if(msg.info.name.isEmpty())
+            return;
+
+        QString dir = GlobalVariable::getPosOfDownloadFile();
+        QDir().mkpath(dir);
+        QString target = QDir(dir).filePath(msg.info.name);
+
+
+        bool isExists = GlobalVariable::isDownloadFileExists(msg.info.name);
+        this->item->getMessagesManager().setDownloadExists(msg.info.url, isExists);
+        if(isExists)
+        {
+            QProcess::startDetached("explorer.exe", {"/select,", QDir::toNativeSeparators(target)});
+            return;
+        }
+        else
+        {
+            target = HttpShortConnection::getHttpClient().resolveTargetPath(target);
+            bool needDownload = !this->item->getMessagesManager().isDownloading(msg.info.url);
+            this->item->getMessagesManager().registerDownload(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID, msg.info.url);
+            if(needDownload)
+                HttpShortConnection::getHttpClient().downloadFile(msg.info.url, target);
+        }
+    });
+
+    connect(this->delegate, &ConversationDelegate::cancelDownloadClicked, this, [this](const QString& msgID){
+        int index = this->item->getMessagesManager().indexOfMsg(msgID);
+        if(index < 0)
+            return;
+
+        const Message& msg = this->item->getMessagesManager().getMessages().at(index);
+        QString url = msg.info.url;
+
+        if(this->item->getMessagesManager().cancelDownload(msgID))
+            HttpShortConnection::getHttpClient().cancelDownloadFile(url);
     });
 
     connect(this->item, &ConversationItem::finishLoadedImage, this, [this](){
@@ -916,7 +973,25 @@ void ConversationWidget::handleNextBlock()
 
             this->item->getMessagesManager().unregisterUpload(block.tempID);
             this->item->updateMessageContent(block.tempID, newJson);
+            this->item->getMessagesManager().setDownloadExists(result.url, true);
+
             TcpLongConnection::getTcpClient().sendMessageTo(this->item->getConversationID(), newJson, block.tempID, block.type);
+
+            QPointer<ConversationWidget> self(this);
+            QString srcPath = filePath;
+            QString uploadedUrl = result.url;
+            auto future = QtConcurrent::run([self, srcPath, uploadedUrl](){
+                QString dir = GlobalVariable::getPosOfDownloadFile();
+                if(dir.isEmpty())
+                    return;
+
+                QDir().mkpath(dir);
+                QString target = QDir(dir).filePath(QFileInfo(srcPath).fileName());
+
+                if(!QFile::exists(target))
+                    QFile::copy(srcPath, target);
+            });
+
             handleNextBlock();
         }, false, [this, block, filePath](const QString& info){
             this->item->getMessagesManager().unregisterUpload(block.tempID);

@@ -41,7 +41,9 @@ public:
         MediaExpired,
         VideoThumbnail,
         VideoDuration,
-        FileName
+        FileName,
+        FileDownloadStatus,
+        FileDownloadProgress
     };
 
     enum ContentType
@@ -64,6 +66,8 @@ signals:
     void ReSendClicked(const QString& tempMsgID);
     void ReloadImageClicked(const QString& msgID);
     void CancelUploadClicked(const QString& tempMsgID);
+    void fileDownloadClicked(const QString& msgID);
+    void cancelDownloadClicked(const QString& msgID);
     void previewImageClicked(const QString& url);
     void previewVideoClicked(const QString& url, const qint64& videoSize);
 
