@@ -45,6 +45,7 @@ private:
     void initListStyle();
 
     void initStackedConversation();
+    void precreateConversations();
 
     void restoreSelection(const QString& conversationID);
 

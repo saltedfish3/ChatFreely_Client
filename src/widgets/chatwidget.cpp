@@ -203,6 +203,11 @@ void ChatWidget::initListWidget()
 
     connect(&ConversationManager::getConversationManager(), &ConversationManager::conversationCreated, this, [this](ConversationItem* item){
         createConversationListItem(item);
+
+        const QString uid = item->getConversationID();
+        if(this->map_conversation.contains(uid))
+            return;
+        createConversation(uid);
     });
 
     connect(&GlobalInitController::getController(), &GlobalInitController::allConversationsLoaded, this, [this]
@@ -217,6 +222,8 @@ void ChatWidget::initListWidget()
         this->model->setSortRole(ConversationListDelegate::LastTimestampRole);
         this->model->sort(0, Qt::DescendingOrder);
         ConversationManager::getConversationManager().startSyncMessage();
+
+        precreateConversations();
     });
 
     connect(&FriendManage::getFriendManage(), &FriendManage::allFriendList, this, [this](){
@@ -272,6 +279,29 @@ void ChatWidget::initStackedConversation()
 
     this->stackedWidget_Conversation->addWidget(this->widget_noSelect);
     this->stackedWidget_Conversation->setCurrentWidget(this->widget_noSelect);
+}
+
+void ChatWidget::precreateConversations()
+{
+    QList<QString> uids;
+    int count = qMin(30, this->model->rowCount());
+    for(int i = 0; i < count; i++)
+    {
+        QString uid = this->model->index(i, 0).data(ConversationListDelegate::UIDRole).toString();
+        if(!uid.isEmpty())
+            uids.append(uid);
+    }
+
+    for(int i = 0; i < uids.size(); i++)
+    {
+        const QString uid = uids[i];
+        QTimer::singleShot(i * 100, this, [this, uid](){
+            if(this->map_conversation.contains(uid))
+                return;
+
+            createConversation(uid);
+        });
+    }
 }
 
 void ChatWidget::restoreSelection(const QString &conversationID)
