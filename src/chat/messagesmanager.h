@@ -70,6 +70,10 @@ public:
     int indexOfConvSeqOrBefore(qint64 convSeq) const;
     int findRangeIndexByconvSeq(qint64 convSeq) const;
 
+    //高亮
+    void setHighLightMsgID(const QString& msgID);
+    QString getHighLightMsgID() const;
+
 signals:
     void messageAdd(int row);
     void messagesAdd(int first, int end);
@@ -94,6 +98,9 @@ signals:
     void jumpToFinished(int row, const QString& msgID);
     void jumpToFailed(const QString& msgID);
 
+    //高亮
+    void highLightChanged(const QString& oldMsgID, const QString& newMsgID);
+
 private:
     QList<Message> messages;
     QHash<QString, int> index_message;//消息索引(消息ID，行号)
@@ -106,6 +113,9 @@ private:
     quint64 loadGen_newer = 0;
     quint64 loadGen_around = 0;
     quint64 loadGen_jump = 0;
+
+    QString highLightMsgID;
+    QTimer* timer_highLight;
 
     //上传
     QHash<QString, QString> hash_tempIDToFilePath;//tempID - filePath

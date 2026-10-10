@@ -3,6 +3,13 @@
 MessagesManager::MessagesManager(const QString& conversationID, QObject* parent)
     : QObject(parent), conversationID(conversationID)
 {
+    this->timer_highLight = new QTimer(this);
+    this->timer_highLight->setSingleShot(true);
+
+    connect(this->timer_highLight, &QTimer::timeout, this, [this](){
+        setHighLightMsgID({});
+    });
+
     connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::uploadProgressChanged, this, [this](const QString& filePath, qint64 sendsize, qint64 totalsize, int percent){
         if(!this->hash_registerUploadID.contains(filePath))
             return;
@@ -346,6 +353,8 @@ void MessagesManager::clearMessages()
     this->lastConvSeq = 0;
     this->isReachedNewest = false;
     this->isReachedOldest = false;
+    this->highLightMsgID.clear();
+    this->timer_highLight->stop();
     emit resetModel();
 }
 
@@ -954,4 +963,30 @@ int MessagesManager::findRangeIndexByconvSeq(qint64 convSeq) const
     if(result < 0 || convSeq > this->ranges[result].last)
         return -1;
     return result;
+}
+
+void MessagesManager::setHighLightMsgID(const QString &msgID)
+{
+    if(msgID == this->highLightMsgID)
+        return;
+
+    QString oldMsgID = this->highLightMsgID;
+    this->highLightMsgID = msgID;
+
+    emit highLightChanged(oldMsgID, msgID);
+
+    if(msgID.isEmpty())
+        this->timer_highLight->stop();
+    else
+    {
+        if(this->timer_highLight->isActive())
+            this->timer_highLight->stop();
+
+        this->timer_highLight->start(1000);
+    }
+}
+
+QString MessagesManager::getHighLightMsgID() const
+{
+    return this->highLightMsgID;
 }

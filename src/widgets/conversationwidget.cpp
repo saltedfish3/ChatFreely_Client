@@ -474,6 +474,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
             return;
 
         this->listView_messages->scrollTo(this->model->index(row, 0), QAbstractItemView::PositionAtCenter);
+        this->item->getMessagesManager().setHighLightMsgID(msgID);
     });
 
     connect(this->item, &ConversationItem::jumpToFailed, this, [this](const QString& msgID){

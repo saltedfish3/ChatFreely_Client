@@ -24,6 +24,16 @@ void ConversationDelegate::paint(QPainter *painter, const QStyleOptionViewItem &
 
     getLayout(option, index, TimeStamp, contain, avatarRect, textRegionRect, statusRect, textTotalHeight);
 
+    if(index.data(IsHighLighted).toBool())
+    {
+        painter->save();
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(QColor(255, 220, 120, 60));
+        bool isBottom = index.row() == index.model()->rowCount() - 1;
+        painter->drawRect(contain.adjusted(0, 0, 0, isBottom ? -30 : 0));
+        painter->restore();
+    }
+
     QVariant vi1 = index.data(IsNeedShowTime);
     bool isTimeStamp = vi1.isValid() ? vi1.toBool() : false;
     if(isTimeStamp)

@@ -35,7 +35,8 @@ public:
         VideoDuration,
         FileName,
         FileDownloadStatus,
-        FileDownloadProgress
+        FileDownloadProgress,
+        IsHighLighted
     };
 
     explicit MessageModel(MessagesManager* manager, QObject *parent = nullptr);
@@ -57,6 +58,7 @@ public slots:
     void onMediaExpired(const QString& url);
     void onDownloadProgressUpdate(const QString& msgID, const QString& url, int percent);
     void onUpdateDownloadStatus(const QString& url);
+    void onHighLightChanged(const QString& oldMsgID, const QString& newMsgID);
 
 signals:
 

@@ -43,7 +43,8 @@ public:
         VideoDuration,
         FileName,
         FileDownloadStatus,
-        FileDownloadProgress
+        FileDownloadProgress,
+        IsHighLighted
     };
 
     enum ContentType

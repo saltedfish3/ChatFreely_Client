@@ -15,6 +15,7 @@ MessageModel::MessageModel(MessagesManager* manager, QObject *parent)
     connect(manager, &MessagesManager::mediaExpired, this, &MessageModel::onMediaExpired);
     connect(manager, &MessagesManager::mediaAvailable, this, &MessageModel::onMediaExpired);
     connect(manager, &MessagesManager::updateDownloadStatus, this, &MessageModel::onUpdateDownloadStatus);
+    connect(manager, &MessagesManager::highLightChanged, this, &MessageModel::onHighLightChanged);
 }
 
 int MessageModel::rowCount(const QModelIndex &parent) const
@@ -88,6 +89,18 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
         return this->manager->getDownloadProgress(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID);
     case FileDownloadStatus:
         return this->manager->isDownloaded(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID);
+    case IsHighLighted:
+    {
+        const QString& highLightMsgID = this->manager->getHighLightMsgID();
+        if(highLightMsgID.isEmpty())
+            return false;
+
+        if(!msg.serverMsgID.isEmpty() && msg.serverMsgID == highLightMsgID)
+            return true;
+        if(!msg.tempMsgID.isEmpty() && msg.tempMsgID == highLightMsgID)
+            return true;
+        return false;
+    }
     default:
         return {};
     }
@@ -135,6 +148,23 @@ void MessageModel::onUpdateDownloadStatus(const QString &url)
         const Message& msg = this->manager->getMessages().at(i);
         if(msg.contentType == File && msg.info.url == url)
             emit dataChanged(index(i), index(i), {FileDownloadProgress, FileDownloadStatus});
+    }
+}
+
+void MessageModel::onHighLightChanged(const QString &oldMsgID, const QString &newMsgID)
+{
+    if(!oldMsgID.isEmpty())
+    {
+        int oldRow = this->manager->indexOfMsg(oldMsgID);
+        if(oldRow >= 0 && oldRow < rowCount())
+            emit dataChanged(index(oldRow, 0), index(oldRow, 0), {IsHighLighted});
+    }
+
+    if(!newMsgID.isEmpty())
+    {
+        int newRow = this->manager->indexOfMsg(newMsgID);
+        if(newRow >= 0 && newRow < rowCount())
+            emit dataChanged(index(newRow, 0), index(newRow, 0), {IsHighLighted});
     }
 }
 
