@@ -86,24 +86,28 @@ void ConversationListDelegate::paint(QPainter *painter, const QStyleOptionViewIt
     QString drawLastMsg = fm.elidedText(lastMsg, Qt::ElideRight, lastMsgRect.width());
     painter->drawText(lastMsgRect, Qt::AlignVCenter, drawLastMsg);
 
-    font.setPointSizeF(7.5);
-    painter->setFont(font);
-    fm = painter->fontMetrics();
-    QRect timestampRect(username.topRight(), QSize(contain.topRight().x() - username.topRight().x() - 5, fm.height()));
-    QString drawTime = formatTimestamp(index.data(LastTimestampRole).toLongLong());
-    painter->drawText(timestampRect, Qt::AlignVCenter | Qt::AlignRight, drawTime);
+    bool isSearchRole = index.data(IsSearchModeRole).toBool();
+    if(!isSearchRole)
+    {
+        font.setPointSizeF(7.5);
+        painter->setFont(font);
+        fm = painter->fontMetrics();
+        QRect timestampRect(username.topRight(), QSize(contain.topRight().x() - username.topRight().x() - 5, fm.height()));
+        QString drawTime = formatTimestamp(index.data(LastTimestampRole).toLongLong());
+        painter->drawText(timestampRect, Qt::AlignVCenter | Qt::AlignRight, drawTime);
 
-    QSize onlineSize(contain.height() * 0.15, contain.height() * 0.15);
-    QRect onlineIcon(avatar.bottomRight() - QPoint(9, 9), onlineSize);
-    painter->setPen(QColor(240, 240, 240));
+        QSize onlineSize(contain.height() * 0.15, contain.height() * 0.15);
+        QRect onlineIcon(avatar.bottomRight() - QPoint(9, 9), onlineSize);
+        painter->setPen(QColor(240, 240, 240));
 
-    QVariant v = index.data(IsOnlineRole);
-    bool isOnline = v.isValid() ? v.toBool() : false;
-    painter->setBrush(Qt::gray);
-    if(isOnline)
-        painter->setBrush(QColor(102, 255, 0));
+        QVariant v = index.data(IsOnlineRole);
+        bool isOnline = v.isValid() ? v.toBool() : false;
+        painter->setBrush(Qt::gray);
+        if(isOnline)
+            painter->setBrush(QColor(102, 255, 0));
 
-    painter->drawRoundedRect(onlineIcon, onlineSize.width()/2, onlineSize.height()/2);
+        painter->drawRoundedRect(onlineIcon, onlineSize.width()/2, onlineSize.height()/2);
+    }
 
     painter->setBrush(Qt::NoBrush);
     painter->setPen(QColor(240, 240, 240));

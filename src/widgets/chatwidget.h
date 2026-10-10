@@ -5,7 +5,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QStackedWidget>
-#include <QACtion>
+#include <QAction>
 #include <QPlainTextEdit>
 #include <QListView>
 #include <QPushButton>
@@ -23,6 +23,7 @@
 #include "../chat/conversationmanager.h"
 #include "../chat/conversationitem.h"
 #include "../utils/globalinitcontroller.h"
+#include "searchresultlistdelegate.h"
 
 
 class ChatWidget : public QWidget
@@ -40,6 +41,7 @@ private slots:
 private:
     void initSearchWidget();
     void initSearchStyle();
+    void initSearchModels();
 
     void initListWidget();
     void initListStyle();
@@ -48,6 +50,15 @@ private:
     void precreateConversations();
 
     void restoreSelection(const QString& conversationID);
+
+    void loadSearchConvFirstPage(quint64 gen, const QString& keyword);
+    void loadSearchConvNextPage(quint64 gen);
+    void appendSearchConvItem(const DatabaseManager::SearchConvResult& result);
+
+    void loadSearchMsgFirstPage(quint64 gen);
+    void loadSearchMsgNextPage(quint64 gen);
+    void appendSearchMsgItem(const Message& msg);
+    void openSearchMsgView(const QString& conversationID);
 
     ConversationWidget* createConversation(const QString& conversationID);
     void createConversationListItem(ConversationItem* item, const DatabaseManager::ConversationInfo& info = {});
@@ -59,7 +70,19 @@ private:
     //--------------------------------
     QListView* listView_conversationList;
     QStandardItemModel* model;
+    QStandardItemModel* model_searchConversation;
+    QStandardItemModel* model_searchMsg;
     ConversationListDelegate* delegate;
+    SearchResultListDelegate* delegate_search;
+
+    QTimer* timer_search;
+    quint64 searchGen = 0;
+    QString currentSearchConversationID;
+
+    bool isLoadingSearchConversation = false;
+    bool isLoadingSearchMsg = false;
+
+    int pos_scroll = 0;
 
     QWidget* widget_noSelect;
     QLabel* label_appIcon;

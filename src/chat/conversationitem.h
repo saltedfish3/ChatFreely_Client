@@ -22,7 +22,6 @@ public:
 
     void updateMessageStatus(bool isSuccess, const QString& tempMsgID, const QString& messageID, int64_t timeStamp, int64_t convSeq);
     void updateMessageContent(const QString& tempMsgID, const QString& content);
-    void loadHistoryMessages(int limit = 20);
 
     bool cancelUpload(const QString& tempMsgID);
     void reloadImage(const QString& msgID);
@@ -40,10 +39,13 @@ signals:
     void UnReadCountChange(int num);
     //用于会话窗口减少loadingcount
     void messageStatusChange();
-    void firstLoadingMessages();
-    void historyMessagesload(int insertCount);
     void startLoadingImage();
     void finishLoadedImage();
+    void loadMessagesFinished(MessagesManager::LoadDir dir);
+    void messagesInserted();
+
+    void jumpToFinished(int row, const QString& msgID);
+    void jumpToFailed(const QString& msgID);
 
 private:
     QString conversationID;
@@ -51,6 +53,7 @@ private:
     int unRead = 0;
     bool active = false;
     bool isFirstLoad = false;
+
 };
 
 #endif // CONVERSATIONITEM_H

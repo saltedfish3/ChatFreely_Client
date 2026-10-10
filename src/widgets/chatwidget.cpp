@@ -11,6 +11,7 @@ ChatWidget::ChatWidget(int width, int height,QWidget *parent)
     initListWidget();
     initListStyle();
     initStackedConversation();
+    initSearchModels();
 }
 
 void ChatWidget::openConversation(const QString &uid)
@@ -45,7 +46,9 @@ void ChatWidget::openConversation(const QString &uid)
         }
         if(targetIndex.isValid())
         {
-            this->listView_conversationList->setCurrentIndex(targetIndex);
+            if(this->listView_conversationList->model() == this->model)
+                this->listView_conversationList->setCurrentIndex(targetIndex);
+
             this->model->setData(targetIndex, true, ConversationListDelegate::IsSelectedRole);
         }
         return;
@@ -113,6 +116,115 @@ void ChatWidget::initSearchStyle()
                                     )");
 }
 
+void ChatWidget::initSearchModels()
+{
+    this->model_searchConversation = new QStandardItemModel(this);
+    this->model_searchMsg = new QStandardItemModel(this);
+    this->delegate_search = new SearchResultListDelegate(this);
+
+    this->timer_search = new QTimer(this);
+    this->timer_search->setSingleShot(true);
+    this->timer_search->setInterval(100);
+
+    connect(this->delegate_search, &SearchResultListDelegate::itemClicked, this, [this](const QModelIndex& index){
+        if(index.data(SearchResultListDelegate::IsReturnBackItemRole).toBool())
+        {
+            this->model_searchMsg->clear();
+            this->currentSearchConversationID.clear();
+            this->isLoadingSearchMsg = false;
+
+            this->listView_conversationList->setItemDelegate(this->delegate);
+            this->listView_conversationList->setModel(this->model_searchConversation);
+            return;
+        }
+
+        QString msgID = index.data(SearchResultListDelegate::MsgIDRole).toString();
+        qint64 convSeq = index.data(SearchResultListDelegate::ConvSeqRole).toLongLong();
+        QString convID = this->currentSearchConversationID;
+
+        if(convID.isEmpty() || msgID.isEmpty())
+            return;
+
+        openConversation(convID);
+
+        auto it = this->map_conversation.find(convID);
+        if(it == this->map_conversation.end())
+            return;
+
+        ConversationWidget* widget = it.value();
+        widget->jumpToMessage(msgID, convSeq);
+    });
+
+    connect(this->edit_search, &QLineEdit::textChanged, this, [this](const QString&){
+        bool isInSearch = this->listView_conversationList->model() != this->model;
+        const QString text = this->edit_search->text().trimmed();
+
+        ++this->searchGen;
+
+        this->model_searchConversation->clear();
+        this->model_searchMsg->clear();
+        this->currentSearchConversationID.clear();
+        this->isLoadingSearchConversation = false;
+        this->isLoadingSearchMsg = false;
+
+        if(text.isEmpty())
+        {
+            if(isInSearch)
+            {
+                this->listView_conversationList->setItemDelegate(delegate);
+                this->listView_conversationList->setModel(this->model);
+
+                QTimer::singleShot(0, this, [this](){
+                    this->listView_conversationList->verticalScrollBar()->setValue(this->pos_scroll);
+                    if(!this->currentConversation.isEmpty())
+                        restoreSelection(this->currentConversation);
+                });
+            }
+            return;
+        }
+
+        if(!isInSearch)
+            this->pos_scroll = this->listView_conversationList->verticalScrollBar()->value();
+
+        this->listView_conversationList->setItemDelegate(delegate);
+        this->listView_conversationList->setModel(this->model_searchConversation);
+
+        if(this->timer_search->isActive())
+            this->timer_search->stop();
+        this->timer_search->start();
+    });
+
+    connect(this->timer_search, &QTimer::timeout, this, [this](){
+        const QString text = this->edit_search->text().trimmed();
+        if(text.isEmpty())
+            return;
+
+        loadSearchConvFirstPage(this->searchGen, text);
+    });
+
+    connect(this->listView_conversationList->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](int value){
+        auto* bar = this->listView_conversationList->verticalScrollBar();
+        if(bar->maximum() == 0 || bar->maximum() - value > 30)
+            return;
+
+        quint64 gen = this->searchGen;
+        QAbstractItemModel* currentModel = this->listView_conversationList->model();
+
+        if(currentModel == this->model_searchConversation)
+        {
+            if(this->isLoadingSearchConversation)
+                return;
+            loadSearchConvNextPage(gen);
+        }
+        else if(currentModel == this->model_searchMsg)
+        {
+            if(this->isLoadingSearchMsg)
+                return;
+            loadSearchMsgNextPage(gen);
+        }
+    });
+}
+
 void ChatWidget::initListWidget()
 {
     this->listView_conversationList = new QListView(this);
@@ -134,6 +246,13 @@ void ChatWidget::initListWidget()
     this->listView_conversationList->setResizeMode(QListView::Fixed);
 
     connect(this->delegate, &ConversationListDelegate::itemClicked, this, [this](const QModelIndex& index){
+        if(this->listView_conversationList->model() == this->model_searchConversation)
+        {
+            QString conversationID = index.data(ConversationListDelegate::UIDRole).toString();
+            openSearchMsgView(conversationID);
+            return;
+        }
+
         if(this->currentConversation == index.data(ConversationListDelegate::UIDRole).toString() && !this->currentConversation.isEmpty())
         {
             this->model->setData(index, false, ConversationListDelegate::IsSelectedRole);
@@ -306,6 +425,9 @@ void ChatWidget::precreateConversations()
 
 void ChatWidget::restoreSelection(const QString &conversationID)
 {
+    if(this->listView_conversationList->model() != this->model)
+        return;
+
     for(int i = 0; i < this->model->rowCount(); i++)
     {
         if(this->model->index(i, 0).data(ConversationListDelegate::UIDRole).toString() == conversationID)
@@ -314,6 +436,136 @@ void ChatWidget::restoreSelection(const QString &conversationID)
             break;
         }
     }
+}
+
+void ChatWidget::loadSearchConvFirstPage(quint64 gen, const QString &keyword)
+{
+    this->isLoadingSearchConversation = true;
+    DatabaseManager::getDatabaseManager().searchConversations(keyword, 0, "", 30, [this, gen](const QList<DatabaseManager::SearchConvResult>& list){
+        if(gen != this->searchGen)
+            return;
+
+        this->isLoadingSearchConversation = false;
+
+        for(const auto& result : list)
+            appendSearchConvItem(result);
+    });
+}
+
+void ChatWidget::loadSearchConvNextPage(quint64 gen)
+{
+    if(this->model_searchConversation->rowCount() == 0)
+        return;
+
+    QStandardItem* lastItem = this->model_searchConversation->item(this->model_searchConversation->rowCount() - 1);
+    qint64 cursorTimestamp = lastItem->data(ConversationListDelegate::LastTimestampRole).toLongLong();
+    QString cursorConversationID = lastItem->data(ConversationListDelegate::UIDRole).toString();
+
+    this->isLoadingSearchConversation = true;
+    DatabaseManager::getDatabaseManager().searchConversations(this->edit_search->text().trimmed(), cursorTimestamp, cursorConversationID, 30, [this, gen](const QList<DatabaseManager::SearchConvResult>& list){
+        if(gen != this->searchGen)
+            return;
+        this->isLoadingSearchConversation = false;
+
+        for(const auto& result : list)
+            appendSearchConvItem(result);
+    });
+}
+
+void ChatWidget::appendSearchConvItem(const DatabaseManager::SearchConvResult &result)
+{
+    FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(result.conversationID);
+    QStandardItem* item = new QStandardItem;
+
+    item->setData(result.conversationID, ConversationListDelegate::UIDRole);
+    item->setData(info.username, ConversationListDelegate::UsernameRole);
+
+    QPixmap avatar = info.uid.isEmpty() ? QPixmap(":/default/images/defaultAvatar.png") : FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(36, 36));
+    avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+    item->setData(avatar, ConversationListDelegate::AvatarRole);
+
+    item->setData(QString("共 %1 条匹配的聊天记录").arg(result.matchCount), ConversationListDelegate::LastMsgRole);
+    item->setData(result.lastTimestamp, ConversationListDelegate::LastTimestampRole);
+    item->setData(0, ConversationListDelegate::UnReadRole);
+    item->setData(false, ConversationListDelegate::IsOnlineRole);
+    item->setData(false, ConversationListDelegate::IsSelectedRole);
+    item->setData(true, ConversationListDelegate::IsSearchModeRole);
+
+    this->model_searchConversation->appendRow(item);
+}
+
+void ChatWidget::loadSearchMsgFirstPage(quint64 gen)
+{
+    this->isLoadingSearchMsg = true;
+
+    DatabaseManager::getDatabaseManager().searchMessagesInConv(this->currentSearchConversationID, this->edit_search->text().trimmed(), 0, 50, [this, gen](const QList<Message>& list){
+        if(gen != this->searchGen)
+            return;
+        this->isLoadingSearchMsg = false;
+
+        for(const auto& msg : list)
+            appendSearchMsgItem(msg);
+    });
+}
+
+void ChatWidget::loadSearchMsgNextPage(quint64 gen)
+{
+    if(this->model_searchMsg->rowCount() <= 1)
+        return;
+
+    QStandardItem* lastItem = this->model_searchMsg->item(this->model_searchMsg->rowCount() - 1);
+    qint64 cursorConvSeq = lastItem->data(SearchResultListDelegate::ConvSeqRole).toLongLong();
+    this->isLoadingSearchMsg = true;
+
+    DatabaseManager::getDatabaseManager().searchMessagesInConv(this->currentSearchConversationID, this->edit_search->text().trimmed(), cursorConvSeq, 50, [this, gen](const QList<Message>& list){
+        if(gen != this->searchGen)
+            return;
+        this->isLoadingSearchMsg = false;
+
+        for(const auto& msg : list)
+            appendSearchMsgItem(msg);
+    });
+}
+
+void ChatWidget::appendSearchMsgItem(const Message &msg)
+{
+    bool isMyself = msg.senderUID == UserInfo::getUserInfo().getUID();
+    QPixmap avatar = isMyself ? UserInfo::getUserInfo().getAvatar(QSize(36, 36)) : FriendManage::getFriendManage().getFriendAvatar(msg.senderUID, QSize(36, 36));
+    avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+
+    QString name = isMyself ? UserInfo::getUserInfo().getUsername() : FriendManage::getFriendManage().getFriendInfo(msg.senderUID).username;
+    QString msgID = msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID;
+
+    QStandardItem* item = new QStandardItem;
+    item->setData(avatar, SearchResultListDelegate::AvatarRole);
+    item->setData(name, SearchResultListDelegate::UsernameRole);
+    item->setData(msg.content, SearchResultListDelegate::ContentRole);
+    item->setData(msg.timeStamp, SearchResultListDelegate::TimestampRole);
+    item->setData(msgID, SearchResultListDelegate::MsgIDRole);
+    item->setData(msg.convSeq, SearchResultListDelegate::ConvSeqRole);
+    item->setData(false, SearchResultListDelegate::IsReturnBackItemRole);
+    item->setData(this->edit_search->text().trimmed(), SearchResultListDelegate::HighLightKeywordRole);
+
+    this->model_searchMsg->appendRow(item);
+}
+
+void ChatWidget::openSearchMsgView(const QString &conversationID)
+{
+    this->currentSearchConversationID = conversationID;
+    this->model_searchMsg->clear();
+    this->isLoadingSearchMsg = false;
+
+    QStandardItem* returnItem = new QStandardItem;
+    returnItem->setData(true, SearchResultListDelegate::IsReturnBackItemRole);
+    this->model_searchMsg->appendRow(returnItem);
+
+    this->listView_conversationList->setItemDelegate(this->delegate_search);
+    this->listView_conversationList->setModel(this->model_searchMsg);
+
+    this->listView_conversationList->verticalScrollBar()->setValue(0);
+
+    quint64 gen = this->searchGen;
+    loadSearchMsgFirstPage(gen);
 }
 
 ConversationWidget* ChatWidget::createConversation(const QString& conversationID)
@@ -412,6 +664,10 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
         }
 
         this->model->sort(0, Qt::DescendingOrder);
+
+        if(this->listView_conversationList->model() != this->model)
+            return;
+
         if(!selectedUID.isEmpty())
             restoreSelection(selectedUID);
         else
@@ -439,6 +695,10 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
         }
 
         this->model->sort(0, Qt::DescendingOrder);
+
+        if(this->listView_conversationList->model() != this->model)
+            return;
+
         if(!selectedUID.isEmpty())
             restoreSelection(selectedUID);
         else

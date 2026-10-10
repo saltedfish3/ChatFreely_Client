@@ -10,6 +10,22 @@ ConversationItem::ConversationItem(const QString& conversationID, QObject *paren
     connect(&this->msgManager, &MessagesManager::startLoadingImage, this, [this](){
         emit startLoadingImage();
     });
+
+    connect(&this->msgManager, &MessagesManager::loadMessagesFinished, this, [this](MessagesManager::LoadDir dir){
+        emit loadMessagesFinished(dir);
+    });
+
+    connect(&this->msgManager, &MessagesManager::messagesInserted, this, [this](){
+        emit messagesInserted();
+    });
+
+    connect(&this->msgManager, &MessagesManager::jumpToFailed, this, [this](const QString& msgID){
+        emit jumpToFailed(msgID);
+    });
+
+    connect(&this->msgManager, &MessagesManager::jumpToFinished, this, [this](int row, const QString& msgID){
+        emit jumpToFinished(row, msgID);
+    });
 }
 
 QString ConversationItem::getConversationID() const
@@ -57,25 +73,6 @@ void ConversationItem::updateMessageStatus(bool isSuccess, const QString& tempMs
 void ConversationItem::updateMessageContent(const QString &tempMsgID, const QString &content)
 {
     this->msgManager.updateMessageContent(tempMsgID, content);
-}
-
-void ConversationItem::loadHistoryMessages(int limit)
-{
-    Message msg = this->getMessagesManager().getFrontMessage();
-    qint64 endConvSeq = -1;
-    if(!msg.senderUID.isEmpty())
-        endConvSeq = msg.convSeq;
-    DatabaseManager::getDatabaseManager().loadConversationMessages(this->conversationID, 20, endConvSeq, [this](const QList<Message>& msgs){
-        if(msgs.isEmpty())
-            return;
-        this->getMessagesManager().addMessages(msgs, false);
-        emit historyMessagesload(msgs.size());
-        if(!this->isFirstLoad)
-        {
-            this->isFirstLoad = true;
-            emit firstLoadingMessages();
-        }
-    });
 }
 
 bool ConversationItem::cancelUpload(const QString &tempMsgID)

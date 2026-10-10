@@ -25,7 +25,8 @@ public:
         LastMsgRole,
         LastTimestampRole,
         UnReadRole,
-        IsSelectedRole
+        IsSelectedRole,
+        IsSearchModeRole
     };
     explicit ConversationListDelegate(QObject *parent = nullptr);
 

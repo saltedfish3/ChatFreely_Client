@@ -76,7 +76,10 @@ void MessagesManager::addMessage(const Message &msg, bool isStoreDB)
     rebuildIndex();
 
     if(msg.status == Success && msg.convSeq > this->lastConvSeq)
+    {
         this->lastConvSeq = msg.convSeq;
+        this->isReachedNewest = false;
+    }
 
     if(msg.contentType == Image)
     {
@@ -119,14 +122,14 @@ void MessagesManager::addMessage(const Message &msg, bool isStoreDB)
         DatabaseManager::getDatabaseManager().addInsertMessageTask(this->conversationID, this->messages.at(index));
 
     checkMediaExpiredStatus(msg);
+    updateRanges(msg.convSeq, msg.convSeq);
 }
 
-void MessagesManager::addMessages(const QList<Message> &msgs, bool isStoreDB)
+void MessagesManager::addMessages(const QList<Message> &msgs, qint64 convSeqFirst, qint64 convSeqLast, bool isStoreDB)
 {
     if(msgs.isEmpty())
         return;
 
-    QSet<QString> existsID;
     QList<Message> validMsgs;
     for(const auto& msg : msgs)
     {
@@ -135,14 +138,13 @@ void MessagesManager::addMessages(const QList<Message> &msgs, bool isStoreDB)
             //消息去重
             bool isExist = false;
             if(!msg.serverMsgID.isEmpty())
-                isExist = indexOfMsg(msg.serverMsgID) == -1 ? false : true || existsID.contains(msg.serverMsgID);
+                isExist = indexOfMsg(msg.serverMsgID) == -1 ? false : true;
             if(!isExist && !msg.tempMsgID.isEmpty())
-                isExist = indexOfMsg(msg.tempMsgID) == -1 ? false : true || existsID.contains(msg.tempMsgID);
+                isExist = indexOfMsg(msg.tempMsgID) == -1 ? false : true;
 
             if(isExist)
                 continue;
         }
-        existsID.insert(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID);
         validMsgs.append(msg);
     }
 
@@ -153,40 +155,16 @@ void MessagesManager::addMessages(const QList<Message> &msgs, bool isStoreDB)
     {
         int index = findInsertIndex(msg.convSeq);
         this->messages.insert(index, msg);
+        emit messageAdd(index);
 
         if(msg.status == Success && msg.convSeq > this->lastConvSeq)
             this->lastConvSeq = msg.convSeq;
     }
     rebuildIndex();
 
-    for(const auto& msg : validMsgs)
-        checkMediaExpiredStatus(msg);
+    emit messagesInserted();
 
-    if(isStoreDB)
-    {
-        for(const auto& msg : validMsgs)
-        {
-            int index = indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID);
-            if(index != -1)
-            {
-                calcShowTimestamp(index);
-                DatabaseManager::getDatabaseManager().addInsertMessageTask(this->conversationID, this->messages.at(index));
-            }
-        }
-    }
-
-    int first = INT_MAX;
-    int end = -1;
-    for(const auto& msg : validMsgs)
-    {
-        int index = indexOfMsg(msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID);
-        first = qMin(index, first);
-        end = qMax(index, end);
-    }
-    if(first <= end)
-        emit messagesAdd(first, end);
-    else
-        emit resetModel();
+    updateRanges(convSeqFirst, convSeqLast);
 
     for(const auto& msg : validMsgs)
     {
@@ -222,6 +200,19 @@ void MessagesManager::addMessages(const QList<Message> &msgs, bool isStoreDB)
             if(this->set_expiredMediaUrl.remove(msg.info.url))
                 emit mediaAvailable(msg.info.url);
         }
+
+        if(isStoreDB)
+        {
+            const QString msgID = msg.serverMsgID.isEmpty() ? msg.tempMsgID : msg.serverMsgID;
+            int index = indexOfMsg(msgID);
+
+            if(index != -1)
+            {
+                calcShowTimestamp(index);
+                DatabaseManager::getDatabaseManager().addInsertMessageTask(this->conversationID, this->messages.at(index));
+            }
+        }
+        checkMediaExpiredStatus(msg);
     }
 }
 
@@ -351,7 +342,145 @@ void MessagesManager::clearMessages()
 {
     this->messages.clear();
     this->index_message.clear();
+    this->ranges.clear();
+    this->lastConvSeq = 0;
+    this->isReachedNewest = false;
+    this->isReachedOldest = false;
     emit resetModel();
+}
+
+void MessagesManager::loadMessages(LoadDir dir, qint64 cursorConvSeq, int limit)
+{
+    auto finish = [this, dir](){
+        emit loadMessagesFinished(dir);
+    };
+
+    if(dir == LoadDir::Around)
+    {
+        if(findRangeIndexByconvSeq(cursorConvSeq) >= 0)
+        {
+            finish();
+            return;
+        }
+
+        quint64 gen = ++this->loadGen_around;
+        DatabaseManager::getDatabaseManager().loadConversationMessages(this->conversationID, cursorConvSeq, DatabaseManager::MessageQueryDir::Around, limit, [this, gen, finish](const QList<Message>& msgs){
+            if(gen != this->loadGen_around)
+            {
+                finish();
+                return;
+            }
+
+            if(!msgs.isEmpty())
+            {
+                qint64 convSeqFirst = msgs.first().convSeq;
+                qint64 convSeqLast = msgs.last().convSeq;
+                addMessages(msgs, convSeqFirst, convSeqLast, false);
+            }
+            finish();
+        });
+
+        return;
+    }
+
+    bool isOlder = dir == LoadDir::Older;
+    if(isOlder && this->isReachedOldest)
+    {
+        finish();
+        return;
+    }
+    if(!isOlder && this->isReachedNewest)
+    {
+        finish();
+        return;
+    }
+
+    if(findRangeIndexByconvSeq(isOlder ? cursorConvSeq - 1 : cursorConvSeq + 1) >= 0)
+    {
+        finish();
+        return;
+    }
+
+    quint64 gen = isOlder ? ++this->loadGen_older : ++this->loadGen_newer;
+    DatabaseManager::getDatabaseManager().loadConversationMessages(this->conversationID, cursorConvSeq, isOlder ? DatabaseManager::MessageQueryDir::Older : DatabaseManager::MessageQueryDir::Newer, limit,
+        [this, gen, cursorConvSeq, isOlder, limit, finish](const QList<Message>& msgs){
+        quint64 currentGen = isOlder ? this->loadGen_older : this->loadGen_newer;
+        if(gen != currentGen)
+        {
+            finish();
+            return;
+        }
+
+        if(msgs.isEmpty())
+        {
+            if(isOlder)
+            {
+                this->isReachedOldest = true;
+                updateRanges(0, cursorConvSeq - 1);
+            }
+            else
+            {
+                this->isReachedNewest = true;
+                updateRanges(cursorConvSeq + 1, INT64_MAX);
+            }
+            finish();
+            return;
+        }
+
+        qint64 convSeqFirst;
+        qint64 convSeqLast;
+        if(isOlder)
+        {
+            convSeqFirst = msgs.size() < limit ? 0 : msgs.first().convSeq;
+            convSeqLast = cursorConvSeq - 1;
+        }
+        else
+        {
+            convSeqFirst = cursorConvSeq + 1;
+            convSeqLast = msgs.size() < limit ? INT64_MAX : msgs.last().convSeq;
+        }
+
+        addMessages(msgs, convSeqFirst, convSeqLast, false);
+        finish();
+    });
+}
+
+void MessagesManager::jumpToMessage(const QString &msgID, qint64 convSeq)
+{
+    int row = indexOfMsg(msgID);
+    if(row >= 0)
+    {
+        emit jumpToFinished(row, msgID);
+        return;
+    }
+
+    quint64 gen = ++this->loadGen_jump;
+    DatabaseManager::getDatabaseManager().loadConversationMessages(this->conversationID, convSeq, DatabaseManager::MessageQueryDir::Around, 20, [this, gen, msgID, convSeq](const QList<Message>& msgs){
+        if(gen != this->loadGen_jump)
+            return;
+
+        if(msgs.isEmpty())
+        {
+            emit jumpToFailed(msgID);
+            return;
+        }
+
+        qint64 convSeqFirst = msgs.first().convSeq;
+        qint64 convSeqLast = msgs.last().convSeq;
+        addMessages(msgs, convSeqFirst, convSeqLast, false);
+
+        int targetRow = indexOfMsg(msgID);
+        if(targetRow < 0)
+        {
+            targetRow = indexOfConvSeqOrBefore(convSeq);
+            if(targetRow < 0)
+                targetRow = indexOfConvSeqOrAfter(convSeq);
+            if(targetRow < 0)
+                targetRow = 0;
+        }
+
+        emit jumpToFinished(targetRow, msgID);
+    });
 }
 
 Message MessagesManager::getLastMessage() const
@@ -640,6 +769,51 @@ bool MessagesManager::isMediaExpired(const QString &url) const
     return this->set_expiredMediaUrl.contains(url);
 }
 
+const QList<MessagesManager::Range> &MessagesManager::getRanges() const
+{
+    return this->ranges;
+}
+
+int MessagesManager::indexOfConvSeqOrAfter(qint64 convSeq) const
+{
+    int low = 0;
+    int high = this->messages.size() - 1;
+    int result = -1;
+    while(low <= high)
+    {
+        int mid = (low + high) / 2;
+        if(this->messages.at(mid).convSeq >= convSeq)
+        {
+            result = mid;
+            high = mid - 1;
+        }
+        else
+            low = mid + 1;
+    }
+
+    return result;
+}
+
+int MessagesManager::indexOfConvSeqOrBefore(qint64 convSeq) const
+{
+    int low = 0;
+    int high = this->messages.size() - 1;
+    int result = -1;
+    while(low <= high)
+    {
+        int mid = (low + high) / 2;
+        if(this->messages.at(mid).convSeq <= convSeq)
+        {
+            result = mid;
+            low = mid + 1;
+        }
+        else
+            high = mid - 1;
+    }
+
+    return result;
+}
+
 int MessagesManager::findInsertIndex(qint64 convSeq) const
 {
     int low = 0;
@@ -730,4 +904,54 @@ void MessagesManager::checkMediaExpiredStatus(const Message &msg)
             emit mediaExpired(url);
         }
     });
+}
+
+void MessagesManager::updateRanges(qint64 convSeqFirst, qint64 convSeqLast)
+{
+    if(convSeqFirst > convSeqLast)
+        return;
+
+    int i = 0;
+    while(i < this->ranges.size())
+    {
+        const Range& range = this->ranges[i];
+        if(range.last + 1 >= convSeqFirst && range.first <= convSeqLast + 1)
+        {
+            convSeqFirst = qMin(convSeqFirst, range.first);
+            convSeqLast = qMax(convSeqLast, range.last);
+            ranges.removeAt(i);
+        }
+        else if(range.first > convSeqLast + 1)
+            break;
+        else
+            i++;
+    }
+
+    int pos = 0;
+    while(pos < this->ranges.size() && this->ranges[pos].first < convSeqFirst)
+        pos++;
+    this->ranges.insert(pos, {convSeqFirst, convSeqLast});
+}
+
+int MessagesManager::findRangeIndexByconvSeq(qint64 convSeq) const
+{
+    int low = 0;
+    int high = this->ranges.size() - 1;
+    int result = -1;
+
+    while(low <= high)
+    {
+        int mid = (low + high) / 2;
+        if(this->ranges[mid].first <= convSeq)
+        {
+            result = mid;
+            low = mid + 1;
+        }
+        else
+            high = mid - 1;
+    }
+
+    if(result < 0 || convSeq > this->ranges[result].last)
+        return -1;
+    return result;
 }

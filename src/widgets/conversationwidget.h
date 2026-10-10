@@ -38,6 +38,7 @@ public:
     void updateFriendUsername(const QString& username);
     void updateFriendStatus(bool isOnline);
     void setActive(bool isActive);
+    void jumpToMessage(const QString& msgID, qint64 convSeq);
 
 signals:
 
@@ -72,10 +73,15 @@ private:
     ConversationItem* item;
     int64_t theBestConvSeq = 0;
 
-    bool isInsertNow = false;
     bool isAdjustNow = false;
     QString topMsgID;
-    bool isFristTimeOpen = false;
+    bool isFirstTimeOpen = false;
+    bool isFirstLoaded = false;
+
+    bool isLoadingOlder = false;
+    bool isLoadingNewer = false;
+
+    bool isWaitingJump = false;
 };
 
 #endif // CONVERSATIONWIDGET_H

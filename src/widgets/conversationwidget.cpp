@@ -389,7 +389,6 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         QDir().mkpath(dir);
         QString target = QDir(dir).filePath(msg.info.name);
 
-
         bool isExists = GlobalVariable::isDownloadFileExists(msg.info.name);
         this->item->getMessagesManager().setDownloadExists(msg.info.url, isExists);
         if(isExists)
@@ -431,50 +430,97 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         });
     });
 
+    connect(this->item, &ConversationItem::loadMessagesFinished, this, [this](MessagesManager::LoadDir dir){
+        if(dir == MessagesManager::LoadDir::Older)
+        {
+            this->topMsgID.clear();
+            this->isLoadingOlder = false;
+        }
+        else if(dir == MessagesManager::LoadDir::Newer)
+            this->isLoadingNewer = false;
+    });
+
+    connect(this->item, &ConversationItem::messagesInserted, this, [this](){
+        bool isFirstLoad = !this->isFirstLoaded;
+        if(isFirstLoad)
+            this->isFirstLoaded = true;
+
+        if(this->isWaitingJump)
+            return;
+
+        if(isFirstLoad)
+        {
+            this->listView_messages->scrollToBottom();
+            return;
+        }
+
+        if(this->topMsgID.isEmpty())
+            return;
+
+        int newRow = this->item->getMessagesManager().indexOfMsg(this->topMsgID);
+        this->topMsgID.clear();
+
+        if(newRow < 0)
+            return;
+
+        this->isAdjustNow = true;
+        this->listView_messages->scrollTo(this->model->index(newRow, 0), QAbstractItemView::PositionAtTop);
+        this->isAdjustNow = false;
+    });
+
+    connect(this->item, &ConversationItem::jumpToFinished, this, [this](int row, const QString& msgID){
+        this->isWaitingJump = false;
+        if(row < 0 || row >= this->model->rowCount())
+            return;
+
+        this->listView_messages->scrollTo(this->model->index(row, 0), QAbstractItemView::PositionAtCenter);
+    });
+
+    connect(this->item, &ConversationItem::jumpToFailed, this, [this](const QString& msgID){
+        this->isWaitingJump = false;
+        ToastManager::getToastManager(this).error("跳转失败: 找不到该消息");
+    });
+
     connect(this->listView_messages->verticalScrollBar(), &QScrollBar::valueChanged, this, [this](int value){
         if(isAdjustNow)
             return;
 
-        if(isInsertNow)
+        QModelIndex centerIndex = this->listView_messages->indexAt(this->listView_messages->viewport()->rect().center());
+        if(!centerIndex.isValid())
             return;
 
-        if(value <= (this->listView_messages->verticalScrollBar()->minimum() + this->listView_messages->height()*0.2))
+        int centerRow = centerIndex.row();
+        qint64 centerConvSeq = centerIndex.data(MessageModel::ConvSeqRole).toLongLong();
+
+        int rangeIndex = this->item->getMessagesManager().findRangeIndexByconvSeq(centerConvSeq);
+        if(rangeIndex < 0)
+            return;
+
+        const QList<MessagesManager::Range>& ranges = this->item->getMessagesManager().getRanges();
+
+        int row_first = this->item->getMessagesManager().indexOfConvSeqOrAfter(ranges[rangeIndex].first);
+        int row_last = this->item->getMessagesManager().indexOfConvSeqOrBefore(ranges[rangeIndex].last);
+        if(row_first < 0 || row_last < 0)
+            return;
+
+        int rowsToFirst = centerRow - row_first;
+        int rowsToLast = row_last - centerRow;
+
+        if(rowsToFirst <= 6 && !this->isLoadingOlder)
         {
-            Message msg = this->item->getMessagesManager().getFrontMessage();
-            if(!msg.senderUID.isEmpty())
-            {
-                if(msg.convSeq > 1)
-                {
-                    QModelIndex topIndex = this->listView_messages->indexAt(QPoint(1, 1));
+            QModelIndex topIndex = this->listView_messages->indexAt(QPoint(1, 1));
+            if(topIndex.isValid())
+                this->topMsgID = topIndex.data(MessageModel::MessageIDRole).toString();
 
-                    if(topIndex.isValid())
-                        this->topMsgID = topIndex.data(MessageModel::MessageIDRole).toString();
-                    else
-                        this->topMsgID.clear();
-
-                    this->isInsertNow = true;
-                    this->item->loadHistoryMessages();
-                }
-            }
-        }
-    });
-
-    connect(this->item, &ConversationItem::firstLoadingMessages, this, [this](){
-        this->listView_messages->scrollToBottom();
-    });
-
-    connect(this->item, &ConversationItem::historyMessagesload, this, [this](int insertCount){
-        this->isAdjustNow = true;
-
-        if(!this->topMsgID.isEmpty())
-        {
-            QModelIndex newIndex = this->model->index(insertCount, 0);
-            if(newIndex.isValid())
-                this->listView_messages->scrollTo(newIndex, QAbstractItemView::PositionAtTop);
+            this->isLoadingOlder = true;
+            this->item->getMessagesManager().loadMessages(MessagesManager::LoadDir::Older, ranges[rangeIndex].first, 20);
         }
 
-        this->isAdjustNow = false;
-        this->isInsertNow = false;
+        if(rowsToLast <= 6 && !this->isLoadingNewer)
+        {
+            this->isLoadingNewer = true;
+            this->item->getMessagesManager().loadMessages(MessagesManager::LoadDir::Newer, ranges[rangeIndex].last, 20);
+        }
     });
 
     installEventFilter(this);
@@ -484,7 +530,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     this->widget_header->installEventFilter(this);
     this->widget_editRegion->installEventFilter(this);
 
-    this->item->loadHistoryMessages();
+    this->item->getMessagesManager().loadMessages(MessagesManager::LoadDir::Older, INT64_MAX, 20);
 }
 
 void ConversationWidget::updateFriendUsername(const QString &username)
@@ -519,6 +565,12 @@ void ConversationWidget::setActive(bool isActive)
         this->item->clearUnRead();
 }
 
+void ConversationWidget::jumpToMessage(const QString &msgID, qint64 convSeq)
+{
+    this->isWaitingJump = true;
+    this->item->getMessagesManager().jumpToMessage(msgID, convSeq);
+}
+
 bool ConversationWidget::eventFilter(QObject *obj, QEvent *event)
 {
     if(event->type() == QEvent::MouseButtonPress)
@@ -530,9 +582,9 @@ bool ConversationWidget::eventFilter(QObject *obj, QEvent *event)
 
 void ConversationWidget::showEvent(QShowEvent *event)
 {
-    if(!this->isFristTimeOpen)
+    if(!this->isFirstTimeOpen)
     {
-        this->isFristTimeOpen = true;
+        this->isFirstTimeOpen = true;
         this->listView_messages->scrollToBottom();
     }
 }

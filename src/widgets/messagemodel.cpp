@@ -6,7 +6,6 @@ MessageModel::MessageModel(MessagesManager* manager, QObject *parent)
     connect(manager, &MessagesManager::messageAdd, this, &MessageModel::onMessageAdd);
     connect(manager, &MessagesManager::messagesAdd, this, &MessageModel::onMessagesAdd);
     connect(manager, &MessagesManager::messageUpdate, this, &MessageModel::onMessageUpdate);
-    connect(manager, &MessagesManager::messagePrepend, this, &MessageModel::onMessagePrepend);
     connect(manager, &MessagesManager::messageRemove, this, &MessageModel::onMessageRemove);
     connect(manager, &MessagesManager::messageMove, this, &MessageModel::onMessageMove);
     connect(manager, &MessagesManager::resetModel, this, &MessageModel::onResetModel);
@@ -174,18 +173,9 @@ void MessageModel::onMessagesUpdate(int first, int end)
     emit dataChanged(index(first), index(end), {AvatarRole});
 }
 
-void MessageModel::onMessagePrepend(int count)
-{
-    if(count <= 0)
-        return;
-
-    beginInsertRows(QModelIndex(), 0, count - 1);
-    endInsertRows();
-}
-
 void MessageModel::onMessageRemove(int row)
 {
-    if(row < 0 || row >= rowCount())
+    if(row < 0 || row > rowCount())
         return;
 
     beginRemoveRows(QModelIndex(), row, row);

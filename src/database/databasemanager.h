@@ -39,12 +39,26 @@ public:
         SyncConvSeq = 0
     };
 
+    enum class MessageQueryDir
+    {
+        Older,
+        Newer,
+        Around
+    };
+
     struct DBTask
     {
         Type type;
         QString conversationID;
         Message msg;
         int unreadCount = 0;
+    };
+
+    struct SearchConvResult
+    {
+        QString conversationID;
+        int matchCount;
+        qint64 lastTimestamp;
     };
 
     static DatabaseManager& getDatabaseManager();
@@ -63,7 +77,11 @@ public:
     bool getConversationsLastConvSeq(const QString& conversationsID, qint64& outValue);
 
     void loadAllConversationsList(std::function<void(const QList<ConversationInfo>&)> callback);
-    void loadConversationMessages(const QString& conversationID, int limit = 20, qint64 endConvSeq = -1, std::function<void(const QList<Message>&)> callback = nullptr);
+    void loadConversationMessages(const QString& conversationID, qint64 cursorConvSeq, MessageQueryDir dir, int limit = 20, std::function<void(const QList<Message>&)> callback = nullptr);
+
+    //搜索会话
+    void searchConversations(const QString& keyword, qint64 cursorTimestamp, const QString& cursorConversationID, int limit, std::function<void(const QList<SearchConvResult>&)> callback);
+    void searchMessagesInConv(const QString& conversationID, const QString& keyword, qint64 cursorConvseq, int limit, std::function<void(const QList<Message>&)> callback);
 
     void clearAllChatMessages();
 

@@ -306,31 +306,58 @@ void DatabaseManager::loadAllConversationsList(std::function<void (const QList<C
     });
 }
 
-void DatabaseManager::loadConversationMessages(const QString &conversationID, int limit, qint64 endConvSeq, std::function<void (const QList<Message>&)> callback)
+void DatabaseManager::loadConversationMessages(const QString &conversationID, qint64 cursorConvSeq, MessageQueryDir dir, int limit, std::function<void (const QList<Message> &)> callback)
 {
-    auto future = QtConcurrent::run([this, conversationID, limit, endConvSeq, callback](){
+    auto future = QtConcurrent::run([this, conversationID, limit, cursorConvSeq, dir, callback](){
         QString connName = QUuid::createUuid().toString(QUuid::Id128);
+        qint64 convID = toInt64(conversationID);
+        if(convID == 0)
+        {
+            qWarning() << "loadConversationMessages: 载入历史消息convID转int64失败";
+            QMetaObject::invokeMethod(QCoreApplication::instance(), [callback](){
+                if(callback)
+                    callback({});
+            }, Qt::QueuedConnection);
+            return;
+        }
+
         QList<Message> msgs;
         {
             QSqlDatabase db = openConnection(connName);
             QSqlQuery q(db);
-            qint64 convID = toInt64(conversationID);
-            if(convID == 0)
-            {
-                qWarning() << "载入历史消息convID转int64失败";
-                return;
-            }
-            QString sql = "SELECT server_msg_id, temp_msg_id, sender_id, type, content, timestamp, conv_seq, status, show_timestamp "
-                          "FROM messages WHERE conversation_id = ?";
-            if(endConvSeq > 0)
-                sql += " AND conv_seq < ?";
-            sql += " ORDER BY conv_seq DESC LIMIT ?";
-            q.prepare(sql);
 
-            q.addBindValue(convID);
-            if(endConvSeq > 0)
-                q.addBindValue(endConvSeq);
-            q.addBindValue(limit);
+            QString sql;
+            QString baseSql = "SELECT server_msg_id, temp_msg_id, sender_id, type, content, timestamp, conv_seq, status, show_timestamp "
+                              "FROM messages WHERE conversation_id = ? AND conv_seq %1 ? "
+                              "ORDER BY conv_seq %2 LIMIT ?";
+
+            if(dir == MessageQueryDir::Older)
+            {
+                sql = baseSql.arg("<", "DESC");
+                q.prepare(sql);
+                q.addBindValue(convID);
+                q.addBindValue(cursorConvSeq);
+                q.addBindValue(limit);
+            }
+            else if(dir == MessageQueryDir::Newer)
+            {
+                sql = baseSql.arg(">", "ASC");
+                q.prepare(sql);
+                q.addBindValue(convID);
+                q.addBindValue(cursorConvSeq);
+                q.addBindValue(limit);
+            }
+            else
+            {
+                sql = "SELECT * FROM ( SELECT * FROM (" + baseSql.arg("<=", "DESC") + ") UNION ALL SELECT * FROM (" + baseSql.arg(">", "ASC") + ") ) ORDER BY conv_seq ASC";
+                q.prepare(sql);
+                q.addBindValue(convID);
+                q.addBindValue(cursorConvSeq);
+                q.addBindValue(limit);
+                q.addBindValue(convID);
+                q.addBindValue(cursorConvSeq);
+                q.addBindValue(limit);
+            }
 
             if(q.exec())
             {
@@ -353,7 +380,7 @@ void DatabaseManager::loadConversationMessages(const QString &conversationID, in
 
                     msg.parseMedia();
 
-                    msgs.prepend(msg);
+                    msgs.append(msg);
 
                     //防止Sending状态的消息永远处于sending
                     if(oldStatus == Sending)
@@ -363,6 +390,167 @@ void DatabaseManager::loadConversationMessages(const QString &conversationID, in
             else
                 qWarning() << "查询历史记录失败：" << q.lastError().text();
 
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(connName);
+        if(dir == MessageQueryDir::Older)
+            std::reverse(msgs.begin(), msgs.end());
+
+        QMetaObject::invokeMethod(QCoreApplication::instance(), [callback, msgs](){
+            if(callback)
+                callback(msgs);
+        }, Qt::QueuedConnection);
+    });
+}
+
+void DatabaseManager::searchConversations(const QString &keyword, qint64 cursorTimestamp, const QString& cursorConversationID, int limit, std::function<void (const QList<SearchConvResult> &)> callback)
+{
+    auto future = QtConcurrent::run([=](){
+        QList<SearchConvResult> results;
+        QString connName = QUuid::createUuid().toString(QUuid::Id128);
+
+        qint64 convID = 0;
+
+        if(cursorTimestamp)
+        {
+            convID = toInt64(cursorConversationID);
+            if(convID == 0)
+            {
+                qWarning() << "searchConversations: convID转int64失败";
+                QMetaObject::invokeMethod(QCoreApplication::instance(), [callback](){
+                    if(callback)
+                        callback({});
+                }, Qt::QueuedConnection);
+                return;
+            }
+        }
+
+        {
+            QSqlDatabase db = openConnection(connName);
+            if(db.isOpen())
+            {
+                QSqlQuery q(db);
+
+                if(cursorTimestamp <= 0)
+                {
+                    const QString sql =
+                        "SELECT conversation_id, COUNT(*), MAX(timestamp) AS last_ts "
+                        "FROM messages "
+                        "WHERE type = 0 AND instr(content, ?) > 0 "
+                        "GROUP BY conversation_id "
+                        "ORDER BY last_ts DESC, conversation_id DESC "
+                        "LIMIT ?";
+                    q.prepare(sql);
+                    q.addBindValue(keyword);
+                    q.addBindValue(limit);
+                }
+                else
+                {
+                    const QString sql =
+                        "SELECT conversation_id, COUNT(*), MAX(timestamp) AS last_ts "
+                        "FROM messages "
+                        "WHERE type = 0 AND instr(content, ?) > 0 "
+                        "GROUP BY conversation_id "
+                        "HAVING last_ts < ? OR (last_ts = ? AND conversation_id < ?) "
+                        "ORDER BY last_ts DESC, conversation_id DESC "
+                        "LIMIT ?";
+                    q.prepare(sql);
+                    q.addBindValue(keyword);
+                    q.addBindValue(cursorTimestamp);
+                    q.addBindValue(cursorTimestamp);
+                    q.addBindValue(convID);
+                    q.addBindValue(limit);
+                }
+
+                if(q.exec())
+                {
+                    while(q.next())
+                    {
+                        SearchConvResult result;
+                        result.conversationID = QString::number(q.value(0).toLongLong());
+                        result.matchCount = q.value(1).toInt();
+                        result.lastTimestamp = q.value(2).toLongLong();
+                        results.append(result);
+                    }
+                }
+                else
+                    qWarning() << "查询Conversations失败：" << q.lastError().text();
+            }
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(connName);
+        QMetaObject::invokeMethod(QCoreApplication::instance(), [callback, results](){
+            if(callback)
+                callback(results);
+        }, Qt::QueuedConnection);
+    });
+}
+
+void DatabaseManager::searchMessagesInConv(const QString &conversationID, const QString &keyword, qint64 cursorConvseq, int limit, std::function<void (const QList<Message> &)> callback)
+{
+    auto future = QtConcurrent::run([=](){
+        QList<Message> msgs;
+        QString connName = QUuid::createUuid().toString(QUuid::Id128);
+        qint64 convID = toInt64(conversationID);
+        if(convID == 0)
+        {
+            qWarning() << "searchMessagesInConv: convID转int64失败";
+            QMetaObject::invokeMethod(QCoreApplication::instance(), [callback](){
+                if(callback)
+                    callback({});
+            }, Qt::QueuedConnection);
+            return;
+        }
+
+        {
+            QSqlDatabase db = openConnection(connName);
+            if(db.isOpen())
+            {
+                QSqlQuery q(db);
+                QString sql =
+                    "SELECT server_msg_id, temp_msg_id, sender_id, type, content, timestamp, conv_seq "
+                    "FROM messages "
+                    "WHERE conversation_id = ? AND type = 0 AND instr(content, ?) > 0 ";
+
+                if(cursorConvseq <= 0)
+                {
+                    sql += "ORDER BY conv_seq DESC LIMIT ?";
+                    q.prepare(sql);
+                    q.addBindValue(convID);
+                    q.addBindValue(keyword);
+                    q.addBindValue(limit);
+                }
+                else
+                {
+                    sql += "AND conv_seq < ? ORDER BY conv_seq DESC LIMIT ?";
+                    q.prepare(sql);
+                    q.addBindValue(convID);
+                    q.addBindValue(keyword);
+                    q.addBindValue(cursorConvseq);
+                    q.addBindValue(limit);
+                }
+
+                if(q.exec())
+                {
+                    while(q.next())
+                    {
+                        Message msg;
+                        QVariant var_serverMsgID = q.value(0);
+                        if(!var_serverMsgID.isNull())
+                            msg.serverMsgID = QString::number(var_serverMsgID.toLongLong());
+
+                        msg.tempMsgID = q.value(1).toString();
+                        msg.senderUID = QString::number(q.value(2).toLongLong());
+                        msg.contentType = static_cast<ContentType>(q.value(3).toInt());
+                        msg.content = q.value(4).toString();
+                        msg.timeStamp = q.value(5).toLongLong();
+                        msg.convSeq = q.value(6).toLongLong();
+                        msgs.append(msg);
+                    }
+                }
+                else
+                    qWarning() << "查询Conversations的Messages失败：" << q.lastError().text();
+            }
             db.close();
         }
         QSqlDatabase::removeDatabase(connName);
