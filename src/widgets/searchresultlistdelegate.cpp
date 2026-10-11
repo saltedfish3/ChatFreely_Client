@@ -34,7 +34,10 @@ void SearchResultListDelegate::paint(QPainter *painter, const QStyleOptionViewIt
         QRect avatar(contain.topLeft() + QPoint(10, (contain.height() - avatarSize.height())/2), avatarSize);
         QPixmap avatarIcon = index.data(AvatarRole).value<QPixmap>();
         if(avatarIcon.isNull())
+        {
             avatarIcon = QPixmap(":/default/images/defaultAvatar.png");
+            avatarIcon.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+        }
 
         painter->save();
         QPainterPath path;

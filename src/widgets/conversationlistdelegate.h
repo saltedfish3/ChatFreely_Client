@@ -9,6 +9,7 @@
 #include <QMouseEvent>
 #include <QPainterPath>
 #include <QDateTime>
+#include "../utils/GlobalVariable.h"
 
 class ConversationListDelegate : public QStyledItemDelegate
 {

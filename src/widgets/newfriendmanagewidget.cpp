@@ -16,7 +16,10 @@ void NewFriendManageWidget::addRequestsItem(QString uid, QString sid, QString us
     item->setData(uid, FriendApplyDelegate::UIDRole);
     item->setData(sid, FriendApplyDelegate::SIDRole);
     item->setData(username, FriendApplyDelegate::UsernameRole);
-    item->setData(QPixmap(":/default/images/defaultAvatar.pn"), FriendApplyDelegate::AvatarRole);
+
+    QPixmap defAvatar(":/default/images/defaultAvatar.png");
+    defAvatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+    item->setData(defAvatar, FriendApplyDelegate::AvatarRole);
 
     item->setData(verMsg, FriendApplyDelegate::VerMsgRole);
     this->model->appendRow(item);
@@ -32,7 +35,9 @@ void NewFriendManageWidget::addRequestsItem(QString uid, QString sid, QString us
         {
             if(modelPtr && index.isValid())
             {
-                modelPtr->setData(index, pix, FriendApplyDelegate::AvatarRole);
+                QPixmap pix_copy = pix;
+                pix_copy.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                modelPtr->setData(index, pix_copy, FriendApplyDelegate::AvatarRole);
             }
             return;
         }
@@ -40,7 +45,11 @@ void NewFriendManageWidget::addRequestsItem(QString uid, QString sid, QString us
             if(pix.isNull())
                 return;
             if(modelPtr && index.isValid())
-                 modelPtr->setData(index, pix, FriendApplyDelegate::AvatarRole);
+            {
+                QPixmap pix_copy = pix;
+                pix_copy.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                modelPtr->setData(index, pix_copy, FriendApplyDelegate::AvatarRole);
+            }
         }, false, 0, 0, QSize(48, 48));
 
     }, false, 0, 0, QSize(48, 48));

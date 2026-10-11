@@ -270,6 +270,10 @@ void ChatWidget::initListWidget()
     connect(&FriendManage::getFriendManage(), &FriendManage::friendAvatarUpdate, this, [this](const QString& uid, const QPixmap& avatar, const QSize& size){
         if(size != QSize(36, 36) && !size.isEmpty())
             return;
+
+        QPixmap avatar_copy = avatar;
+        avatar_copy.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+
         for(int i = 0; i < this->model->rowCount(); i++)
         {
             QModelIndex index = this->model->index(i, 0);
@@ -277,12 +281,49 @@ void ChatWidget::initListWidget()
             {
                 QStandardItem* item = this->model->itemFromIndex(index);
                 if(!size.isEmpty())
-                    item->setData(avatar, ConversationListDelegate::AvatarRole);
+                    item->setData(avatar_copy, ConversationListDelegate::AvatarRole);
                 else
                 {
                     QPixmap newAvatar = FriendManage::getFriendManage().getFriendAvatar(uid, QSize(36, 36));
+                    newAvatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
                     if(!newAvatar.isNull())
                         item->setData(newAvatar, ConversationListDelegate::AvatarRole);
+                }
+            }
+        }
+
+        for(int i = 0; i < this->model_searchConversation->rowCount(); i++)
+        {
+            QModelIndex index = this->model_searchConversation->index(i, 0);
+            if(uid == index.data(ConversationListDelegate::UIDRole).toString())
+            {
+                QStandardItem* item = this->model_searchConversation->itemFromIndex(index);
+                if(!size.isEmpty())
+                    item->setData(avatar_copy, ConversationListDelegate::AvatarRole);
+                else
+                {
+                    QPixmap newAvatar = FriendManage::getFriendManage().getFriendAvatar(uid, QSize(36, 36));
+                    newAvatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                    if(!newAvatar.isNull())
+                        item->setData(newAvatar, ConversationListDelegate::AvatarRole);
+                }
+            }
+        }
+
+        for(int i = 0; i < this->model_searchMsg->rowCount(); i++)
+        {
+            QModelIndex index = this->model_searchMsg->index(i, 0);
+            if(uid == index.data(SearchResultListDelegate::SenderUIDRole).toString())
+            {
+                QStandardItem* item = this->model_searchMsg->itemFromIndex(index);
+                if(!size.isEmpty())
+                    item->setData(avatar_copy, SearchResultListDelegate::AvatarRole);
+                else
+                {
+                    QPixmap newAvatar = FriendManage::getFriendManage().getFriendAvatar(uid, QSize(36, 36));
+                    newAvatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                    if(!newAvatar.isNull())
+                        item->setData(newAvatar, SearchResultListDelegate::AvatarRole);
                 }
             }
         }
@@ -316,6 +357,26 @@ void ChatWidget::initListWidget()
             {
                 QStandardItem* item = this->model->itemFromIndex(index);
                 item->setData(username, ConversationListDelegate::UsernameRole);
+            }
+        }
+
+        for(int i = 0; i < this->model_searchConversation->rowCount(); i++)
+        {
+            QModelIndex index = this->model_searchConversation->index(i, 0);
+            if(uid == index.data(ConversationListDelegate::UIDRole).toString())
+            {
+                QStandardItem* item = this->model_searchConversation->itemFromIndex(index);
+                item->setData(username, ConversationListDelegate::UsernameRole);
+            }
+        }
+
+        for(int i = 0; i < this->model_searchMsg->rowCount(); i++)
+        {
+            QModelIndex index = this->model_searchMsg->index(i, 0);
+            if(uid == index.data(SearchResultListDelegate::SenderUIDRole).toString())
+            {
+                QStandardItem* item = this->model_searchMsg->itemFromIndex(index);
+                item->setData(username, SearchResultListDelegate::UsernameRole);
             }
         }
     });
@@ -355,8 +416,78 @@ void ChatWidget::initListWidget()
             {
                 QStandardItem* item = this->model->itemFromIndex(index);
                 item->setData(info.username, ConversationListDelegate::UsernameRole);
-                item->setData(FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(36, 36)), ConversationListDelegate::AvatarRole);
+
+                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(36, 36));
+                avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                item->setData(avatar, ConversationListDelegate::AvatarRole);
+
                 item->setData(info.isOnline, ConversationListDelegate::IsOnlineRole);
+            }
+        }
+
+        for(int i = 0; i < this->model_searchConversation->rowCount(); i++)
+        {
+            QModelIndex index = this->model_searchConversation->index(i, 0);
+            QString uid = index.data(ConversationListDelegate::UIDRole).toString();
+            FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
+            if(!info.uid.isEmpty())
+            {
+                QStandardItem* item = this->model_searchConversation->itemFromIndex(index);
+                item->setData(info.username, ConversationListDelegate::UsernameRole);
+
+                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(36, 36));
+                avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                item->setData(avatar, ConversationListDelegate::AvatarRole);
+            }
+        }
+
+        for(int i = 0; i < this->model_searchMsg->rowCount(); i++)
+        {
+            QModelIndex index = this->model_searchMsg->index(i, 0);
+            QString uid = index.data(SearchResultListDelegate::SenderUIDRole).toString();
+            FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
+            if(!info.uid.isEmpty())
+            {
+                QStandardItem* item = this->model_searchMsg->itemFromIndex(index);
+                item->setData(info.username, SearchResultListDelegate::UsernameRole);
+
+                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(36, 36));
+                avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                item->setData(avatar, SearchResultListDelegate::AvatarRole);
+            }
+        }
+    });
+
+    connect(&UserInfo::getUserInfo(), &UserInfo::updateInfo, this, [this](QString username, QString email, QString sid){
+
+        for(int i = 0; i < this->model_searchMsg->rowCount(); i++)
+        {
+            QModelIndex index = this->model_searchMsg->index(i, 0);
+            QString uid = index.data(SearchResultListDelegate::SenderUIDRole).toString();
+            if(uid == UserInfo::getUserInfo().getUID())
+            {
+                QStandardItem* item = this->model_searchMsg->itemFromIndex(index);
+                item->setData(username, SearchResultListDelegate::UsernameRole);
+
+                QPixmap avatar = UserInfo::getUserInfo().getAvatar(QSize(36, 36));
+                avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                item->setData(avatar, ConversationListDelegate::AvatarRole);
+            }
+        }
+    });
+
+    connect(&UserInfo::getUserInfo(), &UserInfo::updateAvatar, this, [this](const QPixmap& avatar, const QSize& size){
+        QPixmap avatar_copy = avatar;
+        avatar_copy.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+
+        for(int i = 0; i < this->model_searchMsg->rowCount(); i++)
+        {
+            QModelIndex index = this->model_searchMsg->index(i, 0);
+            QString uid = index.data(SearchResultListDelegate::SenderUIDRole).toString();
+            if(uid == UserInfo::getUserInfo().getUID())
+            {
+                QStandardItem* item = this->model_searchMsg->itemFromIndex(index);
+                item->setData(size == QSize(36, 36) ? avatar_copy : UserInfo::getUserInfo().getAvatar(QSize(36, 36)), SearchResultListDelegate::AvatarRole);
             }
         }
     });
@@ -545,6 +676,7 @@ void ChatWidget::appendSearchMsgItem(const Message &msg)
     item->setData(msg.convSeq, SearchResultListDelegate::ConvSeqRole);
     item->setData(false, SearchResultListDelegate::IsReturnBackItemRole);
     item->setData(this->edit_search->text().trimmed(), SearchResultListDelegate::HighLightKeywordRole);
+    item->setData(msg.senderUID, SearchResultListDelegate::SenderUIDRole);
 
     this->model_searchMsg->appendRow(item);
 }
@@ -612,14 +744,22 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
     {
         item_standard->setData(item->getConversationID(), ConversationListDelegate::UIDRole);
         item_standard->setData("加载中...", ConversationListDelegate::UsernameRole);
-        item_standard->setData(QPixmap(":/default/images/defaultAvatar.png"), ConversationListDelegate::AvatarRole);
+
+        QPixmap defAvatar = QPixmap(":/default/images/defaultAvatar.png");
+        defAvatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+
+        item_standard->setData(defAvatar, ConversationListDelegate::AvatarRole);
         item_standard->setData(true, ConversationListDelegate::IsOnlineRole);
     }
     else
     {
         item_standard->setData(friend_info.uid, ConversationListDelegate::UIDRole);
         item_standard->setData(friend_info.username, ConversationListDelegate::UsernameRole);
-        item_standard->setData(FriendManage::getFriendManage().getFriendAvatar(friend_info.uid, QSize(36, 36)), ConversationListDelegate::AvatarRole);
+
+        QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(friend_info.uid, QSize(36, 36));
+        avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+
+        item_standard->setData(avatar, ConversationListDelegate::AvatarRole);
         item_standard->setData(friend_info.isOnline, ConversationListDelegate::IsOnlineRole);
     }
 

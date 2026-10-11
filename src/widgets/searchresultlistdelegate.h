@@ -7,6 +7,7 @@
 #include <QMouseEvent>
 #include <QPainterPath>
 #include <QDateTime>
+#include "../utils/GlobalVariable.h"
 
 class SearchResultListDelegate : public QStyledItemDelegate
 {
@@ -21,7 +22,8 @@ public:
         MsgIDRole,
         ConvSeqRole,
         IsReturnBackItemRole,
-        HighLightKeywordRole
+        HighLightKeywordRole,
+        SenderUIDRole
     };
 
     explicit SearchResultListDelegate(QObject *parent = nullptr);

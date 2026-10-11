@@ -131,9 +131,6 @@ private:
     QSet<QString> set_expiredMediaUrl;
     QSet<QString> set_checkingMediaUrl;
 
-    bool isReachedOldest = false;
-    bool isReachedNewest = false;
-
     int findInsertIndex(qint64 convSeq) const;
     void saveMoveMessage(int row);
     void calcShowTimestamp(int row);

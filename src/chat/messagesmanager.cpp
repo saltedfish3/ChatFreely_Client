@@ -85,7 +85,6 @@ void MessagesManager::addMessage(const Message &msg, bool isStoreDB)
     if(msg.status == Success && msg.convSeq > this->lastConvSeq)
     {
         this->lastConvSeq = msg.convSeq;
-        this->isReachedNewest = false;
     }
 
     if(msg.contentType == Image)
@@ -351,8 +350,6 @@ void MessagesManager::clearMessages()
     this->index_message.clear();
     this->ranges.clear();
     this->lastConvSeq = 0;
-    this->isReachedNewest = false;
-    this->isReachedOldest = false;
     this->highLightMsgID.clear();
     this->timer_highLight->stop();
     emit resetModel();
@@ -393,16 +390,6 @@ void MessagesManager::loadMessages(LoadDir dir, qint64 cursorConvSeq, int limit)
     }
 
     bool isOlder = dir == LoadDir::Older;
-    if(isOlder && this->isReachedOldest)
-    {
-        finish();
-        return;
-    }
-    if(!isOlder && this->isReachedNewest)
-    {
-        finish();
-        return;
-    }
 
     if(findRangeIndexByconvSeq(isOlder ? cursorConvSeq - 1 : cursorConvSeq + 1) >= 0)
     {
@@ -422,15 +409,16 @@ void MessagesManager::loadMessages(LoadDir dir, qint64 cursorConvSeq, int limit)
 
         if(msgs.isEmpty())
         {
+            int rangeIndex = findRangeIndexByconvSeq(cursorConvSeq);
             if(isOlder)
             {
-                this->isReachedOldest = true;
-                updateRanges(0, cursorConvSeq - 1);
+                if(rangeIndex <= 0)
+                    updateRanges(0, cursorConvSeq - 1);
             }
             else
             {
-                this->isReachedNewest = true;
-                updateRanges(cursorConvSeq + 1, INT64_MAX);
+                if(rangeIndex < 0 || rangeIndex >= this->ranges.size() - 1)
+                    updateRanges(cursorConvSeq + 1, INT64_MAX);
             }
             finish();
             return;

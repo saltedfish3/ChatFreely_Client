@@ -32,7 +32,10 @@ void FriendApplyDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
     QSize avatarSize = QSize(48, 48);
     QPixmap avatar = index.data(AvatarRole).value<QPixmap>();
     if(avatar.isNull())
+    {
         avatar = QPixmap(":/default/images/defaultAvatar.png");
+        avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+    }
 
     QRect pos_avatarRect = QRect(cardRect.topLeft() + QPoint(16, (cardRect.height() - avatarSize.height())/2), avatarSize);
     painter->save();

@@ -8,6 +8,7 @@
 #include <QEvent>
 #include <QMouseEvent>
 #include <QAbstractItemView>
+#include "../utils/GlobalVariable.h"
 
 class FriendApplyDelegate : public QStyledItemDelegate
 {

@@ -231,12 +231,19 @@ void ContactsWidget::initSideUn()
                 {
                     QStandardItem* item = this->model->itemFromIndex(index);
                     if(!size.isEmpty())
-                        item->setData(avatar, FriendDelegate::AvatarRole);
+                    {
+                        QPixmap avatar_copy = avatar;
+                        avatar_copy.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                        item->setData(avatar_copy, FriendDelegate::AvatarRole);
+                    }
                     else
                     {
                         QPixmap newAvatar = FriendManage::getFriendManage().getFriendAvatar(uid, QSize(38, 38));
                         if(!newAvatar.isNull())
+                        {
+                            newAvatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
                             item->setData(newAvatar, FriendDelegate::AvatarRole);
+                        }
                     }
                     break;
                 }
@@ -461,7 +468,10 @@ void ContactsWidget::sortedFriendList()
             this->model->appendRow(header);
             preGroup = thisGroup;
         }
-        addFriendItem(fi.uid, fi.sid, fi.username, FriendManage::getFriendManage().getFriendAvatar(fi.uid, QSize(38, 38)), fi.email, fi.isOnline);
+
+        QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(fi.uid, QSize(38, 38));
+        avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+        addFriendItem(fi.uid, fi.sid, fi.username, avatar, fi.email, fi.isOnline);
     }
     restoreSelect();
 }
@@ -472,7 +482,11 @@ void ContactsWidget::searchFriend(const QString& text)
     for(const FriendManage::FriendInfo& fi : std::as_const(list))
     {
         if(fi.username.contains(text, Qt::CaseInsensitive))
-            addFriendItem(fi.uid, fi.sid, fi.username, FriendManage::getFriendManage().getFriendAvatar(fi.uid, QSize(38, 38)), fi.email, fi.isOnline);
+        {
+            QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(fi.uid, QSize(38, 38));
+            avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+            addFriendItem(fi.uid, fi.sid, fi.username, avatar, fi.email, fi.isOnline);
+        }
     }
     restoreSelect();
 }

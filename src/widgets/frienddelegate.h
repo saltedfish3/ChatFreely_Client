@@ -8,6 +8,7 @@
 #include <QPainterPath>
 #include <QEvent>
 #include <QMouseEvent>
+#include "../utils/GlobalVariable.h"
 
 class FriendDelegate : public QStyledItemDelegate
 {
