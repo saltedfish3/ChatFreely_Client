@@ -31,51 +31,63 @@ public:
     TcpLongConnection(const TcpLongConnection&) = delete;
     TcpLongConnection& operator=(const TcpLongConnection&) = delete;
 
+    //账号
     void sendLogin(QString email, QString password);
     void sendRegister(QString email, QString password, QString username);
     void sendUpadteAvatar(QString url);
     void sendUpdateUsername(QString username);
-    void sendAddNewFriendRequest(QString sid = "", QString email = "", QString verMsg = "");
-    void sendHandleNewFriendRequest(QString handle_uid, bool isAgree);
-    void sendMessageTo(QString uid, QString message, QString tempMsgID, ContentType type);
     void sendUnLogin();
     void sendRefreshToken(std::function<void(bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired)> callback);
     void sendAccessTokenLogin();
 
+    //好友
+    void sendAddNewFriendRequest(QString sid = "", QString email = "", QString verMsg = "");
+    void sendHandleNewFriendRequest(QString handle_uid, bool isAgree);
     void getNewFriendRequestsList();
     void getFriendList();
-    void getConversationsFriendUIDListAndSeq(int64_t syncConvSeq);
-    void sendSyncNewMessages(const QString& friendUID, qint64 startConvSeq, int limit = 30);
 
+    //群聊
+    void sendCreateGroupRequest(const QString& groupName, const QList<QString>& inviteUIDs, const QString& inviteMsg = "");
+
+    //消息
+    void sendMessageTo(QString conversationID, QString message, QString tempMsgID, ContentType type);
+    void sendSyncNewMessages(const QString& conversationID, qint64 startConvSeq, int limit = 30);
+
+    void getConversationsFriendUIDListAndSeq(int64_t syncConvSeq);
     bool isConnect();
 
 signals:
     void reconnectSuccess();
 
+    //账号
     void LoginState(bool isSuccess, const QString& from, const QString& info, bool reLogin = false);
     void accessTokenLoginSuccess();
-    void RegisterState(bool isSuccess ,QString from, QString info);
-    void mainState(bool isSuccess, QString info);
+    void RegisterState(bool isSuccess, const QString& from, const QString& info);
+    void mainState(bool isSuccess, const QString& info);
+
+    //好友
     void newFriendRequestsState(bool isEmpty);
     void newFriendRequestsHandleResult(bool isSuccess);
-    void newFriendRequests(QString uid, QString sid, QString username, QString avatar_url, QString verMsg);
-
+    void newFriendRequests(const QString& uid, const QString& sid, const QString& username, const QString& avatar_url, const QString& verMsg);
     //全量获取好友列表
     void allFriendList(const QList<QVariantMap>& list);
     //接收服务器的push
-    void newFriend(QString uid, QString sid, QString username, QString avatar_url, QString email, bool isOnline);
+    void newFriend(const QString& conversationID, const QString& uid, const QString& sid, const QString& username, const QString& avatar_url, const QString& email, bool isOnline);
+    //更新好友的状态信息
+    void FriendStatus(const QString& uid, bool isOnline);
+    void FriendUsername(const QString& uid, const QString& username);
+    void FriendAvatar(const QString& uid, const QString& avatar);
+
+    //群聊
+    void createGroupSuccess(const QString& groupID, const QString& conversationID);
+
 
     //用于通知业务层getConversationsListAndSeq是否成功
     void newSyncConvStatus(bool isSuccess, const QList<QString>& conversations, int64_t newSyncConvSeq);
     void syncMessagesStatus(bool isSuccess, const QString& conversationID, const QList<Message>& messages);
 
-    //更新好友的状态信息
-    void FriendStatus(QString uid, bool isOnline);
-    void FriendUsername(QString uid, QString username);
-    void FriendAvatar(QString uid, QString avatar);
-
-    void sendMessageStatus(bool isSuccess, QString tempMsgID, QString receiverUID, QString messageID = "", int64_t timeStamp = 0, int64_t convSeq = 0);
-    void pushMessage(QString senderUID, ContentType type, QString content, QString messageID, int64_t timeStamp, int64_t convSeq);
+    void sendMessageStatus(bool isSuccess, const QString& tempMsgID, const QString& conversationID, const QString& messageID = "", int64_t timeStamp = 0, int64_t convSeq = 0);
+    void pushMessage(const QString& conversationID, const QString& senderUID, ContentType type, const QString& content, const QString& messageID, int64_t timeStamp, int64_t convSeq);
     void cleanNewFriendRequestsList();
     void refreshExpiredExit();
     void exitAccount();
@@ -85,30 +97,36 @@ private:
 
     void startConnect();
     void sendHello();
+
+    //账号
     void handleHelloResp(QJsonObject obj);
     void handleLoginResp(QJsonObject obj);
     void handleAccessTokenLoginResp(QJsonObject obj);
     void handleRegisterResp(QJsonObject obj);
     void handleUpdateAvatarResp(QJsonObject obj);
     void handleUpdateUsernameResp(QJsonObject obj);
+    void handleUnLoginResp(QJsonObject obj);
+    void handleRefreshTokenResp(QJsonObject obj);
+
+    //好友
     void handleAddNewFriendRequestResp(QJsonObject obj);
     void handleHandleNewFriendRequestResp(QJsonObject obj);
     void handleGetNewFriendRequestsListResp(QJsonObject obj);
     void handleGetFriendListResp(QJsonObject obj);
-
-    void handleGetConversationsFriendUIDListAndSeqResp(QJsonObject obj);
-    void handleSyncNewMessagesResp(QJsonObject obj);
-
     void handlePushNewFriendRequests(QJsonObject obj);
     void handlePushNewFriend(QJsonObject obj);
     void handlePushFriendStatus(QJsonObject obj);
-    void handlePushNewMessage(QJsonObject obj);
     void handlePushFriendUsername(QJsonObject obj);
     void handlePushFriendAvatar(QJsonObject obj);
-    void handleSendMessageResp(QJsonObject obj);
-    void handleUnLoginResp(QJsonObject obj);
 
-    void handleRefreshTokenResp(QJsonObject obj);
+    //群聊
+    void handleCreateGroupRequestResp(QJsonObject obj);
+
+    //消息
+    void handleGetConversationsFriendUIDListAndSeqResp(QJsonObject obj);
+    void handleSyncNewMessagesResp(QJsonObject obj);
+    void handlePushNewMessage(QJsonObject obj);
+    void handleSendMessageResp(QJsonObject obj);
 
     uint64_t getRequestsId();
 
@@ -117,10 +135,7 @@ private:
     QTimer* clock_heartbeat;
 
     std::unordered_set<std::string> waiting_requestsID;
-    // QHash<QString, QTimer*> hash_timeoutTimers;//Request作键
-    // QHash<QString, QTimer*> hash_msgTimeoutTimers;//tempMsgID作键
-    // QHash<QString, QString> hash_requestsToFriendUID;
-    QHash<QString, QString> hash_conversationToCurrentReq;//friendUID -> requestID
+    QHash<QString, QString> hash_conversationToCurrentReq;//conversation -> requestID
     std::map<QString, std::function<void(bool, const QString&, bool)>> refreshCallBack;
 
     //曾经是否连接成功过
@@ -136,6 +151,7 @@ private:
         UpdateAvatar = 0,
         UpdateUsername,
         AddNewFriendRequest,
+        CreateGroupRequest,
         Register,
         UnLogin,
         HandleNewFriendRequest
@@ -151,7 +167,7 @@ private:
     {
         ContentType type;
         QString content;
-        QString receiverUID;
+        QString conversationID;
     };
     QMap<QString, PendingRequest> map_idempotentCache;//QString是RequestID
     QMap<QString, MessageRequest> map_messageCache;//QString是tempMsgID

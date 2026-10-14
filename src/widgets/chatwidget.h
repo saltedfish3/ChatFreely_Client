@@ -31,7 +31,7 @@ class ChatWidget : public QWidget
     Q_OBJECT
 public:
     explicit ChatWidget(int width, int height, QWidget *parent = nullptr);
-    void openConversation(const QString &uid);
+    void openConversation(const QString &conversationID);
 
 signals:
 

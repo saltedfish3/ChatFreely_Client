@@ -19,6 +19,7 @@ class FriendManage : public QObject
 public:
     struct FriendInfo
     {
+        QString conversationID;
         QString uid;
         QString sid;
         QString username;
@@ -34,6 +35,7 @@ public:
     int64_t getFriendCount() const;
     FriendManage::FriendInfo getFriendInfo(const QString& uid) const;
     QPixmap getFriendAvatar(const QString& uid, const QSize& wantedSize);
+    QString getFriendUIDByConversationID(const QString& conversationID);
 
     QList<FriendManage::FriendInfo> getAllFriend() const;
 
@@ -54,6 +56,7 @@ private slots:
 private:
     explicit FriendManage(QObject *parent = nullptr);
     QMap<QString, FriendInfo> map_friend;
+    QHash<QString, QString> hash_conversationToUID;//conversationID - UID
     QSet<QString> set_paddingAvatarSize;
 
     mutable QReadWriteLock lock;

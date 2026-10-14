@@ -6,8 +6,15 @@
 #include <QPushButton>
 #include <QLineEdit>
 #include <QRegularExpressionValidator>
+#include <QButtonGroup>
+#include <QListView>
+#include <QStandardItemModel>
+#include <QScrollBar>
+#include <QItemSelectionModel>
+#include "frienddelegate.h"
 #include "toastmanager.h"
 #include "../network/tcplongconnection.h"
+#include "../utils/friendmanage.h"
 
 class AddNewFriendWidget : public QWidget
 {
@@ -17,11 +24,17 @@ public:
 
     static QWidget* findRootWidget(QWidget *caller);
 signals:
-    //void add();
 
 private:
+    enum Mode
+    {
+        AddFriend,
+        JoinGroup,
+        CreateGroup
+    };
     void initWidget();
     void initStyle();
+    void changeMode(Mode mode);
 
     QWidget* widget_card;
 
@@ -38,6 +51,17 @@ private:
 
     QPushButton* btn_cancel;
     QPushButton* btn_add;
+
+    QButtonGroup* group;
+    QPushButton* btn_addPersonal;
+    QPushButton* btn_joinGroup;
+    QPushButton* btn_createGroup;
+
+    QListView* view_inviteFriend;
+    QStandardItemModel* model;
+    FriendDelegate* delegate;
+
+    Mode currentMode = AddFriend;
 };
 
 #endif // ADDNEWFRIENDWIDGET_H

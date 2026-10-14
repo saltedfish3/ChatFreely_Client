@@ -64,7 +64,7 @@ void GlobalInitController::loadLocalConversations()
         QList<QPair<ConversationItem*, DatabaseManager::ConversationInfo>> ls;
         for(const auto& info : list)
         {
-            ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(info.conversationID);
+            ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(info.conversationID, ConversationItem::ConversationType::Personal);
             if(!item)
                 continue;
             ls.append({item, info});
@@ -102,7 +102,7 @@ void GlobalInitController::syncNewMessages()
         this->waitingSyncConversationID.remove(convID);
         this->syncingConversationID.insert(convID);
 
-        ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(convID);
+        ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(convID, ConversationItem::ConversationType::Personal);
 
         if(!item)
         {
@@ -311,7 +311,7 @@ GlobalInitController::GlobalInitController(QObject *parent)
             return;
         }
 
-        ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(conversationID);
+        ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(conversationID, ConversationItem::ConversationType::Personal);
 
         if(!item)
         {

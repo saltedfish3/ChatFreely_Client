@@ -18,7 +18,7 @@ public:
     enum Role
     {
         UsernameRole = Qt::UserRole + 1,
-        UIDRole,
+        ConversationIDRole,
         SIDRole,
         EmailRole,
         AvatarRole,

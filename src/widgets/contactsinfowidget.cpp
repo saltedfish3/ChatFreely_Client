@@ -9,9 +9,9 @@ ContactsInfoWidget::ContactsInfoWidget(int width, int height, QWidget *parent)
     this->setObjectName("this");
 }
 
-void ContactsInfoWidget::changeInfo(QPixmap avatar, QString username, QString uid, QString sid, QString email, bool isOnline)
+void ContactsInfoWidget::changeInfo(QPixmap avatar, QString username, QString conversationID, QString sid, QString email, bool isOnline)
 {
-    this->uid = uid;
+    this->conversationID = conversationID;
 
     setRadius(avatar,this->label_avatar, 64);
     QFontMetrics fm(this->label_username->font());
@@ -124,7 +124,7 @@ void ContactsInfoWidget::init()
                             this->label_status->pos().y() + this->label_status->height() + 32);
 
     connect(this->btn_sendMsg, &QPushButton::clicked, this, [this](){
-        emit openConversation(this->uid);
+        emit openConversation(this->conversationID);
     });
 
     this->label_sendMsg_icon = new QLabel(this->btn_sendMsg);

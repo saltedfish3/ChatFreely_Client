@@ -10,7 +10,8 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     this->widget_header->resize(this->width(), 56);
     this->widget_header->move(0,0);
 
-    FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(item->getConversationID());
+    QString uid = FriendManage::getFriendManage().getFriendUIDByConversationID(item->getConversationID());
+    FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
     QString username;
     bool isOnline = false;
 

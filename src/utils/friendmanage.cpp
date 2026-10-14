@@ -102,6 +102,15 @@ QPixmap FriendManage::getFriendAvatar(const QString &uid, const QSize &wantedSiz
     return QPixmap(":/default/images/defaultAvatar.png");
 }
 
+QString FriendManage::getFriendUIDByConversationID(const QString &conversationID)
+{
+    QReadLocker locker(&this->lock);
+    auto it = this->hash_conversationToUID.find(conversationID);
+    if(it == this->hash_conversationToUID.end())
+        return {};
+    return it.value();
+}
+
 QList<FriendManage::FriendInfo> FriendManage::getAllFriend() const
 {
     QReadLocker locker(&(this->lock));
@@ -113,13 +122,16 @@ void FriendManage::cleanAll()
     QWriteLocker locker(&(this->lock));
     this->map_friend.clear();
     this->set_paddingAvatarSize.clear();
+    this->hash_conversationToUID.clear();
     this->isFirstLoad = false;
 }
 
 FriendManage::FriendManage(QObject *parent)
     : QObject{parent}
 {
-    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newFriend, this, [this](QString uid, QString sid, QString username, QString avatar_url, QString email, bool isOnline){
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newFriend, this, [this](const QString& conversationID, const QString& uid, const QString& sid,
+                                                                                            const QString& username, const QString& avatar_url, const QString& email,
+                                                                                            bool isOnline){
         //防止编译器瞎jb警告
         QPointer<FriendManage> pointer(this);
         if(!pointer)
@@ -129,12 +141,16 @@ FriendManage::FriendManage(QObject *parent)
 
             auto& info = this->map_friend[uid];
 
+            info.conversationID = conversationID;
             info.uid = uid;
             info.sid = sid;
             info.username = username;
             info.email = email;
             info.avatarUrl = avatar_url;
             info.isOnline = isOnline;
+
+            if(!conversationID.isEmpty())
+                this->hash_conversationToUID[conversationID] = uid;
         }
         emit allFriendList();
 
@@ -217,13 +233,17 @@ FriendManage::FriendManage(QObject *parent)
             for(auto& var : std::as_const(list))
             {
                 FriendInfo info;
+                info.conversationID = var.value("ConversationID").toString();
                 info.uid = var.value("UID").toString();
                 info.sid = var.value("SID").toString();
                 info.username = var.value("Username").toString();
                 info.email = var.value("Email").toString();
-                info.avatarUrl = var.value("AvatarUrl").toString();
+                info.avatarUrl = var.value("Avatar_Url").toString();
                 info.isOnline = var.value("IsOnline").toBool();
                 this->map_friend[info.uid] = info;
+
+                if(!info.conversationID.isEmpty())
+                    this->hash_conversationToUID[info.conversationID] = info.uid;
 
                 if(!info.avatarUrl.isEmpty())
                     avatarTasks[info.uid] = info.avatarUrl;

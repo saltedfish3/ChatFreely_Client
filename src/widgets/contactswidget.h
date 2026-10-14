@@ -30,7 +30,7 @@ public:
 
 
 signals:
-    void openConversation(const QString &uid);
+    void openConversation(const QString &conversationID);
 
 private:
     enum Status

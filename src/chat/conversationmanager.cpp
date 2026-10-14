@@ -6,12 +6,12 @@ ConversationManager &ConversationManager::getConversationManager()
     return cm;
 }
 
-ConversationItem *ConversationManager::getOrCreateConversationItem(const QString &conversationID)
+ConversationItem *ConversationManager::getOrCreateConversationItem(const QString &conversationID, ConversationItem::ConversationType type)
 {
     auto it = this->conversations.find(conversationID);
     if(it == this->conversations.end())
     {
-        ConversationItem* item = new ConversationItem(conversationID, this);
+        ConversationItem* item = new ConversationItem(conversationID, type, this);
         this->conversations[conversationID] = item;
         emit conversationCreated(item);
         return item;
@@ -40,17 +40,16 @@ ConversationManager::ConversationManager(QObject *parent)
     : QObject{parent}
 {
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::sendMessageStatus, this, [this]
-            (bool isSuccess, QString tempMsgID, QString receiverUID, QString messageID, int64_t timeStamp, int64_t convSeq){
-        ConversationItem* item = getOrCreateConversationItem(receiverUID);
+            (bool isSuccess, const QString& tempMsgID,const QString& conversationID, const QString& messageID, int64_t timeStamp, int64_t convSeq){
+        ConversationItem* item = getOrCreateConversationItem(conversationID, ConversationItem::ConversationType::Personal);
         if(!item)
             return;
-        if(messageID.isEmpty() || messageID == "0")
-            messageID = QString();
-        item->updateMessageStatus(isSuccess, tempMsgID, messageID, timeStamp, convSeq);
+
+        item->updateMessageStatus(isSuccess, tempMsgID, messageID.isEmpty() || messageID == "0" ? QString() : messageID, timeStamp, convSeq);
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::pushMessage, this, [this]
-            (QString senderUID, ContentType type, QString content, QString messageID, int64_t timeStamp, int64_t convSeq){
+            (const QString& conversationID, const QString& senderUID, ContentType type, const QString& content, const QString& messageID, int64_t timeStamp, int64_t convSeq){
         Message msg;
         msg.senderUID = senderUID;
         msg.contentType = type;
@@ -62,8 +61,12 @@ ConversationManager::ConversationManager(QObject *parent)
 
         msg.parseMedia();
 
-        ConversationItem* item = getOrCreateConversationItem(senderUID);
+        ConversationItem* item = getOrCreateConversationItem(conversationID, ConversationItem::ConversationType::Personal);
         item->addNewMessage(msg);
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::createGroupSuccess, this, [this](const QString& groupID, const QString& conversationID){
+        ConversationItem* item = getOrCreateConversationItem(conversationID, ConversationItem::ConversationType::Group);
     });
 
     connect(&DatabaseManager::getDatabaseManager(), &DatabaseManager::allChatMessagesClean, this, [this](){

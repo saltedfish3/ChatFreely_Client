@@ -59,7 +59,7 @@ void LoginWidget::initWidget()
     this->edit_loginPassd = new QLineEdit(this);
     this->edit_loginPassd->setObjectName("edit_loginPassd");
     this->edit_loginPassd->setPlaceholderText("请输入密码");
-    this->edit_loginPassd->setEchoMode(QLineEdit::PasswordEchoOnEdit);
+    this->edit_loginPassd->setEchoMode(QLineEdit::Password);
     this->edit_loginPassd->setMaxLength(128);
     this->edit_loginPassd->resize(440,52);
     this->edit_loginPassd->move(180,296);

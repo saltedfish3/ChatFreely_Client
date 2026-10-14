@@ -14,16 +14,18 @@ ChatWidget::ChatWidget(int width, int height,QWidget *parent)
     initSearchModels();
 }
 
-void ChatWidget::openConversation(const QString &uid)
+void ChatWidget::openConversation(const QString &conversationID)
 {
-    FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
-    if(info.uid.isEmpty())
+    if(conversationID.isEmpty())
         return;
 
-    if(!this->map_conversation.contains(uid))
-        createConversation(uid);
+    if(!this->map_conversation.contains(conversationID))
+    {
+        if(!createConversation(conversationID))
+            return;
+    }
 
-    auto it = map_conversation.find(uid);
+    auto it = map_conversation.find(conversationID);
     if(it != map_conversation.end())
     {
         ConversationWidget* widget = qobject_cast<ConversationWidget*>(this->stackedWidget_Conversation->currentWidget());
@@ -33,7 +35,7 @@ void ChatWidget::openConversation(const QString &uid)
         this->stackedWidget_Conversation->setCurrentWidget(it.value());
         it.value()->setActive(true);
 
-        this->currentConversation = uid;
+        this->currentConversation = conversationID;
 
         QModelIndex targetIndex;
         for(int i = 0; i < this->model->rowCount(); i++)
@@ -41,7 +43,7 @@ void ChatWidget::openConversation(const QString &uid)
             QModelIndex index = this->model->index(i, 0);
             if(index.data(ConversationListDelegate::IsSelectedRole).toBool())
                 this->model->setData(index, false, ConversationListDelegate::IsSelectedRole);
-            if(uid == index.data(ConversationListDelegate::UIDRole).toString())
+            if(conversationID == index.data(ConversationListDelegate::ConversationIDRole).toString())
                 targetIndex = index;
         }
         if(targetIndex.isValid())
@@ -248,12 +250,16 @@ void ChatWidget::initListWidget()
     connect(this->delegate, &ConversationListDelegate::itemClicked, this, [this](const QModelIndex& index){
         if(this->listView_conversationList->model() == this->model_searchConversation)
         {
-            QString conversationID = index.data(ConversationListDelegate::UIDRole).toString();
+            QString conversationID = index.data(ConversationListDelegate::ConversationIDRole).toString();
             openSearchMsgView(conversationID);
             return;
         }
 
-        if(this->currentConversation == index.data(ConversationListDelegate::UIDRole).toString() && !this->currentConversation.isEmpty())
+        QString conversationID = index.data(ConversationListDelegate::ConversationIDRole).toString();
+        if(conversationID.isEmpty())
+            return;
+
+        if(this->currentConversation == index.data(ConversationListDelegate::ConversationIDRole).toString() && !this->currentConversation.isEmpty())
         {
             this->model->setData(index, false, ConversationListDelegate::IsSelectedRole);
             this->listView_conversationList->viewport()->update();
@@ -263,8 +269,7 @@ void ChatWidget::initListWidget()
             return;
         }
 
-        QString uid = index.data(ConversationListDelegate::UIDRole).toString();
-        openConversation(uid);
+        openConversation(conversationID);
     });
 
     connect(&FriendManage::getFriendManage(), &FriendManage::friendAvatarUpdate, this, [this](const QString& uid, const QPixmap& avatar, const QSize& size){
@@ -274,10 +279,14 @@ void ChatWidget::initListWidget()
         QPixmap avatar_copy = avatar;
         avatar_copy.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
 
+        const QString conversationID = FriendManage::getFriendManage().getFriendInfo(uid).conversationID;
+        if(conversationID.isEmpty())
+            return;
+
         for(int i = 0; i < this->model->rowCount(); i++)
         {
             QModelIndex index = this->model->index(i, 0);
-            if(uid == index.data(ConversationListDelegate::UIDRole).toString())
+            if(conversationID == index.data(ConversationListDelegate::ConversationIDRole).toString())
             {
                 QStandardItem* item = this->model->itemFromIndex(index);
                 if(!size.isEmpty())
@@ -295,7 +304,7 @@ void ChatWidget::initListWidget()
         for(int i = 0; i < this->model_searchConversation->rowCount(); i++)
         {
             QModelIndex index = this->model_searchConversation->index(i, 0);
-            if(uid == index.data(ConversationListDelegate::UIDRole).toString())
+            if(conversationID == index.data(ConversationListDelegate::ConversationIDRole).toString())
             {
                 QStandardItem* item = this->model_searchConversation->itemFromIndex(index);
                 if(!size.isEmpty())
@@ -330,14 +339,18 @@ void ChatWidget::initListWidget()
     });
 
     connect(&FriendManage::getFriendManage(), &FriendManage::friendStatusUpdate, this, [this](const QString& uid, bool isOnline){
-        auto it = this->map_conversation.find(uid);
+        const QString conversationID = FriendManage::getFriendManage().getFriendInfo(uid).conversationID;
+        if(conversationID.isEmpty())
+            return;
+
+        auto it = this->map_conversation.find(conversationID);
         if(it != this->map_conversation.end())
             it.value()->updateFriendStatus(isOnline);
 
         for(int i = 0; i < this->model->rowCount(); i++)
         {
             QModelIndex index = this->model->index(i, 0);
-            if(uid == index.data(ConversationListDelegate::UIDRole).toString())
+            if(conversationID == index.data(ConversationListDelegate::ConversationIDRole).toString())
             {
                 QStandardItem* item = this->model->itemFromIndex(index);
                 item->setData(isOnline, ConversationListDelegate::IsOnlineRole);
@@ -346,14 +359,18 @@ void ChatWidget::initListWidget()
     });
 
     connect(&FriendManage::getFriendManage(), &FriendManage::friendUsernameUpdate, this, [this](const QString& uid, const QString& username){
-        auto it = this->map_conversation.find(uid);
+        const QString conversationID = FriendManage::getFriendManage().getFriendInfo(uid).conversationID;
+        if(conversationID.isEmpty())
+            return;
+
+        auto it = this->map_conversation.find(conversationID);
         if(it != this->map_conversation.end())
             it.value()->updateFriendUsername(username);
 
         for(int i = 0; i < this->model->rowCount(); i++)
         {
             QModelIndex index = this->model->index(i, 0);
-            if(uid == index.data(ConversationListDelegate::UIDRole).toString())
+            if(conversationID == index.data(ConversationListDelegate::ConversationIDRole).toString())
             {
                 QStandardItem* item = this->model->itemFromIndex(index);
                 item->setData(username, ConversationListDelegate::UsernameRole);
@@ -363,7 +380,7 @@ void ChatWidget::initListWidget()
         for(int i = 0; i < this->model_searchConversation->rowCount(); i++)
         {
             QModelIndex index = this->model_searchConversation->index(i, 0);
-            if(uid == index.data(ConversationListDelegate::UIDRole).toString())
+            if(conversationID == index.data(ConversationListDelegate::ConversationIDRole).toString())
             {
                 QStandardItem* item = this->model_searchConversation->itemFromIndex(index);
                 item->setData(username, ConversationListDelegate::UsernameRole);
@@ -384,10 +401,10 @@ void ChatWidget::initListWidget()
     connect(&ConversationManager::getConversationManager(), &ConversationManager::conversationCreated, this, [this](ConversationItem* item){
         createConversationListItem(item);
 
-        const QString uid = item->getConversationID();
-        if(this->map_conversation.contains(uid))
+        const QString conversationID = item->getConversationID();
+        if(this->map_conversation.contains(conversationID))
             return;
-        createConversation(uid);
+        createConversation(conversationID);
     });
 
     connect(&GlobalInitController::getController(), &GlobalInitController::allConversationsLoaded, this, [this]
@@ -410,8 +427,10 @@ void ChatWidget::initListWidget()
         for(int i = 0; i < this->model->rowCount(); i++)
         {
             QModelIndex index = this->model->index(i, 0);
-            QString uid = index.data(ConversationListDelegate::UIDRole).toString();
+            QString conversationID = index.data(ConversationListDelegate::ConversationIDRole).toString();
+            QString uid = FriendManage::getFriendManage().getFriendUIDByConversationID(conversationID);
             FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
+
             if(!info.uid.isEmpty())
             {
                 QStandardItem* item = this->model->itemFromIndex(index);
@@ -428,8 +447,10 @@ void ChatWidget::initListWidget()
         for(int i = 0; i < this->model_searchConversation->rowCount(); i++)
         {
             QModelIndex index = this->model_searchConversation->index(i, 0);
-            QString uid = index.data(ConversationListDelegate::UIDRole).toString();
+            QString conversationID = index.data(ConversationListDelegate::ConversationIDRole).toString();
+            QString uid = FriendManage::getFriendManage().getFriendUIDByConversationID(conversationID);
             FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
+
             if(!info.uid.isEmpty())
             {
                 QStandardItem* item = this->model_searchConversation->itemFromIndex(index);
@@ -533,23 +554,23 @@ void ChatWidget::initStackedConversation()
 
 void ChatWidget::precreateConversations()
 {
-    QList<QString> uids;
+    QList<QString> conversationIDs;
     int count = qMin(30, this->model->rowCount());
     for(int i = 0; i < count; i++)
     {
-        QString uid = this->model->index(i, 0).data(ConversationListDelegate::UIDRole).toString();
-        if(!uid.isEmpty())
-            uids.append(uid);
+        QString conversationID = this->model->index(i, 0).data(ConversationListDelegate::ConversationIDRole).toString();
+        if(!conversationID.isEmpty())
+            conversationIDs.append(conversationID);
     }
 
-    for(int i = 0; i < uids.size(); i++)
+    for(int i = 0; i < conversationIDs.size(); i++)
     {
-        const QString uid = uids[i];
-        QTimer::singleShot(i * 100, this, [this, uid](){
-            if(this->map_conversation.contains(uid))
+        const QString conversationID = conversationIDs[i];
+        QTimer::singleShot(i * 100, this, [this, conversationID](){
+            if(this->map_conversation.contains(conversationID))
                 return;
 
-            createConversation(uid);
+            createConversation(conversationID);
         });
     }
 }
@@ -561,7 +582,7 @@ void ChatWidget::restoreSelection(const QString &conversationID)
 
     for(int i = 0; i < this->model->rowCount(); i++)
     {
-        if(this->model->index(i, 0).data(ConversationListDelegate::UIDRole).toString() == conversationID)
+        if(this->model->index(i, 0).data(ConversationListDelegate::ConversationIDRole).toString() == conversationID)
         {
             this->listView_conversationList->setCurrentIndex(this->model->index(i, 0));
             break;
@@ -590,7 +611,7 @@ void ChatWidget::loadSearchConvNextPage(quint64 gen)
 
     QStandardItem* lastItem = this->model_searchConversation->item(this->model_searchConversation->rowCount() - 1);
     qint64 cursorTimestamp = lastItem->data(ConversationListDelegate::LastTimestampRole).toLongLong();
-    QString cursorConversationID = lastItem->data(ConversationListDelegate::UIDRole).toString();
+    QString cursorConversationID = lastItem->data(ConversationListDelegate::ConversationIDRole).toString();
 
     this->isLoadingSearchConversation = true;
     DatabaseManager::getDatabaseManager().searchConversations(this->edit_search->text().trimmed(), cursorTimestamp, cursorConversationID, 30, [this, gen](const QList<DatabaseManager::SearchConvResult>& list){
@@ -605,10 +626,11 @@ void ChatWidget::loadSearchConvNextPage(quint64 gen)
 
 void ChatWidget::appendSearchConvItem(const DatabaseManager::SearchConvResult &result)
 {
-    FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(result.conversationID);
+    QString uid = FriendManage::getFriendManage().getFriendUIDByConversationID(result.conversationID);
+    FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
     QStandardItem* item = new QStandardItem;
 
-    item->setData(result.conversationID, ConversationListDelegate::UIDRole);
+    item->setData(result.conversationID, ConversationListDelegate::ConversationIDRole);
     item->setData(info.username, ConversationListDelegate::UsernameRole);
 
     QPixmap avatar = info.uid.isEmpty() ? QPixmap(":/default/images/defaultAvatar.png") : FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(36, 36));
@@ -702,7 +724,7 @@ void ChatWidget::openSearchMsgView(const QString &conversationID)
 
 ConversationWidget* ChatWidget::createConversation(const QString& conversationID)
 {
-    ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(conversationID);
+    ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(conversationID, ConversationItem::ConversationType::Personal);
     if(this->map_conversation.contains(item->getConversationID()))
         return this->map_conversation[item->getConversationID()];
 
@@ -722,9 +744,12 @@ ConversationWidget* ChatWidget::createConversation(const QString& conversationID
 void ChatWidget::createConversationListItem(ConversationItem *item, const DatabaseManager::ConversationInfo& info)
 {
     const QString conversationID = item->getConversationID();
+    if(conversationID.isEmpty())
+        return;
+
     for(int i = 0; i < this->model->rowCount(); i++)
     {
-        if(this->model->item(i)->data(ConversationListDelegate::UIDRole).toString() == conversationID)
+        if(this->model->item(i)->data(ConversationListDelegate::ConversationIDRole).toString() == conversationID)
         {
             if(!info.conversationID.isEmpty())
             {
@@ -738,11 +763,14 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
         }
     }
 
-    FriendManage::FriendInfo friend_info = FriendManage::getFriendManage().getFriendInfo(conversationID);
+    QString uid = FriendManage::getFriendManage().getFriendUIDByConversationID(conversationID);
+    FriendManage::FriendInfo friend_info = FriendManage::getFriendManage().getFriendInfo(uid);
     QStandardItem* item_standard = new QStandardItem();
+
+    item_standard->setData(conversationID, ConversationListDelegate::ConversationIDRole);
+
     if(friend_info.uid.isEmpty())
     {
-        item_standard->setData(item->getConversationID(), ConversationListDelegate::UIDRole);
         item_standard->setData("加载中...", ConversationListDelegate::UsernameRole);
 
         QPixmap defAvatar = QPixmap(":/default/images/defaultAvatar.png");
@@ -753,7 +781,6 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
     }
     else
     {
-        item_standard->setData(friend_info.uid, ConversationListDelegate::UIDRole);
         item_standard->setData(friend_info.username, ConversationListDelegate::UsernameRole);
 
         QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(friend_info.uid, QSize(36, 36));
@@ -782,13 +809,13 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
         QString selectedUID;
         QModelIndex currentIndex = this->listView_conversationList->currentIndex();
         if(currentIndex.isValid())
-            selectedUID = currentIndex.data(ConversationListDelegate::UIDRole).toString();
+            selectedUID = currentIndex.data(ConversationListDelegate::ConversationIDRole).toString();
 
         QString conversationID = item->getConversationID();
         for(int i = 0; i < this->model->rowCount(); i++)
         {
             auto index = this->model->index(i, 0);
-            if(conversationID == index.data(ConversationListDelegate::UIDRole).toString())
+            if(conversationID == index.data(ConversationListDelegate::ConversationIDRole).toString())
             {
                 QStandardItem* item = this->model->itemFromIndex(index);
                 if(msg.contentType == ContentType::Text)
@@ -821,13 +848,13 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
         QString selectedUID;
         QModelIndex currentIndex = this->listView_conversationList->currentIndex();
         if(currentIndex.isValid())
-            selectedUID = currentIndex.data(ConversationListDelegate::UIDRole).toString();
+            selectedUID = currentIndex.data(ConversationListDelegate::ConversationIDRole).toString();
 
         QString conversationID = item->getConversationID();
         for(int i = 0; i < this->model->rowCount(); i++)
         {
             auto index = this->model->index(i, 0);
-            if(conversationID == index.data(ConversationListDelegate::UIDRole).toString())
+            if(conversationID == index.data(ConversationListDelegate::ConversationIDRole).toString())
             {
                 QStandardItem* item = this->model->itemFromIndex(index);
                 item->setData(num, ConversationListDelegate::UnReadRole);

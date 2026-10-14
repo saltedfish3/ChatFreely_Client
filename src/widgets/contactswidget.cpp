@@ -178,9 +178,11 @@ void ContactsWidget::initSideUn()
     connect(this->delegate, &FriendDelegate::itemClicked, this, [this](const QModelIndex& item){
         this->btn_newFriend->setChecked(false);
         this->selectedUID = item.data(FriendDelegate::UIDRole).toString();
+        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(this->selectedUID);
+
         this->widget_contactsInfo->changeInfo(FriendManage::getFriendManage().getFriendAvatar(item.data(FriendDelegate::UIDRole).toString(), QSize(128, 128)),
                                               item.data(FriendDelegate::UsernameRole).toString(),
-                                              item.data(FriendDelegate::UIDRole).toString(),
+                                              info.conversationID,
                                               item.data(FriendDelegate::SIDRole).toString(),
                                               item.data(FriendDelegate::EmailRole).toString(),
                                               item.data(FriendDelegate::IsOnlineRole).toBool());
@@ -401,9 +403,9 @@ void ContactsWidget::initStacked()
 
     this->stackedWidget->setCurrentWidget(this->widget_noSelect);
 
-    connect(this->widget_contactsInfo, &ContactsInfoWidget::openConversation, this, [this](const QString &uid){
+    connect(this->widget_contactsInfo, &ContactsInfoWidget::openConversation, this, [this](const QString &conversationID){
         //转发信号
-        emit openConversation(uid);
+        emit openConversation(conversationID);
     });
 }
 
@@ -514,7 +516,7 @@ void ContactsWidget::restoreSelect()
     {
         FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(this->selectedUID);
 
-        this->widget_contactsInfo->changeInfo(FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(128, 128)), info.username, this->selectedUID, info.sid,
+        this->widget_contactsInfo->changeInfo(FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(128, 128)), info.username, info.conversationID, info.sid,
                                               info.email, info.isOnline);
     }
 }

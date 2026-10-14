@@ -14,7 +14,7 @@ class ConversationManager : public QObject
     Q_OBJECT
 public:
     static ConversationManager& getConversationManager();
-    ConversationItem* getOrCreateConversationItem(const QString& conversationID);
+    ConversationItem* getOrCreateConversationItem(const QString& conversationID, ConversationItem::ConversationType type);
     //初始化使用
     void startSyncMessage();
 

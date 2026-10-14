@@ -15,13 +15,13 @@ class ContactsInfoWidget : public QWidget
     Q_OBJECT
 public:
     explicit ContactsInfoWidget(int width, int height, QWidget *parent = nullptr);
-    void changeInfo(QPixmap avatar, QString username, QString uid, QString sid, QString email, bool isOnline);
+    void changeInfo(QPixmap avatar, QString username, QString conversationID, QString sid, QString email, bool isOnline);
     void changeSelectedUsername(QString username);
     void changeSelectedAvatar(QPixmap avatar);
     void changeOnlineStatus(bool isOnline);
 
 signals:
-    void openConversation(const QString &uid);
+    void openConversation(const QString &conversationID);
 private:
     void init();
     void initStyle();
@@ -43,7 +43,7 @@ private:
     QLabel* label_emailChinese;
     QLabel* label_email;
 
-    QString uid;
+    QString conversationID;
 };
 
 #endif // CONTACTSINFOWIDGET_H

@@ -10,13 +10,19 @@ class ConversationItem : public QObject
 {
     Q_OBJECT
 public:
-    explicit ConversationItem(const QString& conversationID, QObject *parent = nullptr);
+    enum class ConversationType
+    {
+        Personal,
+        Group
+    };
+    explicit ConversationItem(const QString& conversationID, ConversationType type, QObject *parent = nullptr);
 
     const MessagesManager& getMessagesManager() const;
     MessagesManager& getMessagesManager();
     Message getLastMessage() const;
     QString getConversationID() const;
     int getUnReadCount() const;
+    ConversationType getConversationType();
 
     void addNewMessage(Message msg);
 
@@ -53,6 +59,8 @@ private:
     int unRead = 0;
     bool active = false;
     bool isFirstLoad = false;
+
+    ConversationType type = ConversationType::Personal;
 
 };
 

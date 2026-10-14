@@ -32,6 +32,7 @@
         <file>images/showFile.png</file>
         <file>images/download.png</file>
         <file>images/downloadSuccess.png</file>
+        <file>images/group.png</file>
     </qresource>
     <qresource prefix="/icon">
         <file>images/favicon.ico</file>

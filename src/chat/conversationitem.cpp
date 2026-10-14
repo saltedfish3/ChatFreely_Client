@@ -1,7 +1,7 @@
 #include "conversationitem.h"
 
-ConversationItem::ConversationItem(const QString& conversationID, QObject *parent)
-    : conversationID(conversationID), QObject{parent}, msgManager(conversationID, this)
+ConversationItem::ConversationItem(const QString& conversationID, ConversationType type, QObject *parent)
+    : conversationID(conversationID), QObject{parent}, msgManager(conversationID, this), type(type)
 {
     connect(&this->msgManager, &MessagesManager::finishLoadedImage, this, [this](){
         emit finishLoadedImage();
@@ -51,6 +51,11 @@ Message ConversationItem::getLastMessage() const
 int ConversationItem::getUnReadCount() const
 {
     return this->unRead;
+}
+
+ConversationItem::ConversationType ConversationItem::getConversationType()
+{
+    return this->type;
 }
 
 void ConversationItem::addNewMessage(Message msg)
