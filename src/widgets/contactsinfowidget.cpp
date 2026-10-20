@@ -41,7 +41,7 @@ void ContactsInfoWidget::changeInfo(QPixmap avatar, QString username, QString co
 
 void ContactsInfoWidget::changeSelectedUsername(QString username)
 {
-    QFontMetrics fm(font());
+    QFontMetrics fm(this->label_username->font());
     QString showUsername = fm.elidedText(username, Qt::ElideRight, this->label_username->width() - 20);
     this->label_username->setText(showUsername);
 }

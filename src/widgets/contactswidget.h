@@ -33,6 +33,7 @@ public:
     void addFriendItem(QString uid, QString sid, QString username, QPixmap avatar, QString email, bool isOnline);
     void addGroupItem(const QString& conversationID, const QString& groupID, const QString& groupName,
                       const QString& ownerUID, const QHash<QString, GroupManager::GroupMemberInfo>& memberInfos, const QPixmap& avatar);
+    void switchToInfoWidget(const QString& conversaionID);
 
 signals:
     void openConversation(const QString &conversationID);

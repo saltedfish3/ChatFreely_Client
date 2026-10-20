@@ -34,6 +34,7 @@ public:
     void openConversation(const QString &conversationID);
 
 signals:
+    void switchToInfoWidget(const QString& conversationID);
 
 private slots:
     void cleanAll();

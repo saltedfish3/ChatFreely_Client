@@ -41,6 +41,65 @@ void ContactsWidget::addGroupItem(const QString &conversationID, const QString &
     this->model_group->appendRow(item);
 }
 
+void ContactsWidget::switchToInfoWidget(const QString &conversaionID)
+{
+    bool isFriend = !FriendManage::getFriendManage().getFriendUIDByConversationID(conversaionID).isEmpty();
+    if(isFriend)
+    {
+        this->btn_myFriend->click();
+        QString uid = FriendManage::getFriendManage().getFriendUIDByConversationID(conversaionID);
+        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
+        for(int i = 0; i < this->model->rowCount(); i++)
+        {
+            QModelIndex index = this->model->index(i, 0);
+            if(uid == index.data(FriendDelegate::UIDRole))
+            {
+                this->listView_myFriend->setCurrentIndex(index);
+                this->listView_myFriend->selectionModel()->select(index, QItemSelectionModel::ClearAndSelect);
+
+                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(uid, QSize(128, 128));
+                avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                this->widget_contactsInfo->changeInfo(avatar,
+                                                      info.username,
+                                                      conversaionID,
+                                                      info.sid,
+                                                      info.email,
+                                                      info.isOnline);
+
+                this->stackedWidget->setCurrentWidget(this->widget_contactsInfo);
+                return;
+            }
+        }
+    }
+    else
+    {
+        this->btn_myGroups->click();
+        GroupManager::GroupInfo info = GroupManager::getGroupManage().getGroupInfo(conversaionID);
+        for(int i = 0; i < this->model_group->rowCount(); i++)
+        {
+            QModelIndex index = this->model_group->index(i, 0);
+            if(conversaionID == index.data(GroupDelegate::ConversationIDRole))
+            {
+                this->listView_myFriend->setCurrentIndex(index);
+                this->listView_myFriend->selectionModel()->select(index, QItemSelectionModel::ClearAndSelect);
+
+                QPixmap avatar = GroupManager::getGroupManage().getGroupAvatar(conversaionID, QSize(128, 128));
+                avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+
+                this->widget_groupInfo->changeInfo(conversaionID,
+                                                      info.groupID,
+                                                      info.groupName,
+                                                      info.ownerUID,
+                                                      info.memberInfos,
+                                                      avatar);
+
+                this->stackedWidget->setCurrentWidget(this->widget_groupInfo);
+                return;
+            }
+        }
+    }
+}
+
 void ContactsWidget::initSideBar()
 {
     this->widget_sideBar = new QWidget(this);

@@ -34,9 +34,31 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         name = info.groupName;
     }
 
+    //初始化 更多 按钮
+    this->btn_more = new QPushButton(this->widget_header);
+    this->btn_more->setObjectName("btn_more");
+    this->btn_more->resize(32,32);
+    this->btn_more->move(this->widget_header->width() - this->btn_more->width() - 16,
+                         (this->widget_header->height() - this->btn_more->height())/2);
+    this->btn_more->setIcon(QIcon(":/default/images/more.png"));
+    this->btn_more->setIconSize(QSize(16,16));
+    this->btn_more->setCheckable(true);
+    this->btn_more->setChecked(false);
+
     this->label_name = new QLabel(name, this->widget_header);
     this->label_name->setObjectName("label_name");
+    this->label_name->setMaximumHeight(24);
+    this->label_name->setMinimumHeight(24);
+    this->label_name->move(16,(this->widget_header->height() - this->label_name->height())/2);
+    this->label_name->setFixedWidth(this->widget_header->width() - this->label_name->pos().x() - (this->widget_header->width() - this->btn_more->pos().x()));
+
     QFont font = this->label_name->font();
+    font.setPointSize(12);
+    font.setWeight(QFont::Bold);
+    this->label_name->setFont(font);
+
+    QString show_name;
+    QFontMetrics fm(font);
 
     if(type == ConversationItem::ConversationType::Personal)
     {
@@ -44,46 +66,39 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         this->label_statusIcon = new QLabel(this->widget_header);
         this->label_statusIcon->setObjectName("label_statusIcon");
         this->label_statusIcon->setFixedSize(8, 8);
-        this->label_statusIcon->adjustSize();
-        this->label_statusIcon->move(this->label_name->pos().x() + this->label_name->width() + 8,
-                           (this->widget_header->height() - this->label_statusIcon->height())/2);
+
         if(isOnline)
             this->label_statusIcon->setProperty("status", "online");
         else
             this->label_statusIcon->setProperty("status", "offline");
 
         //初始化 在线状态文字
-        QString status_text;
-        if(isOnline)
-            status_text = "在线";
-        else
-            status_text = "离线";
+        QString status_text = isOnline ? "在线" : "离线";
         this->label_statusText = new QLabel(status_text, this->widget_header);
         this->label_statusText->setObjectName("label_statusText");
         this->label_statusText->setMaximumHeight(20);
         this->label_statusText->setMinimumHeight(20);
-        font = this->label_statusText->font();
-        font.setPointSize(11);
-        this->label_statusText->adjustSize();
-        this->label_statusText->move(this->label_statusIcon->pos().x() + this->label_statusIcon->width() + 8,
-                                     (this->widget_header->height() - this->label_statusText->height())/2);
+
+        QFontMetrics fmStatus(this->label_statusText->font());
+        int statusWidth = 8 + 8 + fmStatus.horizontalAdvance(status_text) + 8;
+
+        show_name = fm.elidedText(name, Qt::ElideRight, this->label_name->width() - statusWidth);
     }
     else
     {
         this->label_statusIcon = nullptr;
         this->label_statusText = nullptr;
-    }
 
-    //初始化 更多 按钮
-    this->btn_more = new QPushButton(this->widget_header);
-    this->btn_more->setObjectName("btn_more");
-    this->btn_more->resize(32,32);
-    this->btn_more->move(this->widget_header->width() - this->btn_more->width() - 16,
-               (this->widget_header->height() - this->btn_more->height())/2);
-    this->btn_more->setIcon(QIcon(":/default/images/more.png"));
-    this->btn_more->setIconSize(QSize(16,16));
-    this->btn_more->setCheckable(true);
-    this->btn_more->setChecked(false);
+
+        int64_t memberCount = GroupManager::getGroupManage().getGroupInfo(this->item->getConversationID()).memberInfos.size();
+        QString memberCountStr = "(" + QString::number(memberCount) + ")";
+        int width_memberCount = fm.horizontalAdvance(memberCountStr);
+
+        show_name = fm.elidedText(name, Qt::ElideRight, this->label_name->width() - width_memberCount) + memberCountStr;
+    }
+    this->label_name->setText(show_name);
+    if(type == ConversationItem::ConversationType::Personal)
+        updateStatusIconPos();
 
     this->timer_loading = new QTimer(this);
     connect(this->timer_loading, &QTimer::timeout, this, [this](){
@@ -92,27 +107,6 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         if(loadingCount == 0)
             this->timer_loading->stop();
     });
-
-    this->label_name->setMaximumHeight(24);
-    this->label_name->setMinimumHeight(24);
-    this->label_name->move(16,(this->widget_header->height() - this->label_name->height())/2);
-    this->label_name->setFixedWidth(this->widget_header->width() - this->label_name->pos().x() - (this->widget_header->width() - this->btn_more->pos().x()));
-
-    font.setPointSize(12);
-    font.setWeight(QFont::Bold);
-    this->label_name->setFont(font);
-    this->label_name->adjustSize();
-
-    QFontMetrics fm(font);
-    int64_t memberCount = GroupManager::getGroupManage().getGroupInfo(this->item->getConversationID()).memberInfos.size();
-    QString memberCountStr = "(" + QString::number(memberCount) + ")";
-    int width_memberCount = fm.horizontalAdvance(memberCountStr);
-
-    QString show_name = fm.elidedText(name, Qt::ElideRight, this->label_name->width() - width_memberCount);
-    show_name += memberCountStr;
-
-    this->label_name->setText(show_name);
-    this->label_name->adjustSize();
 
     //初始化 消息显示 部分
     this->listView_messages = new QListView(this);
@@ -279,7 +273,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     });
 
     //初始化更多弹窗
-    this->widget_menu = new MoreWidget(this);
+    this->widget_menu = new MoreWidget(item->getConversationType() == ConversationItem::ConversationType::Personal, this);
 
     connect(this->btn_more,&QPushButton::toggled,this,[=](bool checked){
         if(checked)
@@ -299,6 +293,10 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         if(this->btn_more->underMouse())
             return;
         this->btn_more->setChecked(false);
+    });
+
+    connect(this->widget_menu, &MoreWidget::switchToInfoWidget, this, [this](){
+        emit switchToInfoWidget();
     });
 
     initStyle();
@@ -561,7 +559,19 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
 
 void ConversationWidget::updateFriendUsername(const QString &username)
 {
-    this->label_name->setText(username);
+    QFontMetrics fm(this->label_name->font());
+    int statusWidth = 0;
+
+    if(this->label_statusIcon && this->label_statusText)
+    {
+        QFontMetrics fmStatus(this->label_statusText->font());
+        statusWidth = 8 + 8 + fmStatus.horizontalAdvance(this->label_statusText->text()) + 8;
+    }
+
+    QString show_name = fm.elidedText(username, Qt::ElideRight, this->label_name->width() - statusWidth);
+
+    this->label_name->setText(show_name);
+    updateStatusIconPos();
     this->update();
 }
 
@@ -582,6 +592,8 @@ void ConversationWidget::updateFriendStatus(bool isOnline)
         status_text = "离线";
     }
     this->label_statusText->setText(status_text);
+    updateStatusIconPos();
+
     this->label_statusIcon->style()->unpolish(this->label_statusIcon);
     this->label_statusIcon->style()->polish(this->label_statusIcon);
     this->update();
@@ -815,6 +827,22 @@ void ConversationWidget::startReFlashTimeStamp()
         this->listView_messages->viewport()->update();
         startReFlashTimeStamp();
     });
+}
+
+void ConversationWidget::updateStatusIconPos()
+{
+    if(!this->label_statusIcon || !this->label_statusText)
+        return;
+
+    QFontMetrics fm(this->label_name->font());
+    const QString text = this->label_name->text();
+
+    int textWidth = qMin(fm.horizontalAdvance(text), this->label_name->width());
+    int textEndX = this->label_name->pos().x() + textWidth;
+
+    this->label_statusIcon->move(textEndX + 8, (this->widget_header->height() - this->label_statusIcon->height()) / 2);
+    this->label_statusText->move(this->label_statusIcon->pos().x() + this->label_statusIcon->width() + 8,
+                                 (this->widget_header->height() - this->label_statusText->height()) / 2);
 }
 
 void ConversationWidget::handleNextBlock()

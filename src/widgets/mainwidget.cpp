@@ -311,6 +311,13 @@ void MainWidget::initPage()
         this->widget_chat->openConversation(uid);
         changeToChat();
     });
+
+    connect(this->widget_chat, &ChatWidget::switchToInfoWidget, this, [this](const QString& conversationID){
+        this->widget_contacts->switchToInfoWidget(conversationID);
+        QPushButton* btn = this->sideBarButton.value("btn_contacts");
+        if(btn)
+            btn->click();
+    });
 }
 
 void MainWidget::setRadius(QPixmap& pix, QLabel *label, int radius)

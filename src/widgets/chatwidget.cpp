@@ -937,6 +937,14 @@ ConversationWidget* ChatWidget::createConversation(const QString& conversationID
     if(!cw)
         return nullptr;
 
+    connect(cw, &ConversationWidget::switchToInfoWidget, this, [this, item](){
+        if(!item)
+            return;
+
+        ConversationItem::ConversationType type = item->getConversationType();
+        emit switchToInfoWidget(item->getConversationID());
+    });
+
     this->stackedWidget_Conversation->addWidget(cw);
     this->map_conversation[item->getConversationID()] = cw;
 

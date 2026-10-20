@@ -1,6 +1,6 @@
 #include "morewidget.h"
 
-MoreWidget::MoreWidget(QWidget *parent)
+MoreWidget::MoreWidget(bool isFriend, QWidget *parent)
     : QWidget{parent}
 {
     this->setMaximumWidth(150);
@@ -8,7 +8,7 @@ MoreWidget::MoreWidget(QWidget *parent)
     this->setWindowFlags(Qt::Tool | Qt::FramelessWindowHint);
     this->setAttribute(Qt::WA_TranslucentBackground, true);
     this->setFocusPolicy(Qt::StrongFocus);
-    initMore();
+    initMore(isFriend);
     initStyle();
 }
 
@@ -31,9 +31,10 @@ void MoreWidget::paintEvent(QPaintEvent *event)
     painter.drawPath(path);
 }
 
-void MoreWidget::initMore()
+void MoreWidget::initMore(bool isFriend)
 {
-    QPushButton* show_user_info = new QPushButton("查看用户信息",this);
+    QString showText = isFriend ? "用户" : "群聊";
+    QPushButton* show_user_info = new QPushButton("查看" + showText + "信息",this);
     show_user_info->resize(this->width() - 2,30);
     show_user_info->move(1,10);
 
@@ -42,18 +43,9 @@ void MoreWidget::initMore()
     label_showInfo->resize(show_user_info->height(),show_user_info->height());
     label_showInfo->move(12,(show_user_info->height() - label_showInfo->height())/2);
 
-    QPushButton* no_voice = new QPushButton("消息免打扰",this);
-    no_voice->resize(this->width() - 2,30);
-    no_voice->move(1, show_user_info->pos().y() + show_user_info->height());
-
-    QLabel* label_noVoice = new QLabel(no_voice);
-    label_noVoice->setPixmap(QIcon(":/default/images/noNoise.png").pixmap(16));
-    label_noVoice->resize(no_voice->height(),no_voice->height());
-    label_noVoice->move(12,(no_voice->height() - label_noVoice->height())/2);
-
     QPushButton* clear_msg = new QPushButton("清空聊天记录",this);
     clear_msg->resize(this->width() - 2,30);
-    clear_msg->move(1, no_voice->pos().y() + no_voice->height());
+    clear_msg->move(1, show_user_info->pos().y() + show_user_info->height());
 
     QLabel* label_clearMsg = new QLabel(clear_msg);
     label_clearMsg->setPixmap(QIcon(":/default/images/clearMsg.png").pixmap(16));
@@ -61,9 +53,9 @@ void MoreWidget::initMore()
     label_clearMsg->move(12,(clear_msg->height() - label_clearMsg->height())/2);
 
     QFrame* line = new QFrame(this);
-    line->setFrameShape(QFrame::HLine);
-    line->resize(this->width() - 2, 1);
-    line->move(5, clear_msg->pos().y() + clear_msg->height() + 4);
+    line->setFrameShape(QFrame::NoFrame);
+    line->resize(this->width() - 20, 1);
+    line->move(10, clear_msg->pos().y() + clear_msg->height() + 4);
 
     QPushButton* delete_user = new QPushButton("删除用户",this);
     delete_user->resize(this->width() - 2,30);
@@ -75,21 +67,21 @@ void MoreWidget::initMore()
     label_deleteUser->move(12,(delete_user->height() - label_deleteUser->height())/2);
 
     connect(show_user_info,&QPushButton::clicked,this,[=](){
-        qDebug()<<"show_user_info";
+        emit switchToInfoWidget();
         this->hide();
     });
-    connect(no_voice,&QPushButton::clicked,this,[=](){
-        qDebug()<<"no_voice";
-        this->hide();
-    });
+
     connect(clear_msg,&QPushButton::clicked,this,[=](){
         qDebug()<<"clear_msg";
         this->hide();
     });
+
     connect(delete_user,&QPushButton::clicked,this,[=](){
         qDebug()<<"delete_user";
         this->hide();
     });
+
+    this->setFixedHeight(delete_user->pos().y() + delete_user->height() + 10);
 }
 
 void MoreWidget::initStyle()
@@ -98,7 +90,6 @@ void MoreWidget::initStyle()
                     QFrame
                     {
                         background-color: rgba(229, 231, 235, 255);
-                        margin: 4px 0px;
                     }
                     QPushButton
                     {

@@ -43,6 +43,7 @@ public:
     void updateGroupInfo();
 
 signals:
+    void switchToInfoWidget();
 
 protected:
     bool eventFilter(QObject* obj, QEvent* event) override;
@@ -51,6 +52,7 @@ protected:
 private:
     void initStyle();
     void startReFlashTimeStamp();
+    void updateStatusIconPos();
     void handleNextBlock();
 
     QWidget* widget_header;
