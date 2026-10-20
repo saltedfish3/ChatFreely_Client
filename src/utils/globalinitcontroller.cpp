@@ -54,6 +54,24 @@ void GlobalInitController::loadNewFriendRequests()
     TcpLongConnection::getTcpClient().getNewFriendRequestsList();
 }
 
+void GlobalInitController::loadGroupList()
+{
+    if(this->nowStep == Step::LoadingGroups)
+        return;
+
+    this->nowStep = Step::LoadingGroups;
+    TcpLongConnection::getTcpClient().getGroupList();
+}
+
+void GlobalInitController::loadNewGroupJoinRequests()
+{
+    if(this->nowStep == Step::loadingNewGroupJoinRequests)
+        return;
+
+    this->nowStep = Step::loadingNewGroupJoinRequests;
+    TcpLongConnection::getTcpClient().getNewGroupJoinRequestsList();
+}
+
 void GlobalInitController::loadLocalConversations()
 {
     if(this->nowStep == Step::LoadingLocalConversations)
@@ -64,7 +82,9 @@ void GlobalInitController::loadLocalConversations()
         QList<QPair<ConversationItem*, DatabaseManager::ConversationInfo>> ls;
         for(const auto& info : list)
         {
-            ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(info.conversationID, ConversationItem::ConversationType::Personal);
+            ConversationItem::ConversationType type = info.conversationType == 1 ?
+                                                          ConversationItem::ConversationType::Group : ConversationItem::ConversationType::Personal;
+            ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(info.conversationID, type);
             if(!item)
                 continue;
             ls.append({item, info});
@@ -231,14 +251,6 @@ GlobalInitController::GlobalInitController(QObject *parent)
     connect(&FriendManage::getFriendManage(), &FriendManage::loadFirstAllFriendList, this, [this](){
         if(this->nowStep == Step::LoadingFriends)
         {
-            emit friendListFirstLoaded();
-        }
-    });
-
-    //好友列表加载完成响应处理
-    connect(this, &GlobalInitController::friendListFirstLoaded, this, [this](){
-        if(this->nowStep == Step::LoadingFriends)
-        {
             loadNewFriendRequests();
         }
     });
@@ -246,6 +258,20 @@ GlobalInitController::GlobalInitController(QObject *parent)
     //新好友申请列表加载完成响应处理
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newFriendRequestsState, this, [this](bool isEmpty){
         if(this->nowStep == Step::LoadingNewFriendRequests)
+        {
+            loadGroupList();
+        }
+    });
+
+    connect(&GroupManager::getGroupManage(), &GroupManager::loadFirstAllGroupList, this, [this](){
+        if(this->nowStep == Step::LoadingGroups)
+        {
+            loadNewGroupJoinRequests();
+        }
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newGroupJoinRequestsState, this, [this](bool isEmpty){
+        if(this->nowStep == Step::loadingNewGroupJoinRequests)
         {
             loadLocalConversations();
         }
@@ -311,7 +337,9 @@ GlobalInitController::GlobalInitController(QObject *parent)
             return;
         }
 
-        ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(conversationID, ConversationItem::ConversationType::Personal);
+        ConversationItem::ConversationType type = GroupManager::getGroupManage().getGroupInfo(conversationID).conversationID.isEmpty() ?
+                                                      ConversationItem::ConversationType::Personal : ConversationItem::ConversationType::Group;
+        ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(conversationID, type);
 
         if(!item)
         {

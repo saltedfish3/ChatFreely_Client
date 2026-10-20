@@ -28,6 +28,19 @@ void ContactsWidget::addFriendItem(QString uid, QString sid, QString username, Q
     this->model->appendRow(item);
 }
 
+void ContactsWidget::addGroupItem(const QString &conversationID, const QString &groupID, const QString &groupName, const QString &ownerUID, const QHash<QString, GroupManager::GroupMemberInfo> &memberInfos, const QPixmap &avatar)
+{
+
+    QStandardItem* item = new QStandardItem();
+    item->setData(conversationID, GroupDelegate::ConversationIDRole);
+    item->setData(groupID, GroupDelegate::GroupIDRole);
+    item->setData(groupName, GroupDelegate::NameRole);
+    item->setData(avatar, GroupDelegate::AvatarRole);
+    item->setData(ownerUID, GroupDelegate::OwnerUIDRole);
+    item->setData(memberInfos.size(), GroupDelegate::MemberCountRole);
+    this->model_group->appendRow(item);
+}
+
 void ContactsWidget::initSideBar()
 {
     this->widget_sideBar = new QWidget(this);
@@ -118,22 +131,64 @@ void ContactsWidget::initSideUn()
         this->stackedWidget->setCurrentWidget(this->widget_newFriend);
     });
 
-    this->label_myFriend = new QLabel("我的好友",this->widget_sideUn);
-    this->label_myFriend->setObjectName("label_myFriend");
-    this->label_myFriend->move((this->widget_sideBar->width()-this->btn_addFriend->width())/2,
-                               this->btn_newFriend->pos().y()+this->btn_newFriend->height()+8);
+    this->group = new QButtonGroup(this);
+
+    this->btn_myFriend = new QPushButton("我的好友",this->widget_sideUn);
+    this->btn_myFriend->setObjectName("btn_myFriend");
+    this->btn_myFriend->resize(this->widget_sideUn->width() / 2, 35);
+    this->btn_myFriend->move(0, this->btn_newFriend->pos().y()+this->btn_newFriend->height()+8);
+    this->btn_myFriend->setCheckable(true);
+    this->group->addButton(this->btn_myFriend);
+    this->btn_myFriend->setChecked(true);
+
+    connect(this->btn_myFriend, &QPushButton::clicked, [this](){
+        this->listView_myFriend->setModel(this->model);
+        this->listView_myFriend->setItemDelegate(this->delegate);
+        this->edit_searchFriend->setPlaceholderText("搜索联系人");
+        this->label_empty->setText("暂无好友");
+
+        if(this->model->rowCount() == 0)
+            changeStatus(Empty);
+        else
+            changeStatus(Hide);
+        restoreSelect();
+    });
+
+    this->btn_myGroups = new QPushButton("我的群聊",this->widget_sideUn);
+    this->btn_myGroups->setObjectName("btn_myGroups");
+    this->btn_myGroups->resize(this->widget_sideUn->width() - this->btn_myFriend->width(), 35);
+    this->btn_myGroups->move(this->btn_myFriend->pos().x() + this->btn_myFriend->width(),
+                             this->btn_myFriend->pos().y());
+    this->btn_myGroups->setCheckable(true);
+    this->group->addButton(this->btn_myGroups);
+
+    connect(this->btn_myGroups, &QPushButton::clicked, [this](){
+        this->listView_myFriend->setModel(this->model_group);
+        this->listView_myFriend->setItemDelegate(this->delegate_group);
+        this->edit_searchFriend->setPlaceholderText("搜索群聊");
+        this->label_empty->setText("暂无群聊");
+
+        if(this->model_group->rowCount() == 0)
+            changeStatus(Empty);
+        else
+            changeStatus(Hide);
+        restoreSelect();
+    });
 
     this->listView_myFriend = new QListView(this->widget_sideUn);
     this->listView_myFriend->setObjectName("listView_myFriend");
     this->listView_myFriend->resize(this->widget_sideUn->width(),
-                                    this->widget_sideUn->height() - this->label_myFriend->pos().y() - this->label_myFriend->height());
-    this->listView_myFriend->move(0,this->label_myFriend->pos().y() + this->label_myFriend->height());
+                                    this->widget_sideUn->height() - this->btn_myFriend->pos().y() - this->btn_myFriend->height());
+    this->listView_myFriend->move(0,this->btn_myFriend->pos().y() + this->btn_myFriend->height());
 
     this->model = new QStandardItemModel(this);
     this->listView_myFriend->setModel(this->model);
 
     this->delegate = new FriendDelegate(this);
     this->listView_myFriend->setItemDelegate(this->delegate);
+
+    this->model_group = new QStandardItemModel(this);
+    this->delegate_group = new GroupDelegate(this);
 
     this->listView_myFriend->setEditTriggers(QAbstractItemView::NoEditTriggers);
     this->listView_myFriend->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -177,30 +232,58 @@ void ContactsWidget::initSideUn()
 
     connect(this->delegate, &FriendDelegate::itemClicked, this, [this](const QModelIndex& item){
         this->btn_newFriend->setChecked(false);
+
         this->selectedUID = item.data(FriendDelegate::UIDRole).toString();
         FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(this->selectedUID);
 
         this->widget_contactsInfo->changeInfo(FriendManage::getFriendManage().getFriendAvatar(item.data(FriendDelegate::UIDRole).toString(), QSize(128, 128)),
-                                              item.data(FriendDelegate::UsernameRole).toString(),
-                                              info.conversationID,
-                                              item.data(FriendDelegate::SIDRole).toString(),
-                                              item.data(FriendDelegate::EmailRole).toString(),
-                                              item.data(FriendDelegate::IsOnlineRole).toBool());
+                                                  item.data(FriendDelegate::UsernameRole).toString(),
+                                                  info.conversationID,
+                                                  item.data(FriendDelegate::SIDRole).toString(),
+                                                  item.data(FriendDelegate::EmailRole).toString(),
+                                                  item.data(FriendDelegate::IsOnlineRole).toBool());
         this->stackedWidget->setCurrentWidget(this->widget_contactsInfo);
     });
 
+    connect(this->delegate_group, &GroupDelegate::itemClicked, this, [this](const QModelIndex& item){
+        this->btn_newFriend->setChecked(false);
+
+        this->selectedUID = item.data(GroupDelegate::ConversationIDRole).toString();
+        GroupManager::GroupInfo info = GroupManager::getGroupManage().getGroupInfo(this->selectedUID);
+        this->widget_groupInfo->changeInfo(info.conversationID, info.groupID, info.groupName, info.ownerUID, info.memberInfos,
+                                               GroupManager::getGroupManage().getGroupAvatar(info.conversationID, QSize(128, 128)));
+        this->stackedWidget->setCurrentWidget(this->widget_groupInfo);
+    });
+
     connect(this->edit_searchFriend, &QLineEdit::textChanged, this, [this](){
+        bool isFriend = this->btn_myFriend->isChecked();
         changeStatus(Loading);
-        this->model->clear();
         QString text = this->edit_searchFriend->text().trimmed();
-        if(text.isEmpty())
-            sortedFriendList();
+
+        if(isFriend)
+        {
+            this->model->clear();
+            if(text.isEmpty())
+                sortedFriendList();
+            else
+                searchFriend(text);
+            if(this->model->rowCount() == 0)
+                changeStatus(Empty);
+            else
+                changeStatus(Hide);
+        }
         else
-            searchFriend(text);
-        if(this->model->rowCount() == 0)
-            changeStatus(Empty);
-        else
-            changeStatus(Hide);
+        {
+            this->model_group->clear();
+            if(text.isEmpty())
+                sortedGroupList();
+            else
+                searchGroup(text);
+            if(this->model_group->rowCount() == 0)
+                changeStatus(Empty);
+            else
+                changeStatus(Hide);
+        }
     });
 
     connect(&FriendManage::getFriendManage(), &FriendManage::allFriendList, this, [this](){
@@ -216,6 +299,9 @@ void ContactsWidget::initSideUn()
             changeStatus(Loading);
             searchFriend(text);
         }
+
+        if(!this->btn_myFriend->isChecked())
+            return;
 
         if(this->model->rowCount() == 0)
             changeStatus(Empty);
@@ -297,6 +383,113 @@ void ContactsWidget::initSideUn()
             this->widget_contactsInfo->changeOnlineStatus(isOnline);
     });
 
+    connect(&GroupManager::getGroupManage(), &GroupManager::allGroupList, this, [this](){
+        QString text = this->edit_searchFriend->text().trimmed();
+        this->model_group->clear();
+
+        if(text.isEmpty())
+        {
+            sortedGroupList();
+        }
+        else
+        {
+            changeStatus(Loading);
+            searchGroup(text);
+        }
+
+        if(!this->btn_myGroups->isChecked())
+            return;
+
+        if(this->model_group->rowCount() == 0)
+            changeStatus(Empty);
+        else
+            changeStatus(Hide);
+    });
+
+    connect(&GroupManager::getGroupManage(), &GroupManager::groupAvatarUpdate, this, [this](const QString& conversationID, const QPixmap& avatar, const QSize& size){
+        if(size == QSize(38, 38) || size.isEmpty())
+        {
+            for(int i = 0; i < this->model->rowCount(); i++)
+            {
+                QModelIndex index = this->model->index(i, 0);
+                if(index.data(GroupDelegate::ConversationIDRole).toString() == conversationID)
+                {
+                    QStandardItem* item = this->model->itemFromIndex(index);
+                    if(!size.isEmpty())
+                    {
+                        QPixmap avatar_copy = avatar;
+                        avatar_copy.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                        item->setData(avatar_copy, GroupDelegate::AvatarRole);
+                    }
+                    else
+                    {
+                        QPixmap newAvatar = GroupManager::getGroupManage().getGroupAvatar(conversationID, QSize(38, 38));
+                        if(!newAvatar.isNull())
+                        {
+                            newAvatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                            item->setData(newAvatar, GroupDelegate::AvatarRole);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        if(size == QSize(128, 128))
+        {
+            if(conversationID == this->selectedUID)
+                this->widget_contactsInfo->changeSelectedAvatar(avatar);
+        }
+        else if(size.isEmpty())
+        {
+            if(conversationID == this->selectedUID)
+            {
+                QPixmap bigAvatar = GroupManager::getGroupManage().getGroupAvatar(conversationID, QSize(128, 128));
+                if(!bigAvatar.isNull())
+                    this->widget_contactsInfo->changeSelectedAvatar(bigAvatar);
+            }
+        }
+    });
+
+    connect(&GroupManager::getGroupManage(), &GroupManager::groupInfoUpdate, this, [this](const QString& conversationID){
+        GroupManager::GroupInfo info = GroupManager::getGroupManage().getGroupInfo(conversationID);
+        if(info.conversationID.isEmpty())
+            return;
+
+        bool isFound = false;
+        for(int i = 0; i < this->model_group->rowCount(); i++) {
+            QModelIndex index = this->model_group->index(i, 0);
+
+            QVariant vi = index.data(GroupDelegate::GroupRole);
+            if(vi.isValid() && vi.toBool())
+                continue;
+
+            if(index.data(GroupDelegate::ConversationIDRole).toString() == conversationID)
+            {
+                QStandardItem* item = this->model_group->itemFromIndex(index);
+                item->setData(info.groupName, GroupDelegate::NameRole);
+                item->setData(info.memberInfos.size(), GroupDelegate::MemberCountRole);
+                isFound = true;
+                break;
+            }
+        }
+
+        if(!isFound)
+        {
+            QPixmap avatar = GroupManager::getGroupManage().getGroupAvatar(conversationID, QSize(38, 38));
+            avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+
+            addGroupItem(info.conversationID, info.groupID, info.groupName, info.ownerUID, info.memberInfos, avatar);
+
+            if(this->btn_myGroups->isChecked())
+            {
+                if(this->model_group->rowCount() == 0)
+                    changeStatus(Empty);
+                else
+                    changeStatus(Hide);
+            }
+        }
+    });
+
     changeStatus(Empty);
 }
 
@@ -308,11 +501,34 @@ void ContactsWidget::initSideUnStyle()
                                     border-top:1px solid #e0e0e0;
                                     background:#ffffff;
                                 }
-                                #label_myFriend
+                                #btn_myFriend
                                 {
                                     color:#1f2937;
                                     font-size:12px;
                                     font-weight:bold;
+                                    border-right: 1px solid #e0e0e0;
+                                    border-radius: 0;
+                                    padding-bottom: 2px;
+                                }
+                                #btn_myGroups
+                                {
+                                    color:#1f2937;
+                                    font-size:12px;
+                                    font-weight:bold;
+                                    border-radius: 0;
+                                    padding-bottom: 2px;
+                                }
+                                #btn_myFriend:hover,
+                                #btn_myGroups:hover
+                                {
+                                    border-bottom: 2px solid rgba(99, 102, 241, 150);
+                                    padding-bottom: 0px;
+                                }
+                                #btn_myFriend:checked,
+                                #btn_myGroups:checked
+                                {
+                                    border-bottom: 2px solid rgba(99, 102, 241, 255);
+                                    padding-bottom: 0px;
                                 }
                                 #listView_myFriend
                                 {
@@ -396,14 +612,21 @@ void ContactsWidget::initStacked()
     });
 
     this->widget_contactsInfo = new ContactsInfoWidget(this->stackedWidget->width(),this->stackedWidget->height());
+    this->widget_groupInfo = new GroupInfoWidget(this->stackedWidget->width(),this->stackedWidget->height());
 
     this->stackedWidget->addWidget(this->widget_noSelect);
     this->stackedWidget->addWidget(this->widget_newFriend);
     this->stackedWidget->addWidget(this->widget_contactsInfo);
+    this->stackedWidget->addWidget(this->widget_groupInfo);
 
     this->stackedWidget->setCurrentWidget(this->widget_noSelect);
 
     connect(this->widget_contactsInfo, &ContactsInfoWidget::openConversation, this, [this](const QString &conversationID){
+        //转发信号
+        emit openConversation(conversationID);
+    });
+
+    connect(this->widget_groupInfo, &GroupInfoWidget::openConversation, this, [this](const QString &conversationID){
         //转发信号
         emit openConversation(conversationID);
     });
@@ -478,6 +701,47 @@ void ContactsWidget::sortedFriendList()
     restoreSelect();
 }
 
+void ContactsWidget::sortedGroupList()
+{
+    QList<GroupManager::GroupInfo> sortedList = GroupManager::getGroupManage().getAllGroups();
+    QCollator collator;
+    std::sort(sortedList.begin(), sortedList.end(), [&collator, this](const GroupManager::GroupInfo& a, const GroupManager::GroupInfo& b){
+        QString letterA = getFirstLetter(a.groupName);
+        QString letterB = getFirstLetter(b.groupName);
+        //让#排最后面
+        bool aIsSpecial = (letterA == "#");
+        bool bIsSpecial = (letterB == "#");
+
+        if (aIsSpecial && !bIsSpecial)
+            return false;
+        if (!aIsSpecial && bIsSpecial)
+            return true;
+        if (aIsSpecial && bIsSpecial)
+            return collator.compare(a.groupName, b.groupName) < 0;
+        return collator.compare(a.groupName, b.groupName) < 0;
+    });
+
+    QString preGroup;
+    for(const GroupManager::GroupInfo& gi : std::as_const(sortedList))
+    {
+        QString thisGroup = getFirstLetter(gi.groupName);
+        if(thisGroup != preGroup)
+        {
+            //添加组头
+            QStandardItem* header = new QStandardItem(thisGroup);
+            header->setData(true, GroupDelegate::GroupRole);
+            header->setFlags(header->flags() & ~Qt::ItemIsSelectable);
+            this->model_group->appendRow(header);
+            preGroup = thisGroup;
+        }
+
+        QPixmap avatar = GroupManager::getGroupManage().getGroupAvatar(gi.conversationID, QSize(38, 38));
+        avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+        addGroupItem(gi.conversationID, gi.groupID, gi.groupName, gi.ownerUID, gi.memberInfos, avatar);
+    }
+    restoreSelect();
+}
+
 void ContactsWidget::searchFriend(const QString& text)
 {
     QList<FriendManage::FriendInfo> list = FriendManage::getFriendManage().getAllFriend();
@@ -493,31 +757,88 @@ void ContactsWidget::searchFriend(const QString& text)
     restoreSelect();
 }
 
+void ContactsWidget::searchGroup(const QString &text)
+{
+    QList<GroupManager::GroupInfo> list = GroupManager::getGroupManage().getAllGroups();
+    for(const GroupManager::GroupInfo& gi : std::as_const(list))
+    {
+        if(gi.groupName.contains(text, Qt::CaseInsensitive))
+        {
+            QPixmap avatar = GroupManager::getGroupManage().getGroupAvatar(gi.conversationID, QSize(38, 38));
+            avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+            addGroupItem(gi.conversationID, gi.groupID, gi.groupName, gi.ownerUID, gi.memberInfos, avatar);
+        }
+    }
+    restoreSelect();
+}
+
 void ContactsWidget::restoreSelect()
 {
-    if(this->selectedUID.isEmpty() || FriendManage::getFriendManage().getFriendCount() == 0)
+    bool isFriend = this->btn_myFriend->isChecked();
+    if(this->selectedUID.isEmpty())
         return;
-    for(int i = 0; i < this->model->rowCount(); i++)
+
+    if(isFriend)
     {
-        QModelIndex index = this->model->index(i, 0);
-        QVariant vi = index.data(FriendDelegate::GroupRole);
-        bool isGroup = vi.isValid() ? vi.toBool() : false;
-        if(isGroup)
-            continue;
-        if(index.data(FriendDelegate::UIDRole).toString() == this->selectedUID)
+        if(FriendManage::getFriendManage().getFriendCount() == 0)
+            return;
+    }
+    else
+    {
+        if(GroupManager::getGroupManage().getGroupsCount() == 0)
+            return;
+    }
+
+    if(isFriend)
+    {
+        for(int i = 0; i < this->model->rowCount(); i++)
         {
-            this->listView_myFriend->setCurrentIndex(index);
-            this->listView_myFriend->selectionModel()->select(index, QItemSelectionModel::ClearAndSelect);
-            break;
+            QModelIndex index = this->model->index(i, 0);
+            QVariant vi = index.data(FriendDelegate::GroupRole);
+            bool isGroup = vi.isValid() ? vi.toBool() : false;
+            if(isGroup)
+                continue;
+            if(index.data(FriendDelegate::UIDRole).toString() == this->selectedUID)
+            {
+                this->listView_myFriend->setCurrentIndex(index);
+                this->listView_myFriend->selectionModel()->select(index, QItemSelectionModel::ClearAndSelect);
+                break;
+            }
+        }
+    }
+    else
+    {
+        for(int i = 0; i < this->model_group->rowCount(); i++)
+        {
+            QModelIndex index = this->model_group->index(i, 0);
+            QVariant vi = index.data(GroupDelegate::GroupRole);
+            bool isGroup = vi.isValid() ? vi.toBool() : false;
+            if(isGroup)
+                continue;
+
+            //此处复用uid 当为群聊的时候作为会话ID
+            if(index.data(GroupDelegate::ConversationIDRole).toString() == this->selectedUID)
+            {
+                this->listView_myFriend->setCurrentIndex(index);
+                this->listView_myFriend->selectionModel()->select(index, QItemSelectionModel::ClearAndSelect);
+                break;
+            }
         }
     }
 
     if(!this->selectedUID.isEmpty())
     {
-        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(this->selectedUID);
+        if(isFriend)
+        {
+            FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(this->selectedUID);
 
-        this->widget_contactsInfo->changeInfo(FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(128, 128)), info.username, info.conversationID, info.sid,
-                                              info.email, info.isOnline);
+            this->widget_contactsInfo->changeInfo(FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(128, 128)), info.username, info.conversationID, info.sid,
+                                                  info.email, info.isOnline);
+        }
+        else
+        {
+            //设置群聊info界面
+        }
     }
 }
 

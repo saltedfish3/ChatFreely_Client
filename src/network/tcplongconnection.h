@@ -48,6 +48,10 @@ public:
 
     //群聊
     void sendCreateGroupRequest(const QString& groupName, const QList<QString>& inviteUIDs, const QString& inviteMsg = "");
+    void sendHandleNewGroupJoinRequest(const QString& handle_requestID, bool isAgree);
+    void getGroupList();
+    void getNewGroupJoinRequestsList();
+    void sendApplyJoinGroupRequest(const QString& groupID, const QString& verMsg);
 
     //消息
     void sendMessageTo(QString conversationID, QString message, QString tempMsgID, ContentType type);
@@ -67,7 +71,7 @@ signals:
 
     //好友
     void newFriendRequestsState(bool isEmpty);
-    void newFriendRequestsHandleResult(bool isSuccess);
+    void newFriendRequestsHandleResult(const QString& handleUID, bool isSuccess);
     void newFriendRequests(const QString& uid, const QString& sid, const QString& username, const QString& avatar_url, const QString& verMsg);
     //全量获取好友列表
     void allFriendList(const QList<QVariantMap>& list);
@@ -79,8 +83,14 @@ signals:
     void FriendAvatar(const QString& uid, const QString& avatar);
 
     //群聊
-    void createGroupSuccess(const QString& groupID, const QString& conversationID);
-
+    void createGroupSuccess(const QString& groupID, const QString& conversationID, const QString& groupName);
+    void allGroupList(const QList<QVariantMap>& list);
+    void newGroupJoinRequestsState(bool isEmpty);
+    void newGroupJoinRequest(const QString& requestID, const QString& groupName, int source, const QString& displayName,
+                             const QString& displayAvatarUrl, const QString& verMsg, const QString& applicantSID, const QString& inviterName);
+    void newGroupJoinRequestsHandleResult(const QString& handleRequestID, bool isSuccess);
+    void newGroup(const QString& conversationID, const QString& groupID, const QString& groupName,
+                  const QString& avatarUrl, const QString& ownerUID, const QVariantList& memberInfos);
 
     //用于通知业务层getConversationsListAndSeq是否成功
     void newSyncConvStatus(bool isSuccess, const QList<QString>& conversations, int64_t newSyncConvSeq);
@@ -89,6 +99,7 @@ signals:
     void sendMessageStatus(bool isSuccess, const QString& tempMsgID, const QString& conversationID, const QString& messageID = "", int64_t timeStamp = 0, int64_t convSeq = 0);
     void pushMessage(const QString& conversationID, const QString& senderUID, ContentType type, const QString& content, const QString& messageID, int64_t timeStamp, int64_t convSeq);
     void cleanNewFriendRequestsList();
+    void cleanNewGroupJoinRequestsList();
     void refreshExpiredExit();
     void exitAccount();
 
@@ -121,6 +132,12 @@ private:
 
     //群聊
     void handleCreateGroupRequestResp(QJsonObject obj);
+    void handleGetGroupListResp(QJsonObject obj);
+    void handlePushGroupJoinRequestResp(QJsonObject obj);
+    void handleGetNewGroupJoinRequestsListResp(QJsonObject obj);
+    void handleHandleNewGroupJoinRequestResp(QJsonObject obj);
+    void handlePushNewGroupResp(QJsonObject obj);
+    void handleApplyJoinGroupRequestResp(QJsonObject obj);
 
     //消息
     void handleGetConversationsFriendUIDListAndSeqResp(QJsonObject obj);
@@ -154,7 +171,9 @@ private:
         CreateGroupRequest,
         Register,
         UnLogin,
-        HandleNewFriendRequest
+        HandleNewFriendRequest,
+        HandleNewGroupJoinRequest,
+        ApplyJoinGroupRequest
     };
     struct PendingRequest
     {

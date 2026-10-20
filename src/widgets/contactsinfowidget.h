@@ -22,6 +22,7 @@ public:
 
 signals:
     void openConversation(const QString &conversationID);
+
 private:
     void init();
     void initStyle();

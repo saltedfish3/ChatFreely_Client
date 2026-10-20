@@ -28,6 +28,7 @@
 #include "imagepreviewwidget.h"
 #include "../utils/videoutils.h"
 #include "videopreviewwidget.h"
+#include "../utils/groupmanager.h"
 
 class ConversationWidget : public QWidget
 {
@@ -39,6 +40,7 @@ public:
     void updateFriendStatus(bool isOnline);
     void setActive(bool isActive);
     void jumpToMessage(const QString& msgID, qint64 convSeq);
+    void updateGroupInfo();
 
 signals:
 

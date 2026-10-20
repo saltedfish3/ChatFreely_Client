@@ -25,7 +25,7 @@ public:
         Around
     };
 
-    explicit MessagesManager(const QString& conversationID, QObject* parent = nullptr);
+    explicit MessagesManager(const QString& conversationID, int conversationType, QObject* parent = nullptr);
 
     void addMessage(const Message& msg, bool isStoreDB = true);
     void addMessages(const QList<Message>& msgs, qint64 convSeqFirst, qint64 convSeqLast, bool isStoreDB = true);
@@ -106,6 +106,7 @@ private:
     QHash<QString, int> index_message;//消息索引(消息ID，行号)
 
     QString conversationID;
+    int conversationType = 0;
     qint64 lastConvSeq = 0;
 
     QList<Range> ranges;

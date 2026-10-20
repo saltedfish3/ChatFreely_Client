@@ -165,7 +165,21 @@ void AddNewFriendWidget::initWidget()
         }
         else if(currentMode == JoinGroup)
         {
-            qDebug()<<"Join Group";
+            QString groupID = this->edit_IDOrEmail->text().trimmed();
+            QString verMsg = this->edit_verMsg->text().trimmed();
+            if(groupID.isEmpty())
+            {
+                ToastManager::getToastManager(this).error("群聊ID不能为空");
+                return;
+            }
+            QRegularExpression regExp_gid("^\\d{9,10}$");
+            if(!regExp_gid.match(groupID).hasMatch())
+            {
+                ToastManager::getToastManager(this).error("请输入正确的群号");
+                return;
+            }
+
+            TcpLongConnection::getTcpClient().sendApplyJoinGroupRequest(groupID, verMsg);
         }
         else if(currentMode == CreateGroup)
         {
@@ -176,17 +190,11 @@ void AddNewFriendWidget::initWidget()
                 ToastManager::getToastManager(this).error("群聊名称不能为空");
                 return;
             }
-            QRegularExpression regExp_sid("^\\d{9}$");
-            if(!regExp_sid.match(inviteMsg).hasMatch())
-            {
-                ToastManager::getToastManager(this).error("输入为非群聊ID");
-                return;
-            }
 
             QModelIndexList selectedRows = this->view_inviteFriend->selectionModel()->selectedIndexes();
             QList<QString> invitesList;
             for(const QModelIndex& index : std::as_const(selectedRows))
-                invitesList.append(index.data(FriendDelegate::UsernameRole).toString());
+                invitesList.append(index.data(FriendDelegate::UIDRole).toString());
 
             if(invitesList.isEmpty())
             {
@@ -231,7 +239,7 @@ void AddNewFriendWidget::initWidget()
 
     connect(this->delegate, &FriendDelegate::itemClicked, this, [this](){
         QModelIndexList selectedRows = this->view_inviteFriend->selectionModel()->selectedIndexes();
-        for(const QModelIndex& index : selectedRows)
+        for(const QModelIndex& index : std::as_const(selectedRows))
         {
             qDebug()<<index.data(FriendDelegate::UsernameRole).toString();
         }
@@ -408,6 +416,7 @@ void AddNewFriendWidget::changeMode(Mode mode)
         this->label_smallTitle->setText("输入对方信息即可添加好友");
         this->label_UserIDOrEmail->setText("用户ID 或 邮箱");
         this->edit_IDOrEmail->setPlaceholderText("name@example.com 或 123456789");
+        this->edit_IDOrEmail->setMaxLength(254);
         this->label_verMsg->setText("验证消息(选填)");
         this->btn_add->setText("添加");
         this->view_inviteFriend->hide();
@@ -425,6 +434,7 @@ void AddNewFriendWidget::changeMode(Mode mode)
         this->label_smallTitle->setText("输入群聊ID即可加入群聊");
         this->label_UserIDOrEmail->setText("群聊ID");
         this->edit_IDOrEmail->setPlaceholderText("123456789");
+        this->edit_IDOrEmail->setMaxLength(18);
         this->label_verMsg->setText("验证消息(选填)");
         this->btn_add->setText("加入");
         this->view_inviteFriend->hide();
@@ -442,6 +452,7 @@ void AddNewFriendWidget::changeMode(Mode mode)
         this->label_smallTitle->setText("选择邀请进入群聊的好友即可创建群聊");
         this->label_UserIDOrEmail->setText("群聊名称");
         this->edit_IDOrEmail->setPlaceholderText("贝利亚大王的群");
+        this->edit_IDOrEmail->setMaxLength(64);
         this->label_verMsg->setText("邀请消息(选填)");
         this->btn_add->setText("创建");
         this->view_inviteFriend->show();

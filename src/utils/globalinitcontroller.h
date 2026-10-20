@@ -7,6 +7,7 @@
 #include "../database/databasemanager.h"
 #include "../chat/conversationitem.h"
 #include "../chat/conversationmanager.h"
+#include "groupmanager.h"
 
 class GlobalInitController : public QObject
 {
@@ -17,6 +18,8 @@ public:
         Free,
         LoadingFriends,
         LoadingNewFriendRequests,
+        LoadingGroups,
+        loadingNewGroupJoinRequests,
         LoadingLocalConversations,
         SyncingGlobalSeq,
         SyncingMessages,
@@ -35,6 +38,10 @@ public:
     void loadFriendList();
     //加载新好友申请列表
     void loadNewFriendRequests();
+    //加载群聊列表
+    void loadGroupList();
+    //加载新群聊申请列表
+    void loadNewGroupJoinRequests();
     //加载会话列表
     void loadLocalConversations();
     //同步最新全局Seq
@@ -48,9 +55,6 @@ public:
 signals:
     //登录成功与否信号
     void loginResult(bool isSuccess, const QString& from, const QString& info, bool reLogin);
-
-    //好友首次加载完成
-    void friendListFirstLoaded();
 
     //会话列表加载完成
     void allConversationsLoaded(const QList<QPair<ConversationItem *, DatabaseManager::ConversationInfo>>& list);

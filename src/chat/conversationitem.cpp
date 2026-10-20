@@ -1,7 +1,7 @@
 #include "conversationitem.h"
 
 ConversationItem::ConversationItem(const QString& conversationID, ConversationType type, QObject *parent)
-    : conversationID(conversationID), QObject{parent}, msgManager(conversationID, this), type(type)
+    : conversationID(conversationID), QObject{parent}, msgManager(conversationID, static_cast<int>(type), this), type(type)
 {
     connect(&this->msgManager, &MessagesManager::finishLoadedImage, this, [this](){
         emit finishLoadedImage();

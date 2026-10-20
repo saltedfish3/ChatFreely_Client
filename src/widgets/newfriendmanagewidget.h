@@ -24,7 +24,11 @@ class NewFriendManageWidget : public QWidget
     Q_OBJECT
 public:
     explicit NewFriendManageWidget(int width, int height, QWidget *parent = nullptr);
-    void addRequestsItem(QString uid, QString sid, QString username, QString avatar_url, QString verMsg);
+    void addFriendRequestsItem(QString uid, QString sid, QString username, QString avatar_url, QString verMsg);
+    void addGroupRequestsItem(const QString& requestID, const QString& groupName, int source,
+                              const QString& displayName, const QString& displayAvatarUrl,
+                              const QString& verMsg, const QString& applicantSID, const QString& inviterName);
+
 
 signals:
     void RequestsNumberChange(size_t number);
@@ -56,8 +60,6 @@ private:
     FriendApplyDelegate* delegate;
 
     QString handle_uid;
-
-    QPersistentModelIndex waitingHandleIndex;
 
     size_t unProcessedRequests = 0;
 };

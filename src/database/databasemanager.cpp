@@ -65,7 +65,8 @@ bool DatabaseManager::changeToCurrentUser()
             QSqlQuery sqlq(db);
             isSuccess &= sqlq.exec("CREATE TABLE IF NOT EXISTS conversations("
                         "conversation_id INTEGER PRIMARY KEY,"
-                        "unread_count INTEGER DEFAULT 0)");
+                        "unread_count INTEGER DEFAULT 0,"
+                        "type INTEGER NOT NULL DEFAULT 0)");
 
             isSuccess &= sqlq.exec("CREATE TABLE IF NOT EXISTS messages("
                         "id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -107,12 +108,13 @@ bool DatabaseManager::changeToCurrentUser()
     return true;
 }
 
-void DatabaseManager::addInsertMessageTask(const QString &conversationID, const Message &msg)
+void DatabaseManager::addInsertMessageTask(const QString &conversationID, const Message &msg, int conversationType)
 {
     DBTask task;
     task.type = InsertMessage;
     task.conversationID = conversationID;
     task.msg = msg;
+    task.conversationType = conversationType;
     addTask(conversationID, task);
 }
 
@@ -263,7 +265,7 @@ void DatabaseManager::loadAllConversationsList(std::function<void (const QList<C
             if(db.isOpen())
             {
                 QSqlQuery q(db);
-                QString sql = "SELECT cp.conversation_id, COALESCE(c.unread_count, 0), m.type, m.content, m.timestamp "
+                QString sql = "SELECT cp.conversation_id, COALESCE(c.unread_count, 0), COALESCE(c.type, 0), m.type, m.content, m.timestamp "
                               "FROM conversation_checkpoint cp "
                               "LEFT JOIN conversations c ON cp.conversation_id = c.conversation_id "
                               "LEFT JOIN messages m ON cp.conversation_id = m.conversation_id "
@@ -280,16 +282,17 @@ void DatabaseManager::loadAllConversationsList(std::function<void (const QList<C
                         ConversationInfo info;
                         info.conversationID = QString::number(q.value(0).toLongLong());
                         info.unReadCount = q.value(1).toInt();
-                        ContentType type = static_cast<ContentType>(q.value(2).toInt());
+                        info.conversationType = q.value(2).toInt();
+                        ContentType type = static_cast<ContentType>(q.value(3).toInt());
                         if(type == ContentType::Text)
-                            info.lastMsg = q.value(3).toString();
+                            info.lastMsg = q.value(4).toString();
                         else if(type == ContentType::Image)
                             info.lastMsg = "[图片]";
                         else if(type == ContentType::Video)
                             info.lastMsg = "[视频]";
                         else if(type == ContentType::File)
                             info.lastMsg = "[文件]";
-                        info.lastTimestamp = q.value(4).toLongLong();
+                        info.lastTimestamp = q.value(5).toLongLong();
                         list.append(info);
                     }
                 }
@@ -798,6 +801,18 @@ bool DatabaseManager::executeInsertMessageTask(const QSqlDatabase& db, const DBT
     {
         qWarning() << "插入或更新conversation_checkpoint失败"<< q_checkpoint.lastError().driverText() << q_checkpoint.lastError().databaseText();
     }
+
+    QSqlQuery q_conv(db);
+    q_conv.prepare("INSERT INTO conversations(conversation_id, unread_count, type) VALUES(?, 0, ?)"
+              " ON CONFLICT(conversation_id) DO UPDATE SET type = excluded.type");
+    q_conv.addBindValue(toInt64(task.conversationID));
+    q_conv.addBindValue(task.conversationType);
+
+    if(!q_conv.exec())
+    {
+        qWarning() << "插入或者更新 conversation 失败" << q_conv.lastError().text();
+    }
+
     return true;
 }
 
@@ -837,7 +852,7 @@ bool DatabaseManager::executeUpdateUnreadTask(const QSqlDatabase &db, const DBTa
 {
     QSqlQuery q(db);
     q.prepare("INSERT INTO conversations(conversation_id, unread_count) VALUES(?, ?)"
-              " ON CONFLICT(conversation_id) DO UPDATE SET unread_count = excluded.unread_count");
+                " ON CONFLICT(conversation_id) DO UPDATE SET unread_count = excluded.unread_count");
     q.addBindValue(toInt64(task.conversationID));
     q.addBindValue(task.unreadCount);
 

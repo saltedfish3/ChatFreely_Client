@@ -25,6 +25,7 @@ public:
         int unReadCount = 0;
         QString lastMsg;
         qint64 lastTimestamp = 0;
+        int conversationType;
     };
 
     enum Type
@@ -52,6 +53,7 @@ public:
         QString conversationID;
         Message msg;
         int unreadCount = 0;
+        int conversationType = -1;
     };
 
     struct SearchConvResult
@@ -69,7 +71,7 @@ public:
     void prepareToSwitchUser();
     bool changeToCurrentUser();
 
-    void addInsertMessageTask(const QString& conversationID, const Message& msg);
+    void addInsertMessageTask(const QString& conversationID, const Message& msg, int conversationType = -1);
     void addUpdateMessageTask(const QString& conversationID, const Message& msg);
     void addUpdateUnreadTask(const QString& conversationID, int unreadCount);
     bool setMeta(MetaType type, const QString& value);

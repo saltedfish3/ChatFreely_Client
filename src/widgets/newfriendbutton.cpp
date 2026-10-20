@@ -121,13 +121,13 @@ void NewFriendButton::initButton()
     this->label_Icon->resize(36,36);
     this->label_Icon->move(16,(this->height() - this->label_Icon->height())/2);
 
-    this->label_newFriend = new QLabel("新的朋友",this);
+    this->label_newFriend = new QLabel("新的申请",this);
     this->label_newFriend->setObjectName("label_newFriend");
     this->label_newFriend->setMaximumHeight(20);
     this->label_newFriend->setMinimumHeight(20);
     this->label_newFriend->move(60,10);
 
-    this->label_checkApply = new QLabel("查看好友申请",this);
+    this->label_checkApply = new QLabel("查看申请",this);
     this->label_checkApply->setObjectName("label_checkApply");
     this->label_checkApply->setMaximumHeight(18);
     this->label_checkApply->setMinimumHeight(18);

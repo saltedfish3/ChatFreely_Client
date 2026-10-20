@@ -45,46 +45,8 @@ void FriendApplyDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
     painter->drawPixmap(pos_avatarRect, avatar);
     painter->restore();
 
-    //绘制用户名和sid
-    QFont nameFont = option.font;
-    nameFont.setPointSize(11);
-    painter->setFont(nameFont);
-    painter->setPen(QColor(17, 24, 39));
-
-    QString name = index.data(UsernameRole).toString();
-    QString name_sid;
-    if(name.length() > 15)
-        name_sid = name.left(15) + "...";
-    else
-        name_sid += name;
-    name_sid += " (ID:" + index.data(SIDRole).toString() + ")";
-
+    bool isGroup = index.data(IsGroupRequest).toBool();
     QFontMetrics fm = painter->fontMetrics();
-    int textWidth = fm.horizontalAdvance(name_sid) + 4;
-    int textHeight = fm.height();
-    QRect pos_nameRect = QRect(pos_avatarRect.topRight() + QPoint(15, 5), QSize(textWidth, textHeight));
-    painter->drawText(pos_nameRect, Qt::AlignLeft | Qt::AlignVCenter, name_sid);
-
-    //绘制验证信息
-    nameFont.setPointSize(8);
-    painter->setFont(nameFont);
-    painter->setPen(QColor(107, 114, 128));
-    QString msg = "验证信息：";
-    QString verMsg = index.data(VerMsgRole).toString();
-    if(verMsg.isEmpty())
-        msg += "加个好友认识一下!";
-    else
-    {
-        if(verMsg.length() > 20)
-            msg += verMsg.left(20) + "...";
-        else
-            msg += verMsg;
-    }
-
-    int msgWidth = fm.horizontalAdvance(msg) + 4;
-    int msgHeight = fm.height();
-    QRect pos_msgRect = QRect(pos_avatarRect.topRight() + QPoint(16, 26), QSize(msgWidth, msgHeight));
-    painter->drawText(pos_msgRect, Qt::AlignLeft | Qt::AlignVCenter, msg);
 
     //绘制拒绝按钮
     QFont btnFont = option.font;
@@ -157,6 +119,94 @@ void FriendApplyDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
     //绘制同意按钮的同意
     painter->setPen(QPen(Qt::white, 1));
     painter->drawText(pos_agreeRect, Qt::AlignCenter, agreeText);
+
+    //绘制用户名和sid
+    QFont nameFont = option.font;
+    nameFont.setPointSize(11);
+    painter->setFont(nameFont);
+    painter->setPen(QColor(17, 24, 39));
+
+    int width_nameText = cardRect.width() - (pos_avatarRect.topRight() + QPoint(15, 5)).x() - (cardRect.width() - pos_agreeRect.left() - 10);
+    int height_nameText = fm.height();
+    int margin_verMsg = 0;
+
+    QString name = index.data(UsernameRole).toString();
+    if(!isGroup)
+    {
+        QString name_sid;
+
+        name_sid += " (ID:" + index.data(SIDRole).toString() + ")";
+        int width_nameSID = fm.horizontalAdvance(name_sid);
+
+        name = fm.elidedText(name, Qt::ElideRight, width_nameText - width_nameSID);
+        name += name_sid;
+
+        QRect pos_nameRect = QRect(pos_avatarRect.topRight() + QPoint(15, 5), QSize(width_nameText, height_nameText));
+        painter->drawText(pos_nameRect, Qt::AlignLeft | Qt::AlignVCenter, name);
+    }
+    else
+    {
+        int source = index.data(Source).toInt();
+        QRect rect_name = QRect(pos_avatarRect.topRight() + QPoint(15, 0), QSize(width_nameText, height_nameText));
+        QRect rect_sourceTitle = QRect(rect_name.bottomLeft() + QPoint(0, 5), QSize(width_nameText, height_nameText));
+        margin_verMsg = 10;
+
+        QString groupName = index.data(GroupName).toString();
+        QString sourceTitle;
+        if(source == 0)
+        {
+            QString inviterName = index.data(InviterName).toString();
+            QString base = " 邀请您加入群聊";
+            int width_base = fm.horizontalAdvance(base);
+            int width_available = rect_sourceTitle.width() - width_base;
+            sourceTitle = fm.elidedText(inviterName, Qt::ElideMiddle, width_available) + base;
+            name = fm.elidedText(name, Qt::ElideRight, rect_name.width());
+        }
+        else if(source == 1)
+        {
+            QString applicantName = index.data(UsernameRole).toString();
+            QString base = "申请加入群聊 ";
+            int width_base = fm.horizontalAdvance(base);
+            int width_available = rect_sourceTitle.width() - width_base;
+
+            int width_groupName = fm.horizontalAdvance(groupName);
+            if(width_groupName > width_available / 2)
+            {
+                groupName = fm.elidedText(groupName, Qt::ElideMiddle, width_available / 2);
+                width_groupName = fm.horizontalAdvance(groupName);
+            }
+            width_available -= width_groupName;
+
+            sourceTitle = fm.elidedText(applicantName, Qt::ElideMiddle, width_available) + base + groupName;
+
+            QString sid = "(ID:" + index.data(SIDRole).toString() + ")";
+            int width_sid = fm.horizontalAdvance(sid);
+            name = fm.elidedText(name, Qt::ElideRight, rect_name.width() - width_sid) + sid;
+        }
+        else
+            sourceTitle = "邀请您加入群聊";
+
+        painter->drawText(rect_name, Qt::AlignLeft | Qt::AlignVCenter, name);
+
+        nameFont.setPointSize(8);
+        painter->setFont(nameFont);
+        painter->setPen(QColor(107, 114, 128));
+        painter->drawText(rect_sourceTitle, Qt::AlignLeft | Qt::AlignVCenter, sourceTitle);
+    }
+
+    //绘制验证信息
+    nameFont.setPointSize(8);
+    painter->setFont(nameFont);
+    painter->setPen(QColor(107, 114, 128));
+    QString msg = "验证信息：";
+    QString verMsg = index.data(VerMsgRole).toString();
+    if(verMsg.isEmpty())
+        msg += "加个好友认识一下!";
+    else
+        msg += fm.elidedText(verMsg, Qt::ElideRight, width_nameText);
+
+    QRect pos_msgRect = QRect(pos_avatarRect.topRight() + QPoint(16, 26 + margin_verMsg), QSize(width_nameText, height_nameText));
+    painter->drawText(pos_msgRect, Qt::AlignLeft | Qt::AlignVCenter, msg);
 
     painter->restore();
 }
@@ -258,7 +308,10 @@ bool FriendApplyDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, 
         {
             if(this->isAgreePressed)
             {
-                emit agreeClicked(index.data(UIDRole).toString(), index);
+                if(index.data(IsGroupRequest).toBool())
+                    emit agreeGroupClicked(index.data(RequestID).toString(), index);
+                else
+                    emit agreeFriendClicked(index.data(UIDRole).toString(), index);
             }
             newAgreeState = Hover;
         }
@@ -266,7 +319,10 @@ bool FriendApplyDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, 
         {
             if(this->isRefusePressed)
             {
-                emit refuseClicked(index.data(UIDRole).toString(), index);
+                if(index.data(IsGroupRequest).toBool())
+                    emit refuseGroupClicked(index.data(RequestID).toString(), index);
+                else
+                    emit refuseFriendClicked(index.data(UIDRole).toString(), index);
             }
             newRefuseState = Hover;
         }

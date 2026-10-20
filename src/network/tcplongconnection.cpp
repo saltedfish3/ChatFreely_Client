@@ -85,7 +85,7 @@ void TcpLongConnection::sendRegister(QString username, QString email, QString pa
     QTimer::singleShot(5000,[this,requestsID](){
         if(this->waiting_requestsID.erase(requestsID.toStdString()))
         {
-            emit LoginState(false, "", "注册超时，请稍后再试");
+            emit RegisterState(false, "", "注册超时，请稍后再试");
         }
     });
 }
@@ -428,7 +428,7 @@ void TcpLongConnection::sendSyncNewMessages(const QString &conversationID, qint6
     this->socket->write(data);
     this->socket->flush();
 
-    QTimer::singleShot(5000, this, [this, requestsID, conversationID](){
+    QTimer::singleShot(30000, this, [this, requestsID, conversationID](){
         if(this->waiting_requestsID.erase(requestsID.toStdString()))
         {
             if(this->hash_conversationToCurrentReq.value(conversationID) == requestsID)
@@ -612,6 +612,188 @@ void TcpLongConnection::sendCreateGroupRequest(const QString &groupName, const Q
     });
 }
 
+void TcpLongConnection::sendHandleNewGroupJoinRequest(const QString &handle_requestID, bool isAgree)
+{
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        emit mainState(false, "无法连接服务器，请稍后再试");
+        return;
+    }
+    if(handle_requestID.isEmpty())
+    {
+        emit mainState(false, "处理申请错误，请稍后再试");
+        return;
+    }
+    //显示loading
+    emit newGroupJoinRequestsState(false);
+
+    QVariantMap currentParams;
+    QString requestsID;
+    currentParams["handle_requestID"] = handle_requestID;
+    currentParams["isAgree"] = isAgree;
+    for(auto it = this->map_idempotentCache.begin(); it != this->map_idempotentCache.end(); it++)
+    {
+        if(it.value().name == HandleNewGroupJoinRequest && it.value().params == currentParams)
+        {
+            requestsID = it.key();
+            break;
+        }
+    }
+
+    //是否复用幂等
+    if(requestsID.isEmpty())
+    {
+        requestsID = QString::number(getRequestsId());
+        PendingRequest prt;
+        prt.requestID = requestsID;
+        prt.name = HandleNewGroupJoinRequest;
+        prt.params = currentParams;
+
+        QVariantMap tokenParams;
+        tokenParams["handle_requestID"] = handle_requestID;
+        tokenParams["isAgree"] = isAgree;
+        prt.tokenParams = tokenParams;
+
+        this->map_idempotentCache[requestsID] = prt;
+    }
+
+    QJsonObject obj;
+    obj["Requests_id"] = requestsID;
+    obj["Type"] = "HandleNewGroupJoinRequest";
+    obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
+    obj["Status"] = isAgree;
+    obj["HandleRequestID"] = handle_requestID;
+
+    QJsonDocument doc(obj);
+    QByteArray data =doc.toJson(QJsonDocument::Compact) + "\n";
+    this->socket->write(data);
+    this->socket->flush();
+
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(5000,[this,requestsID, handle_requestID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            emit newGroupJoinRequestsHandleResult(handle_requestID, false);
+            emit mainState(false, "处理群聊申请超时，请稍后再试");
+        }
+    });
+}
+
+void TcpLongConnection::getGroupList()
+{
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        return;
+    }
+    QJsonObject obj;
+    QString requestsID = QString::number(getRequestsId());
+    obj["Requests_id"] = requestsID;
+    obj["Type"] = "GetGroupList";
+    obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
+
+    QJsonDocument doc(obj);
+    QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
+
+    this->socket->write(data);
+    this->socket->flush();
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(7000,[this,requestsID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            emit mainState(false, "连接超时，请稍后再试");
+        }
+    });
+}
+
+void TcpLongConnection::getNewGroupJoinRequestsList()
+{
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        return;
+    }
+    QJsonObject obj;
+    QString requestsID = QString::number(getRequestsId());
+    obj["Requests_id"] = requestsID;
+    obj["Type"] = "GetNewGroupJoinRequestsList";
+    obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
+
+    QJsonDocument doc(obj);
+    QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
+
+    this->socket->write(data);
+    this->socket->flush();
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(7000,[this,requestsID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            emit mainState(false, "连接超时，请稍后再试");
+        }
+    });
+}
+
+void TcpLongConnection::sendApplyJoinGroupRequest(const QString &groupID, const QString &verMsg)
+{
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        emit mainState(false, "无法连接服务器，请稍后再试");
+        return;
+    }
+    if(groupID.isEmpty())
+    {
+        emit mainState(false, "申请添加好友失败");
+        return;
+    }
+
+    QVariantMap currentParams;
+    currentParams["groupID"] = groupID;
+    currentParams["verMsg"] = verMsg;
+
+    QString requestsID;
+    for(auto it = this->map_idempotentCache.begin(); it != this->map_idempotentCache.end(); it++)
+    {
+        if(it.value().name == ApplyJoinGroupRequest && it.value().params == currentParams)
+        {
+            requestsID = it.key();
+            break;
+        }
+    }
+
+    if(requestsID.isEmpty())
+    {
+        requestsID = QString::number(getRequestsId());
+        PendingRequest prt;
+        prt.requestID = requestsID;
+        prt.name = ApplyJoinGroupRequest;
+        prt.params = currentParams;
+
+        QVariantMap tokenParams;
+        tokenParams["groupID"] = groupID;
+        tokenParams["verMsg"] = verMsg;
+        prt.tokenParams = tokenParams;
+
+        this->map_idempotentCache[requestsID] = prt;
+    }
+
+    QJsonObject obj;
+    obj["Requests_id"] = requestsID;
+    obj["Type"] = "ApplyJoinGroupRequest";
+    obj["GroupID"] = groupID;
+    obj["VerMsg"] = verMsg;
+    obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
+
+    QJsonDocument doc(obj);
+    QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
+
+    this->socket->write(data);
+    this->socket->flush();
+
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(5000,[this,requestsID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+            emit mainState(false, "申请加入群聊超时，请稍后再试");
+    });
+}
+
 void TcpLongConnection::sendHandleNewFriendRequest(QString handle_uid, bool isAgree)
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
@@ -670,10 +852,10 @@ void TcpLongConnection::sendHandleNewFriendRequest(QString handle_uid, bool isAg
     this->socket->flush();
 
     this->waiting_requestsID.insert(requestsID.toStdString());
-    QTimer::singleShot(5000,[this,requestsID](){
+    QTimer::singleShot(5000,[this,requestsID, handle_uid](){
         if(this->waiting_requestsID.erase(requestsID.toStdString()))
         {
-            emit newFriendRequestsHandleResult(false);
+            emit newFriendRequestsHandleResult(handle_uid, false);
             emit mainState(false, "处理好友申请超时，请稍后再试");
         }
     });
@@ -967,8 +1149,11 @@ void TcpLongConnection::handleUpdateAvatarResp(QJsonObject obj)
 
                         auto it = this->map_idempotentCache.find(requestsID);
                         if(it != this->map_idempotentCache.end())
-                            sendUpadteAvatar(it.value().tokenParams.value("url").toString());
-                        this->map_idempotentCache.remove(requestsID);
+                        {
+                            QString url = it.value().tokenParams.value("url").toString();
+                            this->map_idempotentCache.remove(requestsID);
+                            sendUpadteAvatar(url);
+                        }
                         return;
                     }
                     else
@@ -1133,7 +1318,11 @@ void TcpLongConnection::handleUpdateUsernameResp(QJsonObject obj)
                         UserInfo::getUserInfo().setAccessToken(newAccessToken);
                         auto it = this->map_idempotentCache.find(requestsID);
                         if(it != this->map_idempotentCache.end())
-                            sendUpdateUsername(it.value().tokenParams.value("Username").toString());
+                        {
+                            QString username = it.value().tokenParams.value("Username").toString();
+                            this->map_idempotentCache.remove(requestsID);
+                            sendUpdateUsername(username);
+                        }
                         return;
                     }
                     else
@@ -1187,7 +1376,8 @@ void TcpLongConnection::handleAddNewFriendRequestResp(QJsonObject obj)
                         auto it = this->map_idempotentCache.find(requestsID);
                         if(it != this->map_idempotentCache.end())
                         {
-                            const QVariantMap& tokenParams = it.value().tokenParams;
+                            const QVariantMap tokenParams = it.value().tokenParams;
+                            this->map_idempotentCache.remove(requestsID);
                             sendAddNewFriendRequest(tokenParams.value("sid").toString(),
                                                     tokenParams.value("email").toString(),
                                                     tokenParams.value("verMsg").toString());
@@ -1234,13 +1424,14 @@ void TcpLongConnection::handleCreateGroupRequestResp(QJsonObject obj)
     {
         QString gid = obj.value("GroupID").toString();
         QString conversationID = obj.value("ConversationID").toString();
+        QString groupName = obj.value("GroupName").toString();
         if(conversationID.isEmpty())
         {
             emit mainState(false, "创建群聊失败，请稍后重试");
             this->map_idempotentCache.remove(requestsID);
             return;
         }
-        emit createGroupSuccess(gid, conversationID);
+        emit createGroupSuccess(gid, conversationID, groupName);
         emit mainState(true, "创建群聊成功");
     }
     else
@@ -1263,7 +1454,8 @@ void TcpLongConnection::handleCreateGroupRequestResp(QJsonObject obj)
                         auto it = this->map_idempotentCache.find(requestsID);
                         if(it != this->map_idempotentCache.end())
                         {
-                            const QVariantMap& tokenParams = it.value().tokenParams;
+                            const QVariantMap tokenParams = it.value().tokenParams;
+                            this->map_idempotentCache.remove(requestsID);
                             sendCreateGroupRequest(tokenParams.value("groupName").toString(),
                                                     tokenParams.value("inviteUIDs").toStringList(),
                                                     tokenParams.value("inviteMsg").toString());
@@ -1297,21 +1489,352 @@ void TcpLongConnection::handleCreateGroupRequestResp(QJsonObject obj)
     this->map_idempotentCache.remove(requestsID);
 }
 
-void TcpLongConnection::handleHandleNewFriendRequestResp(QJsonObject obj)
+void TcpLongConnection::handleGetGroupListResp(QJsonObject obj)
+{
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+    if(!obj.contains("Result") || !obj.value("Result").isBool())
+    {
+        emit allGroupList({});
+        return;
+    }
+    bool success = obj.value("Result").toBool();
+    if(success)
+    {
+        if(!obj.contains("List") || !obj.value("List").isArray())
+        {
+            emit allGroupList({});
+            return;
+        }
+        const QJsonArray arr = obj.value("List").toArray();
+        if(arr.isEmpty())
+        {
+            emit allGroupList({});
+            return;
+        }
+
+        QList<QVariantMap> list;
+        for(const QJsonValue& jv : arr)
+        {
+            if(!jv.isObject())
+                continue;
+            QJsonObject obj = jv.toObject();
+            QVariantMap var;
+            var["ConversationID"] = obj.value("ConversationID").toString();
+            var["GroupID"] = obj.value("GroupID").toString();
+            var["GroupName"] = obj.value("GroupName").toString();
+            var["Avatar_Url"] = obj.value("Avatar_Url").toString();
+            var["OwnerUID"] = obj.value("OwnerUID").toString();
+
+            QVariantList uidList;
+            QJsonArray uidArr = obj.value("MemberInfos").toArray();
+            for(const QJsonValue& jv_uid : std::as_const(uidArr))
+            {
+                if(!jv_uid.isObject())
+                {
+                    continue;
+                }
+                QJsonObject ob = jv_uid.toObject();
+                QVariantMap va;
+                va["Username"] = ob.value("Username").toString();
+                va["UID"] = ob.value("UID").toString();
+                va["SID"] = ob.value("SID").toString();
+                va["AvatarUrl"] = ob.value("AvatarUrl").toString();
+                uidList << va;
+            }
+            var["MemberInfos"] = uidList;
+            list.append(var);
+        }
+        emit allGroupList(list);
+    }
+    else
+    {
+        if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
+        {
+            bool isExpired = obj.value("AccessTokenExpired").toBool();
+            if(isExpired)
+            {
+                sendRefreshToken([this](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                    if(isSuccess)
+                    {
+                        if(newAccessToken.isEmpty())
+                        {
+                            emit refreshExpiredExit();
+                            return;
+                        }
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        getGroupList();
+                        return;
+                    }
+                    else
+                    {
+                        if(isRefreshTokenExpired)
+                            emit refreshExpiredExit();
+                        else
+                        {
+                            emit allGroupList({});
+                        }
+                    }
+                });
+            }
+            return;
+        }
+        emit allGroupList({});
+    }
+}
+
+void TcpLongConnection::handlePushGroupJoinRequestResp(QJsonObject obj)
+{
+    if(obj.contains("RequestID") && obj.value("RequestID").isString() &&
+        obj.contains("GroupName") && obj.value("GroupName").isString() &&
+        obj.contains("Source") && obj.value("Source").isString() &&
+        obj.contains("DisplayName") && obj.value("DisplayName").isString() &&
+        obj.contains("DisplayAvatarUrl") && obj.value("DisplayAvatarUrl").isString() &&
+        obj.contains("VerMsg") && obj.value("VerMsg").isString())
+    {
+        int source = obj.value("Source").toString().toInt();
+        if(source == 0 && obj.contains("InviterName") && obj.value("InviterName").isString())
+        {
+            emit newGroupJoinRequest(obj.value("RequestID").toString(),
+                                     obj.value("GroupName").toString(),
+                                     source,
+                                     obj.value("DisplayName").toString(),
+                                     obj.value("DisplayAvatarUrl").toString(),
+                                     obj.value("VerMsg").toString(),
+                                     "",
+                                     obj.value("InviterName").toString());
+            return;
+        }
+        else if(source == 1 && obj.contains("ApplicantSID") && obj.value("ApplicantSID").isString())
+        {
+            emit newGroupJoinRequest(obj.value("RequestID").toString(),
+                                     obj.value("GroupName").toString(),
+                                     source,
+                                     obj.value("DisplayName").toString(),
+                                     obj.value("DisplayAvatarUrl").toString(),
+                                     obj.value("VerMsg").toString(),
+                                     obj.value("ApplicantSID").toString(),
+                                     "");
+            return;
+        }
+    }
+    getNewGroupJoinRequestsList();
+}
+
+void TcpLongConnection::handleGetNewGroupJoinRequestsListResp(QJsonObject obj)
+{
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+    if(!obj.contains("Result") || !obj.value("Result").isBool())
+    {
+        emit newGroupJoinRequestsState(true);
+        return;
+    }
+    bool success = obj.value("Result").toBool();
+    if(success)
+    {
+        if(!obj.contains("List") || !obj.value("List").isArray())
+        {
+            emit newGroupJoinRequestsState(true);
+            return;
+        }
+        const QJsonArray arr = obj.value("List").toArray();
+        if(arr.isEmpty())
+        {
+            emit newGroupJoinRequestsState(true);
+            return;
+        }
+        emit cleanNewGroupJoinRequestsList();
+        emit newGroupJoinRequestsState(false);
+        for(const QJsonValue& jv : arr)
+        {
+            if(!jv.isObject())
+                continue;
+            QJsonObject obj = jv.toObject();
+
+            int source = obj.value("Source").toString().toInt();
+            if(source == 0 && obj.contains("InviterName") && obj.value("InviterName").isString())
+            {
+                emit newGroupJoinRequest(obj.value("RequestID").toString(),
+                                         obj.value("GroupName").toString(),
+                                         source,
+                                         obj.value("DisplayName").toString(),
+                                         obj.value("DisplayAvatarUrl").toString(),
+                                         obj.value("VerMsg").toString(),
+                                         "",
+                                         obj.value("InviterName").toString());
+                return;
+            }
+            else if(source == 1 && obj.contains("ApplicantSID") && obj.value("ApplicantSID").isString())
+            {
+                emit newGroupJoinRequest(obj.value("RequestID").toString(),
+                                         obj.value("GroupName").toString(),
+                                         source,
+                                         obj.value("DisplayName").toString(),
+                                         obj.value("DisplayAvatarUrl").toString(),
+                                         obj.value("VerMsg").toString(),
+                                         obj.value("ApplicantSID").toString(),
+                                         "");
+                return;
+            }
+        }
+    }
+    else
+    {
+        if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
+        {
+            bool isExpired = obj.value("AccessTokenExpired").toBool();
+            if(isExpired)
+            {
+                sendRefreshToken([this](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                    if(isSuccess)
+                    {
+                        if(newAccessToken.isEmpty())
+                        {
+                            emit refreshExpiredExit();
+                            return;
+                        }
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        emit newGroupJoinRequestsState(false);
+                        getNewGroupJoinRequestsList();
+                        return;
+                    }
+                    else
+                    {
+                        if(isRefreshTokenExpired)
+                            emit refreshExpiredExit();
+                        else
+                        {
+                            emit newGroupJoinRequestsState(true);
+                        }
+                    }
+                });
+            }
+            return;
+        }
+        emit newGroupJoinRequestsState(true);
+    }
+}
+
+void TcpLongConnection::handleHandleNewGroupJoinRequestResp(QJsonObject obj)
+{
+    if(!obj.contains("Result") || !obj.value("Result").isBool() || !obj.contains("HandleRequestID") || !obj.value("HandleRequestID").isString())
+        return;
+
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+    bool success = obj.value("Result").toBool();
+    QString handleRequestID = obj.value("HandleRequestID").toString();
+    if(success)
+    {
+        emit newGroupJoinRequestsHandleResult(handleRequestID, true);
+        emit mainState(true, "处理成功");
+        this->map_idempotentCache.remove(requestsID);
+        return;
+    }
+    else
+    {
+        if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
+        {
+            bool isExpired = obj.value("AccessTokenExpired").toBool();
+            if(isExpired)
+            {
+                sendRefreshToken([this, requestsID, handleRequestID](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                    if(isSuccess)
+                    {
+                        if(newAccessToken.isEmpty())
+                        {
+                            emit refreshExpiredExit();
+                            this->map_idempotentCache.remove(requestsID);
+                            return;
+                        }
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        //静默重试 或者 让用户重新操作
+                        auto it = this->map_idempotentCache.find(requestsID);
+                        if(it != this->map_idempotentCache.end())
+                        {
+                            const QVariantMap tokenParams = it.value().tokenParams;
+                            this->map_idempotentCache.remove(requestsID);
+                            sendHandleNewGroupJoinRequest(tokenParams.value("handle_requestID").toString(),
+                                                          tokenParams.value("isAgree").toBool());
+                        }
+
+                        return;
+                    }
+                    else
+                    {
+                        if(isRefreshTokenExpired)
+                        {
+                            emit refreshExpiredExit();
+                            this->map_idempotentCache.remove(requestsID);
+                            return;
+                        }
+                        emit newGroupJoinRequestsHandleResult(handleRequestID, false);
+                        emit mainState(false, "处理群聊申请失败，请稍后再试");
+                        this->map_idempotentCache.remove(requestsID);
+                    }
+                });
+                return;
+            }
+            emit newGroupJoinRequestsHandleResult(handleRequestID, false);
+            emit mainState(false, "处理群聊申请失败，请稍后再试");
+            this->map_idempotentCache.remove(requestsID);
+            return;
+        }
+        emit newGroupJoinRequestsHandleResult(handleRequestID, false);
+        emit mainState(false, "处理群聊申请失败，请稍后再试");
+        this->map_idempotentCache.remove(requestsID);
+    }
+}
+
+void TcpLongConnection::handlePushNewGroupResp(QJsonObject obj)
+{
+    if(obj.contains("ConversationID") && obj.value("ConversationID").isString() &&
+        obj.contains("OwnerUID") && obj.value("OwnerUID").isString() &&
+        obj.contains("GroupID") && obj.value("GroupID").isString() &&
+        obj.contains("GroupName") && obj.value("GroupName").isString() &&
+        obj.contains("Avatar_Url") && obj.value("Avatar_Url").isString() &&
+        obj.contains("MemberInfos") && obj.value("MemberInfos").isArray())
+    {
+        QVariantList uidList;
+        QJsonArray uidArr = obj.value("MemberInfos").toArray();
+        for(const QJsonValue& jv_uid : std::as_const(uidArr))
+        {
+            if(!jv_uid.isObject())
+            {
+                continue;
+            }
+            QJsonObject ob = jv_uid.toObject();
+            QVariantMap va;
+            va["Username"] = ob.value("Username").toString();
+            va["UID"] = ob.value("UID").toString();
+            va["SID"] = ob.value("SID").toString();
+            va["AvatarUrl"] = ob.value("AvatarUrl").toString();
+            uidList << va;
+        }
+
+        emit newGroup(obj.value("ConversationID").toString(),
+                       obj.value("GroupID").toString(),
+                       obj.value("GroupName").toString(),
+                       obj.value("Avatar_Url").toString(),
+                       obj.value("OwnerUID").toString(),
+                      uidList);
+        return;
+    }
+    getFriendList();
+}
+
+void TcpLongConnection::handleApplyJoinGroupRequestResp(QJsonObject obj)
 {
     if(!obj.contains("Result") || !obj.value("Result").isBool())
         return;
 
     QString requestsID = obj.value("Requests_id").toString();
     this->waiting_requestsID.erase(requestsID.toStdString());
+
     bool success = obj.value("Result").toBool();
     if(success)
-    {
-        emit newFriendRequestsHandleResult(true);
-        emit mainState(true, "处理成功");
-        this->map_idempotentCache.remove(requestsID);
-        return;
-    }
+        emit mainState(true, "成功发送加入群聊申请");
     else
     {
         if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
@@ -1329,12 +1852,14 @@ void TcpLongConnection::handleHandleNewFriendRequestResp(QJsonObject obj)
                             return;
                         }
                         UserInfo::getUserInfo().setAccessToken(newAccessToken);
-                        //静默重试 或者 让用户重新操作
                         auto it = this->map_idempotentCache.find(requestsID);
                         if(it != this->map_idempotentCache.end())
-                            sendHandleNewFriendRequest(it.value().tokenParams.value("handle_uid").toString(),
-                                                       it.value().tokenParams.value("isAgree").toBool());
-
+                        {
+                            const QVariantMap tokenParams = it.value().tokenParams;
+                            this->map_idempotentCache.remove(requestsID);
+                            sendApplyJoinGroupRequest(tokenParams.value("groupID").toString(),
+                                                    tokenParams.value("verMsg").toString());
+                        }
                         return;
                     }
                     else
@@ -1345,19 +1870,90 @@ void TcpLongConnection::handleHandleNewFriendRequestResp(QJsonObject obj)
                             this->map_idempotentCache.remove(requestsID);
                             return;
                         }
-                        emit newFriendRequestsHandleResult(false);
+                        emit mainState(false, "申请加入群聊失败，请稍后重试");
+                    }
+                });
+                return;
+            }
+            emit mainState(false, "申请加入群聊失败，请稍后重试");
+            return;
+        }
+        if(!obj.contains("Info") || !obj.value("Info").isString())
+        {
+            emit mainState(false, "申请加入群聊失败，请稍后重试");
+            this->map_idempotentCache.remove(requestsID);
+            return;
+        }
+        emit mainState(false, obj.value("Info").toString());
+    }
+    this->map_idempotentCache.remove(requestsID);
+}
+
+void TcpLongConnection::handleHandleNewFriendRequestResp(QJsonObject obj)
+{
+    if(!obj.contains("Result") || !obj.value("Result").isBool() || !obj.contains("HandleUID") || !obj.value("HandleUID").isString())
+        return;
+
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+    bool success = obj.value("Result").toBool();
+    QString handleUID = obj.value("HandleUID").toString();
+    if(success)
+    {
+        emit newFriendRequestsHandleResult(handleUID, true);
+        emit mainState(true, "处理成功");
+        this->map_idempotentCache.remove(requestsID);
+        return;
+    }
+    else
+    {
+        if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
+        {
+            bool isExpired = obj.value("AccessTokenExpired").toBool();
+            if(isExpired)
+            {
+                sendRefreshToken([this, requestsID, handleUID](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                    if(isSuccess)
+                    {
+                        if(newAccessToken.isEmpty())
+                        {
+                            emit refreshExpiredExit();
+                            this->map_idempotentCache.remove(requestsID);
+                            return;
+                        }
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        //静默重试 或者 让用户重新操作
+                        auto it = this->map_idempotentCache.find(requestsID);
+                        if(it != this->map_idempotentCache.end())
+                        {
+                            const QVariantMap tokenParams = it.value().tokenParams;
+                            this->map_idempotentCache.remove(requestsID);
+                            sendHandleNewFriendRequest(tokenParams.value("handle_uid").toString(),
+                                                      tokenParams.value("isAgree").toBool());
+                        }
+                        return;
+                    }
+                    else
+                    {
+                        if(isRefreshTokenExpired)
+                        {
+                            emit refreshExpiredExit();
+                            this->map_idempotentCache.remove(requestsID);
+                            return;
+                        }
+                        emit newFriendRequestsHandleResult(handleUID, false);
                         emit mainState(false, "处理好友申请失败，请稍后再试");
                         this->map_idempotentCache.remove(requestsID);
                     }
                 });
                 return;
             }
-            emit newFriendRequestsHandleResult(false);
+            emit newFriendRequestsHandleResult(handleUID, false);
             emit mainState(false, "处理好友申请失败，请稍后再试");
             this->map_idempotentCache.remove(requestsID);
             return;
         }
-        emit newFriendRequestsHandleResult(false);
+        emit newFriendRequestsHandleResult(handleUID, false);
         emit mainState(false, "处理好友申请失败，请稍后再试");
         this->map_idempotentCache.remove(requestsID);
     }
@@ -1600,26 +2196,32 @@ void TcpLongConnection::handleSyncNewMessagesResp(QJsonObject obj)
         return;
     }
 
-    this->hash_conversationToCurrentReq.remove(conversationID);
+    if(conversationID.isEmpty())
+    {
+        qWarning() << "同步最新消息: 会话ID为空";
+        return;
+    }
 
     if(!obj.contains("Result") || !obj.value("Result").isBool())
     {
-        emit syncMessagesStatus(false, conversationID, {});
+        qWarning() << "同步最新消息: 缺失字段Result[" << conversationID << "]";
         return;
     }
 
     bool success = obj.value("Result").toBool();
     if(success)
     {
-        if(!obj.contains("Messages") || !obj.value("Messages").isArray() || conversationID.isEmpty())
+        if(!obj.contains("Messages") || !obj.value("Messages").isArray())
         {
-            emit syncMessagesStatus(false, conversationID, {});
+            qWarning() << "同步最新消息: 缺失字段Messages[" << conversationID << "]";
             return;
         }
 
         const QJsonArray arr = obj.value("Messages").toArray();
         if(arr.isEmpty())
         {
+            this->hash_conversationToCurrentReq.remove(conversationID);
+            this->waiting_requestsID.erase(requestsID.toStdString());
             emit syncMessagesStatus(true, conversationID, {});
             return;
         }
@@ -1646,6 +2248,8 @@ void TcpLongConnection::handleSyncNewMessagesResp(QJsonObject obj)
     }
     else
     {
+        this->hash_conversationToCurrentReq.remove(conversationID);
+
         if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
         {
             bool isExpired = obj.value("AccessTokenExpired").toBool();
@@ -1995,9 +2599,37 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
                         if(obj.value("Requests_id").toString() == "125433706")
                             this->handlePushFriendAvatar(obj);
                     }
+                    else if(type == "PushGroupJoinRequest")
+                    {
+                        //125433707
+                        if(obj.value("Requests_id").toString() == "125433707")
+                            this->handlePushGroupJoinRequestResp(obj);
+                    }
+                    else if(type == "PushNewGroup")
+                    {
+                        //125433708
+                        if(obj.value("Requests_id").toString() == "125433708")
+                            this->handlePushNewGroupResp(obj);
+                    }
                     else if(type == "CreateGroupRequestResp")
                     {
                         handleCreateGroupRequestResp(obj);
+                    }
+                    else if(type == "GetGroupListResp")
+                    {
+                        handleGetGroupListResp(obj);
+                    }
+                    else if(type == "GetNewGroupJoinRequestsListResp")
+                    {
+                        handleGetNewGroupJoinRequestsListResp(obj);
+                    }
+                    else if(type == "HandleNewGroupJoinRequestResp")
+                    {
+                        this->handleHandleNewGroupJoinRequestResp(obj);
+                    }
+                    else if(type == "ApplyJoinGroupRequestResp")
+                    {
+                        this->handleApplyJoinGroupRequestResp(obj);
                     }
                     else
                     {

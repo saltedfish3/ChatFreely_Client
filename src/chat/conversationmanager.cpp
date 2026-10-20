@@ -41,7 +41,11 @@ ConversationManager::ConversationManager(QObject *parent)
 {
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::sendMessageStatus, this, [this]
             (bool isSuccess, const QString& tempMsgID,const QString& conversationID, const QString& messageID, int64_t timeStamp, int64_t convSeq){
-        ConversationItem* item = getOrCreateConversationItem(conversationID, ConversationItem::ConversationType::Personal);
+
+        ConversationItem::ConversationType conversationType = GroupManager::getGroupManage().getGroupInfo(conversationID).conversationID.isEmpty() ?
+                                                                  ConversationItem::ConversationType::Personal : ConversationItem::ConversationType::Group;
+
+        ConversationItem* item = getOrCreateConversationItem(conversationID, conversationType);
         if(!item)
             return;
 
@@ -61,17 +65,23 @@ ConversationManager::ConversationManager(QObject *parent)
 
         msg.parseMedia();
 
-        ConversationItem* item = getOrCreateConversationItem(conversationID, ConversationItem::ConversationType::Personal);
-        item->addNewMessage(msg);
-    });
+        ConversationItem::ConversationType conversationType = GroupManager::getGroupManage().getGroupInfo(conversationID).conversationID.isEmpty() ?
+                                                                  ConversationItem::ConversationType::Personal : ConversationItem::ConversationType::Group;
 
-    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::createGroupSuccess, this, [this](const QString& groupID, const QString& conversationID){
-        ConversationItem* item = getOrCreateConversationItem(conversationID, ConversationItem::ConversationType::Group);
+        ConversationItem* item = getOrCreateConversationItem(conversationID, conversationType);
+        item->addNewMessage(msg);
     });
 
     connect(&DatabaseManager::getDatabaseManager(), &DatabaseManager::allChatMessagesClean, this, [this](){
         for(auto* it : std::as_const(this->conversations))
             it->clearMessages();
+    });
+
+    connect(&GroupManager::getGroupManage(), &GroupManager::groupCreated, this, [this](const QString& conversationID){
+        if(conversationID.isEmpty())
+            return;
+
+        ConversationItem* item = getOrCreateConversationItem(conversationID, ConversationItem::ConversationType::Group);
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &ConversationManager::cleanAll);

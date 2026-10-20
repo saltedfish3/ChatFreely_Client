@@ -17,10 +17,15 @@ public:
     enum DataRole
     {
         SIDRole = Qt::UserRole + 1,
+        UIDRole,
         AvatarRole,
         UsernameRole,
         VerMsgRole,
-        UIDRole
+        IsGroupRequest,
+        GroupName,
+        Source,
+        RequestID,
+        InviterName
     };
 
     explicit FriendApplyDelegate(QObject *parent = nullptr);
@@ -30,8 +35,10 @@ public:
     bool editorEvent(QEvent* event, QAbstractItemModel* model, const QStyleOptionViewItem& option, const QModelIndex& index) override;
 
 signals:
-    void agreeClicked(QString UID, QModelIndex index);
-    void refuseClicked(QString UID, QModelIndex index);
+    void agreeFriendClicked(const QString& UID, const QModelIndex& index);
+    void refuseFriendClicked(const QString& UID, const QModelIndex& index);
+    void agreeGroupClicked(const QString& requestID, const QModelIndex& index);
+    void refuseGroupClicked(const QString& requestID, const QModelIndex& index);
 
 private:
     enum ButtonState

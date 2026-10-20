@@ -8,6 +8,7 @@
 #include "../network/httpshortconnection.h"
 #include "../utils/userinfo.h"
 #include "../database/databasemanager.h"
+#include "../utils/groupmanager.h"
 
 class ConversationManager : public QObject
 {

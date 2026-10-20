@@ -26,6 +26,8 @@ public:
         LastMsgRole,
         LastTimestampRole,
         UnReadRole,
+        IsGroupRole,
+        GroupMemberCountRole,
         IsSelectedRole,
         IsSearchModeRole
     };

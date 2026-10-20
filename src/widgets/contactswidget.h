@@ -13,6 +13,7 @@
 #include <QList>
 #include <QCollator>
 #include <QScrollBar>
+#include <QButtonGroup>
 #include "newfriendbutton.h"
 #include "newfriendmanagewidget.h"
 #include "addnewfriendwidget.h"
@@ -20,6 +21,9 @@
 #include "frienddelegate.h"
 #include "loadinglabel.h"
 #include "../utils/friendmanage.h"
+#include "groupdelegate.h"
+#include "../utils/groupmanager.h"
+#include "groupinfowidget.h"
 
 class ContactsWidget : public QWidget
 {
@@ -27,7 +31,8 @@ class ContactsWidget : public QWidget
 public:
     explicit ContactsWidget(int width, int height, QWidget *parent = nullptr);
     void addFriendItem(QString uid, QString sid, QString username, QPixmap avatar, QString email, bool isOnline);
-
+    void addGroupItem(const QString& conversationID, const QString& groupID, const QString& groupName,
+                      const QString& ownerUID, const QHash<QString, GroupManager::GroupMemberInfo>& memberInfos, const QPixmap& avatar);
 
 signals:
     void openConversation(const QString &conversationID);
@@ -49,7 +54,9 @@ private:
 
     void changeStatus(Status status);
     void sortedFriendList();
+    void sortedGroupList();
     void searchFriend(const QString& text);
+    void searchGroup(const QString& text);
     void restoreSelect();
 
     QString getFirstLetter(const QString& str);
@@ -59,6 +66,7 @@ private:
     QWidget* widget_noSelect;
     NewFriendManageWidget* widget_newFriend;
     ContactsInfoWidget* widget_contactsInfo;
+    GroupInfoWidget* widget_groupInfo;
 
     QPushButton* btn_addFriend;
     QLineEdit* edit_searchFriend;
@@ -66,12 +74,17 @@ private:
     NewFriendButton* btn_newFriend;
     QLabel* label_newFriend_icon;
 
-    QLabel* label_myFriend;
+    QButtonGroup* group;
+    QPushButton* btn_myFriend;
+    QPushButton* btn_myGroups;
     QLabel* label_noSelect;
 
     QListView* listView_myFriend;
     QStandardItemModel* model;
     FriendDelegate* delegate;
+
+    QStandardItemModel* model_group;
+    GroupDelegate* delegate_group;
 
     QWidget* widget_status;
     QLabel* label_empty;

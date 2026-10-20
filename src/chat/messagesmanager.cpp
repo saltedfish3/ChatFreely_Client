@@ -1,7 +1,7 @@
 #include "messagesmanager.h"
 
-MessagesManager::MessagesManager(const QString& conversationID, QObject* parent)
-    : QObject(parent), conversationID(conversationID)
+MessagesManager::MessagesManager(const QString& conversationID, int conversationType, QObject* parent)
+    : QObject(parent), conversationID(conversationID), conversationType(conversationType)
 {
     this->timer_highLight = new QTimer(this);
     this->timer_highLight->setSingleShot(true);
@@ -125,7 +125,7 @@ void MessagesManager::addMessage(const Message &msg, bool isStoreDB)
 
     emit messageAdd(index);
     if(isStoreDB)
-        DatabaseManager::getDatabaseManager().addInsertMessageTask(this->conversationID, this->messages.at(index));
+        DatabaseManager::getDatabaseManager().addInsertMessageTask(this->conversationID, this->messages.at(index), this->conversationType);
 
     checkMediaExpiredStatus(msg);
     updateRanges(msg.convSeq, msg.convSeq);
@@ -215,7 +215,7 @@ void MessagesManager::addMessages(const QList<Message> &msgs, qint64 convSeqFirs
             if(index != -1)
             {
                 calcShowTimestamp(index);
-                DatabaseManager::getDatabaseManager().addInsertMessageTask(this->conversationID, this->messages.at(index));
+                DatabaseManager::getDatabaseManager().addInsertMessageTask(this->conversationID, this->messages.at(index), this->conversationType);
             }
         }
         checkMediaExpiredStatus(msg);

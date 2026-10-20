@@ -65,13 +65,26 @@ void ConversationListDelegate::paint(QPainter *painter, const QStyleOptionViewIt
 
     painter->setFont(font);
 
+    bool isGroupRole = index.data(IsGroupRole).toBool();
     QString text = index.data(UsernameRole).toString();
     QFontMetrics fm = painter->fontMetrics();
 
     int textHeight = fm.height();
     QRect username(avatar.topLeft() + QPoint(avatarSize.width() + 8, 0), QSize(85, textHeight));
 
-    QString drawText = fm.elidedText(text, Qt::ElideRight, username.width());
+    int drawTextWidth = username.width();
+    QString drawText;
+    if(isGroupRole)
+    {
+        QString memberCount = "(" + QString::number(index.data(GroupMemberCountRole).toLongLong()) + ")";
+        int width_memberCount = fm.horizontalAdvance(memberCount);
+        drawTextWidth -= width_memberCount;
+        drawText += memberCount;
+    }
+
+    QString elideText = fm.elidedText(text, Qt::ElideRight, drawTextWidth);
+    drawText.push_front(elideText);
+
     painter->setPen(Qt::black);
     painter->drawText(username, Qt::AlignVCenter, drawText);
 
@@ -99,17 +112,20 @@ void ConversationListDelegate::paint(QPainter *painter, const QStyleOptionViewIt
         QString drawTime = formatTimestamp(index.data(LastTimestampRole).toLongLong());
         painter->drawText(timestampRect, Qt::AlignVCenter | Qt::AlignRight, drawTime);
 
-        QSize onlineSize(contain.height() * 0.15, contain.height() * 0.15);
-        QRect onlineIcon(avatar.bottomRight() - QPoint(9, 9), onlineSize);
-        painter->setPen(QColor(240, 240, 240));
+        if(!isGroupRole)
+        {
+            QSize onlineSize(contain.height() * 0.15, contain.height() * 0.15);
+            QRect onlineIcon(avatar.bottomRight() - QPoint(9, 9), onlineSize);
+            painter->setPen(QColor(240, 240, 240));
 
-        QVariant v = index.data(IsOnlineRole);
-        bool isOnline = v.isValid() ? v.toBool() : false;
-        painter->setBrush(Qt::gray);
-        if(isOnline)
-            painter->setBrush(QColor(102, 255, 0));
+            QVariant v = index.data(IsOnlineRole);
+            bool isOnline = v.isValid() ? v.toBool() : false;
+            painter->setBrush(Qt::gray);
+            if(isOnline)
+                painter->setBrush(QColor(102, 255, 0));
 
-        painter->drawRoundedRect(onlineIcon, onlineSize.width()/2, onlineSize.height()/2);
+            painter->drawRoundedRect(onlineIcon, onlineSize.width()/2, onlineSize.height()/2);
+        }
     }
 
     painter->setBrush(Qt::NoBrush);

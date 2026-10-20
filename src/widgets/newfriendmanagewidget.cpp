@@ -9,7 +9,7 @@ NewFriendManageWidget::NewFriendManageWidget(int width, int height, QWidget *par
     initstyle();
 }
 
-void NewFriendManageWidget::addRequestsItem(QString uid, QString sid, QString username, QString avatar_url, QString verMsg)
+void NewFriendManageWidget::addFriendRequestsItem(QString uid, QString sid, QString username, QString avatar_url, QString verMsg)
 {
     //添加项目
     QStandardItem* item = new QStandardItem();
@@ -22,9 +22,61 @@ void NewFriendManageWidget::addRequestsItem(QString uid, QString sid, QString us
     item->setData(defAvatar, FriendApplyDelegate::AvatarRole);
 
     item->setData(verMsg, FriendApplyDelegate::VerMsgRole);
+    item->setData(false, FriendApplyDelegate::IsGroupRequest);
     this->model->appendRow(item);
 
     QString loadUrl = avatar_url.isEmpty() ? ":/default/images/defaultAvatar.png" : avatar_url;
+
+    //防止头像下载成功后item野指针
+    QPersistentModelIndex index = this->model->indexFromItem(item);
+    QPointer<QStandardItemModel> modelPtr(this->model);
+
+    ImageCacheManager::getManager().loadImage(loadUrl, [this, modelPtr, index](const QPixmap& pix){
+        if(!pix.isNull())
+        {
+            if(modelPtr && index.isValid())
+            {
+                QPixmap pix_copy = pix;
+                pix_copy.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                modelPtr->setData(index, pix_copy, FriendApplyDelegate::AvatarRole);
+            }
+            return;
+        }
+        ImageCacheManager::getManager().loadImage(":/default/images/defaultAvatar.png", [this, modelPtr, index](const QPixmap& pix){
+            if(pix.isNull())
+                return;
+            if(modelPtr && index.isValid())
+            {
+                QPixmap pix_copy = pix;
+                pix_copy.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                modelPtr->setData(index, pix_copy, FriendApplyDelegate::AvatarRole);
+            }
+        }, false, 0, 0, QSize(48, 48));
+
+    }, false, 0, 0, QSize(48, 48));
+
+    emit RequestsNumberChange(this->model->rowCount());
+}
+
+void NewFriendManageWidget::addGroupRequestsItem(const QString &requestID, const QString &groupName, int source, const QString &displayName, const QString &displayAvatarUrl, const QString &verMsg, const QString &applicantSID, const QString &inviterName)
+{
+    QStandardItem* item = new QStandardItem();
+    item->setData(requestID, FriendApplyDelegate::RequestID);
+    item->setData(groupName, FriendApplyDelegate::GroupName);
+    item->setData(source, FriendApplyDelegate::Source);
+    item->setData(displayName, FriendApplyDelegate::UsernameRole);
+    item->setData(verMsg, FriendApplyDelegate::VerMsgRole);
+    item->setData(applicantSID, FriendApplyDelegate::SIDRole);
+    item->setData(inviterName, FriendApplyDelegate::InviterName);
+    item->setData(true, FriendApplyDelegate::IsGroupRequest);
+
+    QPixmap defAvatar(":/default/images/defaultAvatar.png");
+    defAvatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+    item->setData(defAvatar, FriendApplyDelegate::AvatarRole);
+
+    this->model->appendRow(item);
+
+    QString loadUrl = displayAvatarUrl.isEmpty() ? ":/default/images/defaultAvatar.png" : displayAvatarUrl;
 
     //防止头像下载成功后item野指针
     QPersistentModelIndex index = this->model->indexFromItem(item);
@@ -64,7 +116,7 @@ void NewFriendManageWidget::initWidget()
     this->widget_friendApply->resize(this->width(),56);
     this->widget_friendApply->move(0,0);
 
-    this->label_friendApply = new QLabel("好友申请管理",this->widget_friendApply);
+    this->label_friendApply = new QLabel("申请管理",this->widget_friendApply);
     this->label_friendApply->setObjectName("label_friendApply");
     this->label_friendApply->setAlignment(Qt::AlignVCenter);
     QFont font = this->label_friendApply->font();
@@ -114,14 +166,14 @@ void NewFriendManageWidget::initWidget()
     this->animation_loading->setLoopCount(-1);
     this->animation_loading->start();
 
-    this->label_loading = new QLabel("正在加载好友申请...", this->widget_status);
+    this->label_loading = new QLabel("正在加载申请列表...", this->widget_status);
     this->label_loading->setObjectName("label_loading");
     this->label_loading->resize(this->widget_status->width(), 40);
     this->label_loading->move(0, (this->widget_status->height() - this->label_loading->height())/2);
     this->label_loading->setAlignment(Qt::AlignCenter);
     this->label_loading->hide();
 
-    this->label_empty = new QLabel("暂无好友申请", this->widget_status);
+    this->label_empty = new QLabel("暂无新申请", this->widget_status);
     this->label_empty->setObjectName("label_empty");
     this->label_empty->resize(this->widget_status->width(), 40);
     this->label_empty->move(0, (this->widget_status->height() - this->label_empty->height())/2 - 30);
@@ -137,32 +189,73 @@ void NewFriendManageWidget::initWidget()
 
     changeStatus(Empty);
 
-    connect(this->delegate, &FriendApplyDelegate::agreeClicked, this, [this](QString UID, const QModelIndex& index){
-        this->waitingHandleIndex = QPersistentModelIndex(index);
-        TcpLongConnection::getTcpClient().sendHandleNewFriendRequest(UID, true);
+    connect(this->delegate, &FriendApplyDelegate::agreeFriendClicked, this, [this](const QString& UID, const QModelIndex& index){
+        if(!index.data(FriendApplyDelegate::IsGroupRequest).toBool())
+            TcpLongConnection::getTcpClient().sendHandleNewFriendRequest(UID, true);
     });
 
-    connect(this->delegate, &FriendApplyDelegate::refuseClicked, this, [this](QString UID, const QModelIndex& index){
-        this->waitingHandleIndex = QPersistentModelIndex(index);
-        TcpLongConnection::getTcpClient().sendHandleNewFriendRequest(UID, false);
+    connect(this->delegate, &FriendApplyDelegate::refuseFriendClicked, this, [this](const QString& UID, const QModelIndex& index){
+        if(!index.data(FriendApplyDelegate::IsGroupRequest).toBool())
+            TcpLongConnection::getTcpClient().sendHandleNewFriendRequest(UID, false);
+    });
+
+    connect(this->delegate, &FriendApplyDelegate::agreeGroupClicked, this, [this](const QString& requestID, const QModelIndex& index){
+        if(index.data(FriendApplyDelegate::IsGroupRequest).toBool())
+            TcpLongConnection::getTcpClient().sendHandleNewGroupJoinRequest(requestID, true);
+    });
+
+    connect(this->delegate, &FriendApplyDelegate::refuseGroupClicked, this, [this](const QString& requestID, const QModelIndex& index){
+        if(index.data(FriendApplyDelegate::IsGroupRequest).toBool())
+            TcpLongConnection::getTcpClient().sendHandleNewGroupJoinRequest(requestID, false);
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newFriendRequests, this, [this](QString uid, QString sid, QString username, QString avatar_url, QString verMsg){
-        addRequestsItem(uid, sid, username, avatar_url, verMsg);
+        addFriendRequestsItem(uid, sid, username, avatar_url, verMsg);
+        changeStatus(Hide);
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newGroupJoinRequest, this, [this](const QString& requestID, const QString& groupName, int source, const QString& displayName,
+                                                                                                      const QString& displayAvatarUrl, const QString& verMsg,
+                                                                                                      const QString& applicantSID, const QString& inviterName){
+        addGroupRequestsItem(requestID, groupName, source, displayName, displayAvatarUrl, verMsg, applicantSID, inviterName);
         changeStatus(Hide);
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::cleanNewFriendRequestsList, this, [this](){
-        this->model->clear();
+        for(int i = this->model->rowCount() - 1; i >= 0; i--)
+        {
+            QModelIndex index = this->model->index(i, 0);
+            if(!index.data(FriendApplyDelegate::IsGroupRequest).toBool())
+                this->model->removeRow(i);
+        }
+        emit RequestsNumberChange(this->model->rowCount());
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::cleanNewGroupJoinRequestsList, this, [this](){
+        for(int i = this->model->rowCount() - 1; i >= 0; i--)
+        {
+            QModelIndex index = this->model->index(i, 0);
+            if(index.data(FriendApplyDelegate::IsGroupRequest).toBool())
+                this->model->removeRow(i);
+        }
         emit RequestsNumberChange(this->model->rowCount());
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newFriendRequestsState, this, [this](bool isEmpty){
         if(isEmpty)
         {
-            this->model->clear();
+            for(int i = this->model->rowCount() - 1; i >= 0; i--)
+            {
+                QModelIndex index = this->model->index(i, 0);
+                if(!index.data(FriendApplyDelegate::IsGroupRequest).toBool())
+                    this->model->removeRow(i);
+            }
             emit RequestsNumberChange(this->model->rowCount());
-            changeStatus(Empty);
+
+            if(this->model->rowCount() > 0)
+                changeStatus(Hide);
+            else
+                changeStatus(Empty);
         }
         else
         {
@@ -170,25 +263,73 @@ void NewFriendManageWidget::initWidget()
         }
     });
 
-    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newFriendRequestsHandleResult, this, [this](bool isSuccess){
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newGroupJoinRequestsState, this, [this](bool isEmpty){
+        if(isEmpty)
+        {
+            for(int i = this->model->rowCount() - 1; i >= 0; i--)
+            {
+                QModelIndex index = this->model->index(i, 0);
+                if(index.data(FriendApplyDelegate::IsGroupRequest).toBool())
+                    this->model->removeRow(i);
+            }
+            emit RequestsNumberChange(this->model->rowCount());
+
+            if(this->model->rowCount() > 0)
+                changeStatus(Hide);
+            else
+                changeStatus(Empty);
+        }
+        else
+        {
+            changeStatus(Loading);
+        }
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newFriendRequestsHandleResult, this, [this](const QString& handleUID, bool isSuccess){
         //处理index删除还是保留
         if(isSuccess)
         {
-            if(this->waitingHandleIndex.isValid())
+            for(int i = 0; i < this->model->rowCount(); i++)
             {
-                this->model->removeRow(this->waitingHandleIndex.row());
-                emit RequestsNumberChange(this->model->rowCount());
+                QModelIndex index = this->model->index(i, 0);
+                if(index.data(FriendApplyDelegate::UIDRole).toString() == handleUID)
+                {
+                    this->model->removeRow(i);
+                    break;
+                }
             }
+            emit RequestsNumberChange(this->model->rowCount());
+        }
+
+        changeStatus(Hide);
+        if(this->model->rowCount() == 0)
+            changeStatus(Empty);
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newGroupJoinRequestsHandleResult, this, [this](const QString& handleRequestID, bool isSuccess){
+        //处理index删除还是保留
+        if(isSuccess)
+        {
+            for(int i = 0; i < this->model->rowCount(); i++)
+            {
+                QModelIndex index = this->model->index(i, 0);
+                if(index.data(FriendApplyDelegate::RequestID).toString() == handleRequestID)
+                {
+                    this->model->removeRow(i);
+                    break;
+                }
+            }
+            emit RequestsNumberChange(this->model->rowCount());
         }
         changeStatus(Hide);
         if(this->model->rowCount() == 0)
             changeStatus(Empty);
     });
 
-
     connect(this->btn_refresh, &QPushButton::clicked, this, [this](){
         changeStatus(Loading);
         TcpLongConnection::getTcpClient().getNewFriendRequestsList();
+        TcpLongConnection::getTcpClient().getNewGroupJoinRequestsList();
     });
 }
 
