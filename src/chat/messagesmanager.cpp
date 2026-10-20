@@ -1,4 +1,5 @@
 #include "messagesmanager.h"
+#include "conversationitem.h"
 
 MessagesManager::MessagesManager(const QString& conversationID, int conversationType, QObject* parent)
     : QObject(parent), conversationID(conversationID), conversationType(conversationType)
@@ -125,7 +126,7 @@ void MessagesManager::addMessage(const Message &msg, bool isStoreDB)
 
     emit messageAdd(index);
     if(isStoreDB)
-        DatabaseManager::getDatabaseManager().addInsertMessageTask(this->conversationID, this->messages.at(index), this->conversationType);
+        DatabaseManager::getDatabaseManager().addInsertMessageTask(this->conversationID, this->messages.at(index), getConversationType());
 
     checkMediaExpiredStatus(msg);
     updateRanges(msg.convSeq, msg.convSeq);
@@ -215,7 +216,7 @@ void MessagesManager::addMessages(const QList<Message> &msgs, qint64 convSeqFirs
             if(index != -1)
             {
                 calcShowTimestamp(index);
-                DatabaseManager::getDatabaseManager().addInsertMessageTask(this->conversationID, this->messages.at(index), this->conversationType);
+                DatabaseManager::getDatabaseManager().addInsertMessageTask(this->conversationID, this->messages.at(index), getConversationType());
             }
         }
         checkMediaExpiredStatus(msg);
@@ -346,12 +347,25 @@ bool MessagesManager::updateMessageContent(const QString &tempMsgID, const QStri
 
 void MessagesManager::clearMessages()
 {
+    this->loadGen_older++;
+    this->loadGen_newer++;
+    this->loadGen_around++;
+    this->loadGen_jump++;
+
     this->messages.clear();
     this->index_message.clear();
     this->ranges.clear();
-    this->lastConvSeq = 0;
+    // this->lastConvSeq = 0;
     this->highLightMsgID.clear();
     this->timer_highLight->stop();
+
+    this->hash_registerUploadID.clear();
+    this->hash_tempIDToFilePath.clear();
+    this->hash_uploadProgress.clear();
+    this->hash_registerDownloadID.clear();
+    this->hash_tempIDToDownloadUrl.clear();
+    this->hash_downloadProgress.clear();
+
     emit resetModel();
 }
 
@@ -977,4 +991,14 @@ void MessagesManager::setHighLightMsgID(const QString &msgID)
 QString MessagesManager::getHighLightMsgID() const
 {
     return this->highLightMsgID;
+}
+
+int MessagesManager::getConversationType() const
+{
+    if(!GroupManager::getGroupManage().getGroupInfo(this->conversationID).conversationID.isEmpty())
+        return static_cast<int>(ConversationItem::ConversationType::Group);
+    if(!FriendManage::getFriendManage().getFriendUIDByConversationID(this->conversationID).isEmpty())
+        return static_cast<int>(ConversationItem::ConversationType::Personal);
+
+    return this->conversationType;
 }

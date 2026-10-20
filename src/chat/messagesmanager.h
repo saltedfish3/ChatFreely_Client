@@ -7,6 +7,10 @@
 #include "../database/databasemanager.h"
 #include "../utils/imagecachemanager.h"
 #include "../utils/videoutils.h"
+#include "../utils/friendmanage.h"
+#include "../utils/groupmanager.h"
+
+class ConversationItem;
 
 class MessagesManager : public QObject
 {
@@ -73,6 +77,8 @@ public:
     //高亮
     void setHighLightMsgID(const QString& msgID);
     QString getHighLightMsgID() const;
+
+    int getConversationType() const;
 
 signals:
     void messageAdd(int row);

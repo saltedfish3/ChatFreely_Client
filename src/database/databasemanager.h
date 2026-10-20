@@ -73,7 +73,7 @@ public:
 
     void addInsertMessageTask(const QString& conversationID, const Message& msg, int conversationType = -1);
     void addUpdateMessageTask(const QString& conversationID, const Message& msg);
-    void addUpdateUnreadTask(const QString& conversationID, int unreadCount);
+    void addUpdateUnreadTask(const QString& conversationID, int unreadCount, int conversationType = -1);
     bool setMeta(MetaType type, const QString& value);
     bool getMeta(MetaType type, QString& outValue);
     bool getConversationsLastConvSeq(const QString& conversationsID, qint64& outValue);
@@ -86,6 +86,7 @@ public:
     void searchMessagesInConv(const QString& conversationID, const QString& keyword, qint64 cursorConvseq, int limit, std::function<void(const QList<Message>&)> callback);
 
     void clearAllChatMessages();
+    void clearChatMessagesOfConversationID(const QString& conversationID);
 
     void stopHandleTask();
     void startHandleTask();
@@ -94,6 +95,7 @@ public:
 
 signals:
     void allChatMessagesClean();
+    void chatMessagesClean(const QString& conversationID);
 
 private:
     explicit DatabaseManager(QObject *parent = nullptr);

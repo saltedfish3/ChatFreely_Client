@@ -18,6 +18,7 @@ public:
 signals:
     void closed();
     void switchToInfoWidget();
+    void clearMessages();
 
 protected:
     void focusOutEvent(QFocusEvent* event) override;

@@ -72,7 +72,7 @@ void MoreWidget::initMore(bool isFriend)
     });
 
     connect(clear_msg,&QPushButton::clicked,this,[=](){
-        qDebug()<<"clear_msg";
+        emit clearMessages();
         this->hide();
     });
 

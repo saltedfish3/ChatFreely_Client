@@ -299,6 +299,20 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         emit switchToInfoWidget();
     });
 
+    connect(this->widget_menu, &MoreWidget::clearMessages, this, [this](){
+        DatabaseManager::getDatabaseManager().clearChatMessagesOfConversationID(this->item->getConversationID());
+        this->item->getMessagesManager().clearMessages();
+
+        this->loadingCount = 0;
+        this->timer_loading->stop();
+        this->isFirstLoaded = false;
+        this->topMsgID.clear();
+        this->isLoadingOlder = false;
+        this->isLoadingNewer = false;
+        this->isWaitingJump = false;
+        this->listView_messages->scrollToBottom();
+    });
+
     initStyle();
     startReFlashTimeStamp();
 

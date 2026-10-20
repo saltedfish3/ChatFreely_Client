@@ -9,6 +9,7 @@
 #include "../utils/userinfo.h"
 #include "../database/databasemanager.h"
 #include "../utils/groupmanager.h"
+#include "../utils/friendmanage.h"
 
 class ConversationManager : public QObject
 {

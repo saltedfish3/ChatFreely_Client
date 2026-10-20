@@ -108,7 +108,7 @@ void ConversationItem::clearUnRead()
         this->unRead = 0;
 
         emit UnReadCountChange(0);
-        DatabaseManager::getDatabaseManager().addUpdateUnreadTask(this->conversationID, this->unRead);
+        DatabaseManager::getDatabaseManager().addUpdateUnreadTask(this->conversationID, this->unRead, static_cast<int>(getConversationType()));
     }
 }
 
@@ -124,7 +124,7 @@ void ConversationItem::addUnReadCount()
 {
     this->unRead++;
     emit UnReadCountChange(this->unRead);
-    DatabaseManager::getDatabaseManager().addUpdateUnreadTask(this->conversationID, this->unRead);
+    DatabaseManager::getDatabaseManager().addUpdateUnreadTask(this->conversationID, this->unRead, static_cast<int>(getConversationType()));
 }
 
 void ConversationItem::setUnReadCount(int count)

@@ -127,12 +127,13 @@ void DatabaseManager::addUpdateMessageTask(const QString &conversationID, const 
     addTask(conversationID, task);
 }
 
-void DatabaseManager::addUpdateUnreadTask(const QString &conversationID, int unreadCount)
+void DatabaseManager::addUpdateUnreadTask(const QString &conversationID, int unreadCount, int conversationType)
 {
     DBTask task;
     task.type = UpdateUnread;
     task.conversationID = conversationID;
     task.unreadCount = unreadCount;
+    task.conversationType = conversationType;
     addTask(conversationID, task);
 }
 
@@ -265,14 +266,23 @@ void DatabaseManager::loadAllConversationsList(std::function<void (const QList<C
             if(db.isOpen())
             {
                 QSqlQuery q(db);
-                QString sql = "SELECT cp.conversation_id, COALESCE(c.unread_count, 0), COALESCE(c.type, 0), m.type, m.content, m.timestamp "
-                              "FROM conversation_checkpoint cp "
-                              "LEFT JOIN conversations c ON cp.conversation_id = c.conversation_id "
-                              "LEFT JOIN messages m ON cp.conversation_id = m.conversation_id "
-                              "AND m.conv_seq = ("
+                // QString sql = "SELECT cp.conversation_id, COALESCE(c.unread_count, 0), COALESCE(c.type, 0), m.type, m.content, m.timestamp "
+                //               "FROM conversation_checkpoint cp "
+                //               "LEFT JOIN conversations c ON cp.conversation_id = c.conversation_id "
+                //               "LEFT JOIN messages m ON cp.conversation_id = m.conversation_id "
+                //               "AND m.conv_seq = ("
+                //               "SELECT MAX(m2.conv_seq) FROM messages m2 "
+                //               "WHERE m2.conversation_id = cp.conversation_id) "
+                //               "GROUP BY cp.conversation_id "
+                //               "ORDER BY m.timestamp DESC";
+
+                QString sql = "SELECT c.conversation_id, c.unread_count, c.type, m.type, m.content, m.timestamp "
+                              "FROM conversations c "
+                              "LEFT JOIN messages m ON c.conversation_id = m.conversation_id "
+                              "AND m.conv_seq = ( "
                               "SELECT MAX(m2.conv_seq) FROM messages m2 "
-                              "WHERE m2.conversation_id = cp.conversation_id) "
-                              "GROUP BY cp.conversation_id "
+                              "WHERE m2.conversation_id = c.conversation_id "
+                              ") "
                               "ORDER BY m.timestamp DESC";
 
                 if(q.exec(sql))
@@ -600,6 +610,48 @@ void DatabaseManager::clearAllChatMessages()
     startHandleTask();
 }
 
+void DatabaseManager::clearChatMessagesOfConversationID(const QString &conversationID)
+{
+    stopHandleTask();
+    {
+        QMutexLocker locker(&(this->mutex_task));
+        this->taskQueues.clear();
+        this->callConversation.clear();
+    }
+
+    QString connName = QUuid::createUuid().toString(QUuid::Id128);
+    {
+        QSqlDatabase db = openConnection(connName);
+        QSqlQuery q(db);
+        if(db.isOpen())
+        {
+            if(db.transaction())
+            {
+                bool isSuccess = true;
+
+                q.prepare("DELETE FROM messages WHERE conversation_id = ?");
+                q.addBindValue(toInt64(conversationID));
+                isSuccess &= q.exec();
+
+                q.prepare("DELETE FROM conversations WHERE conversation_id = ?");
+                q.addBindValue(toInt64(conversationID));
+                isSuccess &= q.exec();
+
+                if(isSuccess)
+                {
+                    db.commit();
+                    emit chatMessagesClean(conversationID);
+                }
+                else
+                    db.rollback();
+            }
+        }
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(connName);
+    startHandleTask();
+}
+
 void DatabaseManager::startHandleTask()
 {
     this->isStop = false;
@@ -804,7 +856,7 @@ bool DatabaseManager::executeInsertMessageTask(const QSqlDatabase& db, const DBT
 
     QSqlQuery q_conv(db);
     q_conv.prepare("INSERT INTO conversations(conversation_id, unread_count, type) VALUES(?, 0, ?)"
-              " ON CONFLICT(conversation_id) DO UPDATE SET type = excluded.type");
+              " ON CONFLICT(conversation_id) DO UPDATE SET unread_count = excluded.unread_count");
     q_conv.addBindValue(toInt64(task.conversationID));
     q_conv.addBindValue(task.conversationType);
 
@@ -851,10 +903,11 @@ bool DatabaseManager::executeUpdateMessageTask(const QSqlDatabase &db, const DBT
 bool DatabaseManager::executeUpdateUnreadTask(const QSqlDatabase &db, const DBTask &task)
 {
     QSqlQuery q(db);
-    q.prepare("INSERT INTO conversations(conversation_id, unread_count) VALUES(?, ?)"
+    q.prepare("INSERT INTO conversations(conversation_id, unread_count, type) VALUES(?, ?, ?)"
                 " ON CONFLICT(conversation_id) DO UPDATE SET unread_count = excluded.unread_count");
     q.addBindValue(toInt64(task.conversationID));
     q.addBindValue(task.unreadCount);
+    q.addBindValue(task.conversationType);
 
     if(!q.exec())
     {

@@ -11,6 +11,11 @@ ConversationItem *ConversationManager::getOrCreateConversationItem(const QString
     auto it = this->conversations.find(conversationID);
     if(it == this->conversations.end())
     {
+        if(!GroupManager::getGroupManage().getGroupInfo(conversationID).conversationID.isEmpty())
+            type = ConversationItem::ConversationType::Group;
+        else if(!FriendManage::getFriendManage().getFriendUIDByConversationID(conversationID).isEmpty())
+            type = ConversationItem::ConversationType::Personal;
+
         ConversationItem* item = new ConversationItem(conversationID, type, this);
         this->conversations[conversationID] = item;
         emit conversationCreated(item);
