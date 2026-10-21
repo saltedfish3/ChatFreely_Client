@@ -15,6 +15,8 @@
 #include "../utils/imagecachemanager.h"
 #include "groupmemberdelegate.h"
 #include "../utils/groupmanager.h"
+#include "../network/tcplongconnection.h"
+#include "../utils/friendmanage.h"
 
 class GroupInfoWidget : public QWidget
 {
@@ -36,6 +38,7 @@ private:
 
     void setRadius(QPixmap& pix, QLabel* label, int radius);
     void addGroupMemberItem(const QString& username, const QString& sid, const QString& uid, const QPixmap& avatar);
+    void updateIsFriend();
 
     QScrollArea* area;
     QWidget* widget_holy;
@@ -60,6 +63,8 @@ private:
     QListView* view;
     QStandardItemModel* model;
     GroupMemberDelegate* delegate;
+
+    QPushButton* btn_addFriend;
 
     QString conversationID;
 };

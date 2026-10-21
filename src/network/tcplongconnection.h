@@ -60,6 +60,10 @@ public:
     void getConversationsFriendUIDListAndSeq(int64_t syncConvSeq);
     bool isConnect();
 
+    //测试
+    void closeConnection();
+    void reConnect();
+
 signals:
     void reconnectSuccess();
 

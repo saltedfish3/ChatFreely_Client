@@ -111,10 +111,27 @@ QString FriendManage::getFriendUIDByConversationID(const QString &conversationID
     return it.value();
 }
 
+QString FriendManage::getFriendUIDBySID(const QString &SID)
+{
+    QReadLocker locker(&(this->lock));
+    for(const auto& it : std::as_const(this->map_friend))
+    {
+        if(it.sid == SID)
+            return it.uid;
+    }
+    return {};
+}
+
 QList<FriendManage::FriendInfo> FriendManage::getAllFriend() const
 {
     QReadLocker locker(&(this->lock));
     return this->map_friend.values();
+}
+
+void FriendManage::resetLoadState()
+{
+    QWriteLocker locker(&(this->lock));
+    this->isFirstLoad = false;
 }
 
 void FriendManage::cleanAll()

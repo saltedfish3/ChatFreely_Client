@@ -113,8 +113,9 @@ void ContactsWidget::initSideBar()
     this->btn_addFriend->move((this->widget_sideBar->width() - this->btn_addFriend->width())/2 , (this->widget_sideBar->width() - this->btn_addFriend->width())/2);
 
     connect(this->btn_addFriend, &QPushButton::clicked, this, [this](){
-        AddNewFriendWidget* anfw = new AddNewFriendWidget(this);
-        anfw->show();
+        // AddNewFriendWidget* anfw = new AddNewFriendWidget(this);
+        // anfw->show();
+        TcpLongConnection::getTcpClient().reConnect();
     });
 
     this->edit_searchFriend = new QLineEdit(this->widget_sideBar);
@@ -186,8 +187,9 @@ void ContactsWidget::initSideUn()
     this->btn_newFriend->setCheckable(true);
     this->btn_newFriend->setChecked(false);
     connect(this->btn_newFriend,&QPushButton::clicked,this,[=](){
-        this->listView_myFriend->clearSelection();
-        this->stackedWidget->setCurrentWidget(this->widget_newFriend);
+        // this->listView_myFriend->clearSelection();
+        // this->stackedWidget->setCurrentWidget(this->widget_newFriend);
+        TcpLongConnection::getTcpClient().closeConnection();
     });
 
     this->group = new QButtonGroup(this);

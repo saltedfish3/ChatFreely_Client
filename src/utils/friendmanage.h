@@ -36,8 +36,11 @@ public:
     FriendManage::FriendInfo getFriendInfo(const QString& uid) const;
     QPixmap getFriendAvatar(const QString& uid, const QSize& wantedSize);
     QString getFriendUIDByConversationID(const QString& conversationID);
+    QString getFriendUIDBySID(const QString& SID);
 
     QList<FriendManage::FriendInfo> getAllFriend() const;
+
+    void resetLoadState();
 
 signals:
     //用于更新全部好友列表

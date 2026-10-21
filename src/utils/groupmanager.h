@@ -43,6 +43,8 @@ public:
     QPixmap getGroupAvatar(const QString& conversationID, const QSize& wantedSize);
     int64_t getGroupsCount();
 
+    void resetLoadState();
+
 signals:
     void groupCreated(const QString& conversatinonID);
     void allGroupList();

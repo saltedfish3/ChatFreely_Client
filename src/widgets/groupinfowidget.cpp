@@ -44,6 +44,17 @@ void GroupInfoWidget::changeInfo(const QString &conversationID, const QString &g
             this->label_ownerUsername->setText(it.username);
             this->label_ownerSID->setText("ID:" + it.sid);
             setRadius(defaultAvatar, this->label_ownerAvatar, 40);
+
+            if(ownerUID == UserInfo::getUserInfo().getUID())
+                this->btn_addFriend->hide();
+            else
+            {
+                if(FriendManage::getFriendManage().getFriendInfo(it.uid).conversationID.isEmpty())
+                    this->btn_addFriend->show();
+                else
+                    this->btn_addFriend->hide();
+            }
+
             continue;
         }
         addGroupMemberItem(it.username, it.sid, it.uid, defaultAvatar);
@@ -192,6 +203,12 @@ void GroupInfoWidget::init()
     this->label_ownerUsername->resize(this->widget_memberRegion->width() - this->label_ownerAvatar->pos().x() - this->label_ownerAvatar->width() - this->label_ownerName->pos().x(), 20);
     this->label_ownerUsername->move(this->label_ownerAvatar->pos().x() + this->label_ownerAvatar->width() + 6, this->label_ownerAvatar->pos().y() + 2);
 
+    this->btn_addFriend = new QPushButton("添加", this->widget_memberRegion);
+    this->btn_addFriend->setObjectName("btn_addFriend");
+    this->btn_addFriend->resize(44, 28);
+    this->btn_addFriend->move(this->label_ownerName->pos().x() + this->label_ownerName->width() - 10 - this->btn_addFriend->width(),
+                              this->label_ownerAvatar->pos().y() + (this->label_ownerAvatar->height() - this->btn_addFriend->height()) / 2);
+
     this->label_ownerSID = new QLabel("ID:1234567892", this->widget_memberRegion);
     this->label_ownerSID->setObjectName("label_ownerSID");
     this->label_ownerSID->resize(this->label_ownerUsername->width(), 15);
@@ -220,6 +237,8 @@ void GroupInfoWidget::init()
     this->view->verticalScrollBar()->setSingleStep(6);
     this->view->setResizeMode(QListView::Fixed);
 
+    this->view->setMouseTracking(true);
+
     this->widget_holy->setMinimumHeight(this->widget_memberRegion->pos().y() + this->widget_memberRegion->height() + 20);
     this->area->setWidgetResizable(true);
 
@@ -230,6 +249,21 @@ void GroupInfoWidget::init()
         GroupManager::GroupInfo info = GroupManager::getGroupManage().getGroupInfo(conversationID);
         QPixmap pix = GroupManager::getGroupManage().getGroupAvatar(conversationID, QSize(128, 128));
         changeInfo(info.conversationID, info.groupID, info.groupName, info.ownerUID, info.memberInfos, pix);
+    });
+
+    connect(this->delegate, &GroupMemberDelegate::addFriendClicked, this, [this](const QString& SID, const QModelIndex& index){
+        TcpLongConnection::getTcpClient().sendAddNewFriendRequest(SID);
+    });
+
+    connect(this->btn_addFriend, &QPushButton::clicked, this, [this](){
+        QString sid = this->label_ownerSID->text().mid(3);
+        if(sid.isEmpty())
+            return;
+        TcpLongConnection::getTcpClient().sendAddNewFriendRequest(sid);
+    });
+
+    connect(&FriendManage::getFriendManage(), &FriendManage::allFriendList, this, [this](){
+        updateIsFriend();
     });
 }
 
@@ -346,6 +380,24 @@ void GroupInfoWidget::initStyle()
                         border-radius: 0;
                         border: none;
                     }
+                    #btn_addFriend
+                    {
+                        margin: 1px;
+                        background-color: transparent;
+                        border: 1px solid rgb(99, 102, 241);
+                        border-radius: 4px;
+                        color: rgb(99, 102, 241);
+                        font-size: 9pt;
+                        font-weight: normal;
+                    }
+                    #btn_addFriend:hover
+                    {
+                        background-color: rgba(99, 102, 241, 20);
+                    }
+                    #btn_addFriend:pressed
+                    {
+                        background-color: rgba(99, 102, 241, 50);
+                    }
                         )"));
 }
 
@@ -379,5 +431,33 @@ void GroupInfoWidget::addGroupMemberItem(const QString &username, const QString 
     item->setData(uid, GroupMemberDelegate::UIDRole);
     item->setData(avatar, GroupMemberDelegate::AvatarRole);
 
+    bool canAdd = true;
+    if(uid != UserInfo::getUserInfo().getUID())
+        canAdd = !FriendManage::getFriendManage().getFriendInfo(uid).uid.isEmpty();
+
+    item->setData(canAdd, GroupMemberDelegate::IsFriendRole);
+
     this->model->appendRow(item);
+}
+
+void GroupInfoWidget::updateIsFriend()
+{
+    for(int i = 0; i < this->model->rowCount(); i++)
+    {
+        QModelIndex index = this->model->index(i, 0);
+        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(index.data(GroupMemberDelegate::UIDRole).toString());
+        if(info.conversationID.isEmpty())
+            continue;
+        QStandardItem* item = this->model->itemFromIndex(index);
+        item->setData(true, GroupMemberDelegate::IsFriendRole);
+    }
+
+    QString sid = this->label_ownerSID->text().mid(3);
+    if(sid.isEmpty() || sid == UserInfo::getUserInfo().getSID())
+        return;
+
+    if(FriendManage::getFriendManage().getFriendUIDBySID(sid).isEmpty())
+        this->btn_addFriend->show();
+    else
+        this->btn_addFriend->hide();
 }

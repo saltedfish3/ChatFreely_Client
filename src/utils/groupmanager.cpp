@@ -115,6 +115,12 @@ int64_t GroupManager::getGroupsCount()
     return this->hash_groups.size();
 }
 
+void GroupManager::resetLoadState()
+{
+    QWriteLocker locker(&(this->lock));
+    this->isFirstLoad = false;
+}
+
 void GroupManager::cleanAll()
 {
     QWriteLocker locker(&(this->lock));

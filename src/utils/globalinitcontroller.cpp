@@ -32,6 +32,9 @@ bool GlobalInitController::restartFromLogin()
         return false;
     }
 
+    FriendManage::getFriendManage().resetLoadState();
+    GroupManager::getGroupManage().resetLoadState();
+
     start();
     return true;
 }

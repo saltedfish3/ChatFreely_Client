@@ -446,6 +446,16 @@ bool TcpLongConnection::isConnect()
     return this->socket->state() == QAbstractSocket::ConnectedState;
 }
 
+void TcpLongConnection::closeConnection()
+{
+    this->socket->abort();
+}
+
+void TcpLongConnection::reConnect()
+{
+    startConnect();
+}
+
 void TcpLongConnection::sendHello()
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)

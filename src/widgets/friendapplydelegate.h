@@ -47,6 +47,7 @@ private:
         Hover,
         Pressed
     };
+
     QPersistentModelIndex agreeIndex;
     ButtonState agreeState = None;
     bool isAgreePressed = false;
