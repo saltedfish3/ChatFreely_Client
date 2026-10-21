@@ -468,12 +468,12 @@ void ContactsWidget::initSideUn()
     connect(&GroupManager::getGroupManage(), &GroupManager::groupAvatarUpdate, this, [this](const QString& conversationID, const QPixmap& avatar, const QSize& size){
         if(size == QSize(38, 38) || size.isEmpty())
         {
-            for(int i = 0; i < this->model->rowCount(); i++)
+            for(int i = 0; i < this->model_group->rowCount(); i++)
             {
-                QModelIndex index = this->model->index(i, 0);
+                QModelIndex index = this->model_group->index(i, 0);
                 if(index.data(GroupDelegate::ConversationIDRole).toString() == conversationID)
                 {
-                    QStandardItem* item = this->model->itemFromIndex(index);
+                    QStandardItem* item = this->model_group->itemFromIndex(index);
                     if(!size.isEmpty())
                     {
                         QPixmap avatar_copy = avatar;
@@ -496,7 +496,7 @@ void ContactsWidget::initSideUn()
         if(size == QSize(128, 128))
         {
             if(conversationID == this->selectedUID)
-                this->widget_contactsInfo->changeSelectedAvatar(avatar);
+                this->widget_groupInfo->changeSelectedAvatar(avatar);
         }
         else if(size.isEmpty())
         {
@@ -504,7 +504,7 @@ void ContactsWidget::initSideUn()
             {
                 QPixmap bigAvatar = GroupManager::getGroupManage().getGroupAvatar(conversationID, QSize(128, 128));
                 if(!bigAvatar.isNull())
-                    this->widget_contactsInfo->changeSelectedAvatar(bigAvatar);
+                    this->widget_groupInfo->changeSelectedAvatar(bigAvatar);
             }
         }
     });

@@ -32,7 +32,7 @@ void GroupInfoWidget::changeInfo(const QString &conversationID, const QString &g
     this->label_groupName->setText(showGroupName);
     this->label_groupID->setText("ID:" + groupID);
 
-    QPixmap defaultAvatar = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", 0, 0, QSize(48, 48));
+    QPixmap defaultAvatar = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", 0, 0, QSize(38, 38));
     if(defaultAvatar.isNull())
         defaultAvatar = QPixmap(":/default/images/defaultAvatar.png");
     defaultAvatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
@@ -74,7 +74,7 @@ void GroupInfoWidget::changeInfo(const QString &conversationID, const QString &g
                 return;
             }
             changeMemberAvatar(currentUID, avatar);
-        });
+        }, false, 0, 0, QSize(38, 38));
     }
 }
 
