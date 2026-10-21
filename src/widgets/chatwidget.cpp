@@ -932,7 +932,6 @@ void ChatWidget::loadSearchMsgNextPage(quint64 gen)
 
 void ChatWidget::appendSearchMsgItem(const Message &msg)
 {
-    //待后续加入群聊头像和群聊成员头像单独获取
     bool isMyself = msg.senderUID == UserInfo::getUserInfo().getUID();
     GroupManager::GroupInfo info = GroupManager::getGroupManage().getGroupInfo(this->currentSearchConversationID);
     bool isGroup = !info.conversationID.isEmpty();
@@ -951,13 +950,14 @@ void ChatWidget::appendSearchMsgItem(const Message &msg)
         {
             GroupManager::GroupMemberInfo memberInfo = info.memberInfos.value(msg.senderUID);
             name = memberInfo.username;
-            avatar = ImageCacheManager::getManager().fastLoadImage(memberInfo.avatarUrl, 0, 0, QSize(36, 36));
+            QString avatarUrl = memberInfo.avatarUrl.isEmpty() ? ":/default/images/defaultAvatar.png" : memberInfo.avatarUrl;
+            avatar = ImageCacheManager::getManager().fastLoadImage(avatarUrl, 0, 0, QSize(36, 36));
             if(avatar.isNull())
             {
                 avatar = QPixmap(":/default/images/defaultAvatar.png");
                 QString currentReqSearchConversationID = this->currentSearchConversationID;
                 QString currentSenderUID = memberInfo.uid;
-                ImageCacheManager::getManager().loadImage(memberInfo.avatarUrl, [this, currentReqSearchConversationID, currentSenderUID](const QPixmap& pix){
+                ImageCacheManager::getManager().loadImage(avatarUrl, [this, currentReqSearchConversationID, currentSenderUID](const QPixmap& pix){
                     if(currentReqSearchConversationID != this->currentSearchConversationID)
                         return;
 
@@ -996,7 +996,7 @@ void ChatWidget::appendSearchMsgItem(const Message &msg)
         }
     }
 
-    if (avatar.isNull())
+    if(avatar.isNull())
         avatar = QPixmap(":/default/images/defaultAvatar.png");
 
     avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
