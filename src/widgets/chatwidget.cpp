@@ -19,11 +19,43 @@ void ChatWidget::openConversation(const QString &conversationID)
     if(conversationID.isEmpty())
         return;
 
+    this->forceConversations.insert(conversationID);
+
     if(!this->map_conversation.contains(conversationID))
     {
         if(!createConversation(conversationID))
+        {
+            this->forceConversations.remove(conversationID);
             return;
+        }
     }
+
+    bool isInList = false;
+    for(int i = 0; i < this->model->rowCount(); i++)
+    {
+
+        if(this->model->index(i, 0).data(ConversationListDelegate::ConversationIDRole).toString() == conversationID)
+        {
+            isInList = true;
+            break;
+        }
+    }
+
+    if(!isInList)
+    {
+        auto it = this->map_conversation.find(conversationID);
+        if(it != this->map_conversation.end())
+        {
+            ConversationItem* item = ConversationManager::getConversationManager().getOrCreateConversationItem(conversationID,
+                                                                                                               GroupManager::getGroupManage().getGroupInfo(conversationID).conversationID.isEmpty() ?
+                                                                                                                   ConversationItem::ConversationType::Personal : ConversationItem::ConversationType::Group);
+
+            if(item)
+                createConversationListItem(item);
+        }
+    }
+
+    this->forceConversations.remove(conversationID);
 
     auto it = map_conversation.find(conversationID);
     if(it != map_conversation.end())
@@ -60,6 +92,8 @@ void ChatWidget::openConversation(const QString &conversationID)
 void ChatWidget::cleanAll()
 {
     this->model->clear();
+    this->boundConversations.clear();
+    this->forceConversations.clear();
     for(auto it = this->map_conversation.cbegin(); it != this->map_conversation.cend(); it++)
     {
         this->stackedWidget_Conversation->removeWidget(it.value());
@@ -648,6 +682,89 @@ void ChatWidget::initListStyle()
                                             )");
 }
 
+void ChatWidget::bindConversationItemSignals(ConversationItem *item)
+{
+    const QString conversationID = item->getConversationID();
+    if(this->boundConversations.contains(conversationID))
+        return;
+    this->boundConversations.insert(conversationID);
+
+    connect(item, &ConversationItem::LastMessageChange, this, [this, item](const Message& msg){
+        QString selectedUID;
+        QModelIndex currentIndex = this->listView_conversationList->currentIndex();
+        if(currentIndex.isValid())
+            selectedUID = currentIndex.data(ConversationListDelegate::ConversationIDRole).toString();
+
+        bool isFound = false;
+        QString conversationID = item->getConversationID();
+        for(int i = 0; i < this->model->rowCount(); i++)
+        {
+            auto index = this->model->index(i, 0);
+            if(conversationID == index.data(ConversationListDelegate::ConversationIDRole).toString())
+            {
+                QStandardItem* item = this->model->itemFromIndex(index);
+                if(msg.contentType == ContentType::Text)
+                    item->setData(msg.content, ConversationListDelegate::LastMsgRole);
+                else if(msg.contentType == ContentType::Image)
+                    item->setData("[图片]", ConversationListDelegate::LastMsgRole);
+                else if(msg.contentType == ContentType::Video)
+                    item->setData("[视频]", ConversationListDelegate::LastMsgRole);
+                else if(msg.contentType == ContentType::File)
+                    item->setData("[文件]", ConversationListDelegate::LastMsgRole);
+                item->setData(msg.timeStamp, ConversationListDelegate::LastTimestampRole);
+                break;
+            }
+        }
+
+        if(!isFound)
+            createConversationListItem(item);
+
+        this->model->sort(0, Qt::DescendingOrder);
+
+        if(this->listView_conversationList->model() != this->model)
+            return;
+
+        if(!selectedUID.isEmpty())
+            restoreSelection(selectedUID);
+        else
+        {
+            this->listView_conversationList->setCurrentIndex(QModelIndex());
+            this->listView_conversationList->clearSelection();
+        }
+    });
+
+    connect(item, &ConversationItem::UnReadCountChange, this, [this, item](int num){
+        QString selectedUID;
+        QModelIndex currentIndex = this->listView_conversationList->currentIndex();
+        if(currentIndex.isValid())
+            selectedUID = currentIndex.data(ConversationListDelegate::ConversationIDRole).toString();
+
+        QString conversationID = item->getConversationID();
+        for(int i = 0; i < this->model->rowCount(); i++)
+        {
+            auto index = this->model->index(i, 0);
+            if(conversationID == index.data(ConversationListDelegate::ConversationIDRole).toString())
+            {
+                QStandardItem* item = this->model->itemFromIndex(index);
+                item->setData(num, ConversationListDelegate::UnReadRole);
+            }
+        }
+
+        this->model->sort(0, Qt::DescendingOrder);
+
+        if(this->listView_conversationList->model() != this->model)
+            return;
+
+        if(!selectedUID.isEmpty())
+            restoreSelection(selectedUID);
+        else
+        {
+            this->listView_conversationList->setCurrentIndex(QModelIndex());
+            this->listView_conversationList->clearSelection();
+        }
+    });
+}
+
 void ChatWidget::initStackedConversation()
 {
     this->stackedWidget_Conversation = new QStackedWidget(this);
@@ -973,6 +1090,13 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
         }
     }
 
+    Message lastMsg = item->getLastMessage();
+    if(!this->forceConversations.contains(conversationID) && info.conversationID.isEmpty() && lastMsg.tempMsgID.isEmpty() && lastMsg.serverMsgID.isEmpty())
+    {
+        bindConversationItemSignals(item);
+        return;
+    }
+
     QString name;
     QPixmap avatar;
     bool isOnline = false;
@@ -1032,73 +1156,5 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
     }
     this->model->appendRow(item_standard);
 
-    connect(item, &ConversationItem::LastMessageChange, this, [this, item](const Message& msg){
-        QString selectedUID;
-        QModelIndex currentIndex = this->listView_conversationList->currentIndex();
-        if(currentIndex.isValid())
-            selectedUID = currentIndex.data(ConversationListDelegate::ConversationIDRole).toString();
-
-        QString conversationID = item->getConversationID();
-        for(int i = 0; i < this->model->rowCount(); i++)
-        {
-            auto index = this->model->index(i, 0);
-            if(conversationID == index.data(ConversationListDelegate::ConversationIDRole).toString())
-            {
-                QStandardItem* item = this->model->itemFromIndex(index);
-                if(msg.contentType == ContentType::Text)
-                    item->setData(msg.content, ConversationListDelegate::LastMsgRole);
-                else if(msg.contentType == ContentType::Image)
-                    item->setData("[图片]", ConversationListDelegate::LastMsgRole);
-                else if(msg.contentType == ContentType::Video)
-                    item->setData("[视频]", ConversationListDelegate::LastMsgRole);
-                else if(msg.contentType == ContentType::File)
-                    item->setData("[文件]", ConversationListDelegate::LastMsgRole);
-                item->setData(msg.timeStamp, ConversationListDelegate::LastTimestampRole);
-            }
-        }
-
-        this->model->sort(0, Qt::DescendingOrder);
-
-        if(this->listView_conversationList->model() != this->model)
-            return;
-
-        if(!selectedUID.isEmpty())
-            restoreSelection(selectedUID);
-        else
-        {
-            this->listView_conversationList->setCurrentIndex(QModelIndex());
-            this->listView_conversationList->clearSelection();
-        }
-    });
-
-    connect(item, &ConversationItem::UnReadCountChange, this, [this, item](int num){
-        QString selectedUID;
-        QModelIndex currentIndex = this->listView_conversationList->currentIndex();
-        if(currentIndex.isValid())
-            selectedUID = currentIndex.data(ConversationListDelegate::ConversationIDRole).toString();
-
-        QString conversationID = item->getConversationID();
-        for(int i = 0; i < this->model->rowCount(); i++)
-        {
-            auto index = this->model->index(i, 0);
-            if(conversationID == index.data(ConversationListDelegate::ConversationIDRole).toString())
-            {
-                QStandardItem* item = this->model->itemFromIndex(index);
-                item->setData(num, ConversationListDelegate::UnReadRole);
-            }
-        }
-
-        this->model->sort(0, Qt::DescendingOrder);
-
-        if(this->listView_conversationList->model() != this->model)
-            return;
-
-        if(!selectedUID.isEmpty())
-            restoreSelection(selectedUID);
-        else
-        {
-            this->listView_conversationList->setCurrentIndex(QModelIndex());
-            this->listView_conversationList->clearSelection();
-        }
-    });
+    bindConversationItemSignals(item);
 }

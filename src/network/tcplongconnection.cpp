@@ -2147,6 +2147,7 @@ void TcpLongConnection::handleGetConversationsFriendUIDListAndSeqResp(QJsonObjec
                 continue;
             list.append(jv.toString());
         }
+
         emit newSyncConvStatus(true, list, newSyncConvSeq);
     }
     else

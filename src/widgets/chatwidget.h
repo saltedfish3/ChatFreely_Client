@@ -47,6 +47,8 @@ private:
     void initListWidget();
     void initListStyle();
 
+    void bindConversationItemSignals(ConversationItem* item);
+
     void initStackedConversation();
     void precreateConversations();
 
@@ -95,6 +97,11 @@ private:
     QMap<QString, ConversationWidget*> map_conversation;
 
     QString currentConversation;
+
+    //防止信号重复绑定
+    QSet<QString> boundConversations;
+    //强制创建列表项
+    QSet<QString> forceConversations;
 };
 
 #endif // CHATWIDGET_H

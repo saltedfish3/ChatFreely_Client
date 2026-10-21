@@ -301,7 +301,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
 
     connect(this->widget_menu, &MoreWidget::clearMessages, this, [this](){
         DatabaseManager::getDatabaseManager().clearChatMessagesOfConversationID(this->item->getConversationID());
-        this->item->getMessagesManager().clearMessages();
+        this->item->clearMessages();
 
         this->loadingCount = 0;
         this->timer_loading->stop();

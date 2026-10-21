@@ -53,6 +53,8 @@ private:
 
     void initStacked();
 
+    void cleanAll();
+
     void changeStatus(Status status);
     void sortedFriendList();
     void sortedGroupList();

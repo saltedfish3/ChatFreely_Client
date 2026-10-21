@@ -549,6 +549,10 @@ void ContactsWidget::initSideUn()
         }
     });
 
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &ContactsWidget::cleanAll);
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, &ContactsWidget::cleanAll);
+    connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::refreshExpiredExit, this, &ContactsWidget::cleanAll);
+
     changeStatus(Empty);
 }
 
@@ -689,6 +693,21 @@ void ContactsWidget::initStacked()
         //转发信号
         emit openConversation(conversationID);
     });
+}
+
+void ContactsWidget::cleanAll()
+{
+    this->selectedUID.clear();
+    this->model->clear();
+    this->model_group->clear();
+
+    this->btn_newFriend->setChecked(false);
+    this->btn_myFriend->setChecked(true);
+    this->listView_myFriend->setModel(this->model);
+    this->listView_myFriend->setItemDelegate(this->delegate);
+
+    this->stackedWidget->setCurrentWidget(this->widget_noSelect);
+    changeStatus(Empty);
 }
 
 void ContactsWidget::changeStatus(Status status)
