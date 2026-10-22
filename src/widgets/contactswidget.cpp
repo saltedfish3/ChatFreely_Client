@@ -113,9 +113,8 @@ void ContactsWidget::initSideBar()
     this->btn_addFriend->move((this->widget_sideBar->width() - this->btn_addFriend->width())/2 , (this->widget_sideBar->width() - this->btn_addFriend->width())/2);
 
     connect(this->btn_addFriend, &QPushButton::clicked, this, [this](){
-        // AddNewFriendWidget* anfw = new AddNewFriendWidget(this);
-        // anfw->show();
-        TcpLongConnection::getTcpClient().reConnect();
+        AddNewFriendWidget* anfw = new AddNewFriendWidget(this);
+        anfw->show();
     });
 
     this->edit_searchFriend = new QLineEdit(this->widget_sideBar);
@@ -187,9 +186,8 @@ void ContactsWidget::initSideUn()
     this->btn_newFriend->setCheckable(true);
     this->btn_newFriend->setChecked(false);
     connect(this->btn_newFriend,&QPushButton::clicked,this,[=](){
-        // this->listView_myFriend->clearSelection();
-        // this->stackedWidget->setCurrentWidget(this->widget_newFriend);
-        TcpLongConnection::getTcpClient().closeConnection();
+        this->listView_myFriend->clearSelection();
+        this->stackedWidget->setCurrentWidget(this->widget_newFriend);
     });
 
     this->group = new QButtonGroup(this);
@@ -314,6 +312,9 @@ void ContactsWidget::initSideUn()
         this->widget_groupInfo->changeInfo(info.conversationID, info.groupID, info.groupName, info.ownerUID, info.memberInfos,
                                                GroupManager::getGroupManage().getGroupAvatar(info.conversationID, QSize(128, 128)));
         this->stackedWidget->setCurrentWidget(this->widget_groupInfo);
+
+        if(!GroupManager::getGroupManage().getGroupInfo(info.conversationID).conversationID.isEmpty())
+            TcpLongConnection::getTcpClient().getGroupInfo(info.conversationID);
     });
 
     connect(this->edit_searchFriend, &QLineEdit::textChanged, this, [this](){
@@ -529,6 +530,11 @@ void ContactsWidget::initSideUn()
                 QStandardItem* item = this->model_group->itemFromIndex(index);
                 item->setData(info.groupName, GroupDelegate::NameRole);
                 item->setData(info.memberInfos.size(), GroupDelegate::MemberCountRole);
+
+                QPixmap avatar = GroupManager::getGroupManage().getGroupAvatar(conversationID, QSize(38, 38));
+                avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                item->setData(avatar, GroupDelegate::AvatarRole);
+
                 isFound = true;
                 break;
             }

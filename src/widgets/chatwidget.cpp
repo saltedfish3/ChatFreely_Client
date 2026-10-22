@@ -30,6 +30,9 @@ void ChatWidget::openConversation(const QString &conversationID)
         }
     }
 
+    if(!GroupManager::getGroupManage().getGroupInfo(conversationID).conversationID.isEmpty())
+        TcpLongConnection::getTcpClient().getGroupInfo(conversationID);
+
     bool isInList = false;
     for(int i = 0; i < this->model->rowCount(); i++)
     {
@@ -608,7 +611,13 @@ void ChatWidget::initListWidget()
             if(index.data(ConversationListDelegate::ConversationIDRole).toString() == conversationID)
             {
                 QStandardItem* item = this->model->itemFromIndex(index);
+                item->setData(info.groupName, ConversationListDelegate::UsernameRole);
                 item->setData(info.memberInfos.size(), ConversationListDelegate::GroupMemberCountRole);
+
+                QPixmap avatar = GroupManager::getGroupManage().getGroupAvatar(info.conversationID, QSize(36, 36));
+                avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                item->setData(avatar, ConversationListDelegate::AvatarRole);
+
                 break;
             }
         }
@@ -619,7 +628,13 @@ void ChatWidget::initListWidget()
             if(index.data(ConversationListDelegate::ConversationIDRole).toString() == conversationID)
             {
                 QStandardItem* item = this->model_searchConversation->itemFromIndex(index);
+                item->setData(info.groupName, ConversationListDelegate::UsernameRole);
                 item->setData(info.memberInfos.size(), ConversationListDelegate::GroupMemberCountRole);
+
+                QPixmap avatar = GroupManager::getGroupManage().getGroupAvatar(info.conversationID, QSize(36, 36));
+                avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                item->setData(avatar, ConversationListDelegate::AvatarRole);
+
                 break;
             }
         }

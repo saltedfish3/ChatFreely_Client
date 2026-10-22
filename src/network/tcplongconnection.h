@@ -50,6 +50,7 @@ public:
     void sendCreateGroupRequest(const QString& groupName, const QList<QString>& inviteUIDs, const QString& inviteMsg = "");
     void sendHandleNewGroupJoinRequest(const QString& handle_requestID, bool isAgree);
     void getGroupList();
+    void getGroupInfo(const QString& conversationID);
     void getNewGroupJoinRequestsList();
     void sendApplyJoinGroupRequest(const QString& groupID, const QString& verMsg);
 
@@ -95,6 +96,7 @@ signals:
     void newGroupJoinRequestsHandleResult(const QString& handleRequestID, bool isSuccess);
     void newGroup(const QString& conversationID, const QString& groupID, const QString& groupName,
                   const QString& avatarUrl, const QString& ownerUID, const QVariantList& memberInfos);
+    void groupInfoFetched(const QVariantMap& memberInfos);
 
     //用于通知业务层getConversationsListAndSeq是否成功
     void newSyncConvStatus(bool isSuccess, const QList<QString>& conversations, int64_t newSyncConvSeq);
@@ -137,6 +139,7 @@ private:
     //群聊
     void handleCreateGroupRequestResp(QJsonObject obj);
     void handleGetGroupListResp(QJsonObject obj);
+    void handleGetGroupInfoResp(QJsonObject obj);
     void handlePushGroupJoinRequestResp(QJsonObject obj);
     void handleGetNewGroupJoinRequestsListResp(QJsonObject obj);
     void handleHandleNewGroupJoinRequestResp(QJsonObject obj);

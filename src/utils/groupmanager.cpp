@@ -238,6 +238,39 @@ GroupManager::GroupManager(QObject *parent)
         emit pointer->groupInfoUpdate(conversationID);
     });
 
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::groupInfoFetched, this, [pointer, this](const QVariantMap& info){
+        if(!pointer)
+            return;
+
+        QString conversationID = info.value("ConversationID").toString();
+
+        {
+            QWriteLocker locker(&pointer->lock);
+            GroupInfo& info_g = pointer->hash_groups[conversationID];
+            info_g.groupID = info.value("GroupID").toString().isEmpty() ? info_g.groupID : info.value("GroupID").toString();
+            info_g.groupName = info.value("GroupName").toString().isEmpty() ? info_g.groupName : info.value("GroupName").toString();
+            info_g.avatarUrl = info.value("Avatar_Url").toString();
+            info_g.ownerUID = info.value("OwnerUID").toString().isEmpty() ? info_g.ownerUID : info.value("OwnerUID").toString();;
+            info_g.conversationID = conversationID;
+            info_g.memberInfos.clear();
+
+            QVariantList memberInfos = info.value("MemberInfos").toList();
+            info_g.memberInfos.clear();
+            for(const auto& mv : std::as_const(memberInfos))
+            {
+                QVariantMap m = mv.toMap();
+                GroupMemberInfo in;
+                in.uid = m.value("UID").toString();
+                in.sid = m.value("SID").toString();
+                in.username = m.value("Username").toString();
+                in.avatarUrl = m.value("AvatarUrl").toString();
+                info_g.memberInfos[m.value("UID").toString()] = in;
+            }
+        }
+
+        emit pointer->groupInfoUpdate(conversationID);
+    });
+
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &GroupManager::cleanAll);
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, &GroupManager::cleanAll);
     connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::refreshExpiredExit, this, &GroupManager::cleanAll);

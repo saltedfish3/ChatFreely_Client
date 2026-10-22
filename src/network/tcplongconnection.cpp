@@ -715,6 +715,33 @@ void TcpLongConnection::getGroupList()
     });
 }
 
+void TcpLongConnection::getGroupInfo(const QString &conversationID)
+{
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        return;
+    }
+
+    QJsonObject obj;
+    QString requestsID = QString::number(getRequestsId());
+    obj["Requests_id"] = requestsID;
+    obj["Type"] = "GetGroupInfoRequest";
+    obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
+    obj["ConversationID"] = conversationID;
+
+    QJsonDocument doc(obj);
+    QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
+
+    this->socket->write(data);
+    this->socket->flush();
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(7000,[this,requestsID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+        }
+    });
+}
+
 void TcpLongConnection::getNewGroupJoinRequestsList()
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
@@ -1590,6 +1617,89 @@ void TcpLongConnection::handleGetGroupListResp(QJsonObject obj)
             return;
         }
         emit allGroupList({});
+    }
+}
+
+void TcpLongConnection::handleGetGroupInfoResp(QJsonObject obj)
+{
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+    if(!obj.contains("Result") || !obj.value("Result").isBool() ||
+        !obj.contains("ConversationID") || !obj.value("ConversationID").isString())
+        return;
+
+    bool success = obj.value("Result").toBool();
+    QString conversationID = obj.value("ConversationID").toString();
+    if(success)
+    {
+        if(!obj.contains("GroupInfo") || !obj.value("GroupInfo").isObject())
+            return;
+
+        const QJsonObject obj_groupInfo = obj.value("GroupInfo").toObject();
+        if(obj_groupInfo.isEmpty())
+            return;
+
+        const QJsonArray arr = obj_groupInfo.value("MemberInfos").toArray();
+
+        QVariantMap var;
+        var["ConversationID"] = obj_groupInfo.value("ConversationID").toString();
+        var["GroupID"] = obj_groupInfo.value("GroupID").toString();
+        var["GroupName"] = obj_groupInfo.value("GroupName").toString();
+        var["Avatar_Url"] = obj_groupInfo.value("Avatar_Url").toString();
+        var["OwnerUID"] = obj_groupInfo.value("OwnerUID").toString();
+
+        QVariantList uidList;
+        QJsonArray uidArr = obj_groupInfo.value("MemberInfos").toArray();
+        for(const QJsonValue& jv_uid : std::as_const(uidArr))
+        {
+            if(!jv_uid.isObject())
+            {
+                 continue;
+            }
+            QJsonObject ob = jv_uid.toObject();
+            QVariantMap va;
+            va["Username"] = ob.value("Username").toString();
+            va["UID"] = ob.value("UID").toString();
+            va["SID"] = ob.value("SID").toString();
+            va["AvatarUrl"] = ob.value("AvatarUrl").toString();
+            uidList << va; 
+        }
+        var["MemberInfos"] = uidList;
+
+        emit groupInfoFetched(var);
+    }
+    else
+    {
+        if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
+        {
+            bool isExpired = obj.value("AccessTokenExpired").toBool();
+            if(isExpired)
+            {
+                sendRefreshToken([this, conversationID](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                    if(isSuccess)
+                    {
+                        if(newAccessToken.isEmpty())
+                        {
+                            emit refreshExpiredExit();
+                            return;
+                        }
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        getGroupInfo(conversationID);
+                        return;
+                    }
+                    else
+                    {
+                        if(isRefreshTokenExpired)
+                            emit refreshExpiredExit();
+                        else
+                        {
+                            emit allGroupList({});
+                        }
+                    }
+                });
+            }
+            return;
+        }
     }
 }
 
@@ -2641,6 +2751,10 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
                     else if(type == "ApplyJoinGroupRequestResp")
                     {
                         this->handleApplyJoinGroupRequestResp(obj);
+                    }
+                    else if(type == "GetGroupInfoRequestResp")
+                    {
+                        this->handleGetGroupInfoResp(obj);
                     }
                     else
                     {
