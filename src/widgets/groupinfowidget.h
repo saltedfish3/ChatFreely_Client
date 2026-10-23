@@ -13,11 +13,13 @@
 #include <QStandardItemModel>
 #include <QScrollBar>
 #include <QLineEdit>
+#include <QFileDialog>
 #include "../utils/imagecachemanager.h"
 #include "groupmemberdelegate.h"
 #include "../utils/groupmanager.h"
 #include "../network/tcplongconnection.h"
 #include "../utils/friendmanage.h"
+#include "avatarview.h"
 
 class GroupInfoWidget : public QWidget
 {
@@ -37,7 +39,8 @@ private:
     void init();
     void initStyle();
 
-    void setRadius(QPixmap& pix, QLabel* label, int radius);
+    void setRadius(QPixmap& pix, AvatarView* view, int radius);
+    void setRadiusOnLabel(QPixmap& pix, QLabel* label, int radius);
     void addGroupMemberItem(const QString& username, const QString& sid, const QString& uid, const QPixmap& avatar);
     void updateIsFriend();
     void updateEditPos();
@@ -45,8 +48,10 @@ private:
     QScrollArea* area;
     QWidget* widget_holy;
 
-    QLabel* label_avatar;
-    // QLabel* label_groupName;
+    // QLabel* label_avatar;
+    AvatarView* view_avatar;
+    QLabel* label_camera_icon;
+
     QLineEdit* edit_groupName;
     QPushButton* btn_doneOrEdit;
     QLabel* label_groupID;

@@ -912,6 +912,77 @@ void TcpLongConnection::sendUpdateGroupName(const QString &conversationID, const
     });
 }
 
+void TcpLongConnection::sendUpdateGroupAvatar(const QString &conversationID, const QString &avatarUrl)
+{
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        emit mainState(false, "无法连接服务器，请稍后再试");
+        return;
+    }
+    if(conversationID.isEmpty())
+    {
+        emit mainState(false, "更新失败, 群聊错误");
+        return;
+    }
+    if(avatarUrl.isEmpty())
+    {
+        emit mainState(false, "更新失败, 请稍后重试");
+        return;
+    }
+
+    //幂等操作
+    QVariantMap currentParams;
+    QString requestsID;
+    currentParams["conversationID"] = conversationID;
+    currentParams["avatarUrl"] = avatarUrl;
+    for(auto it = this->map_idempotentCache.begin(); it != this->map_idempotentCache.end(); it++)
+    {
+        if(it.value().name == updateGroupAvatarRequest && it.value().params == currentParams)
+        {
+            requestsID = it.key();
+            break;
+        }
+    }
+
+    //是否复用幂等
+    if(requestsID.isEmpty())
+    {
+        requestsID = QString::number(getRequestsId());
+        PendingRequest prt;
+        prt.requestID = requestsID;
+        prt.name = updateGroupAvatarRequest;
+        prt.params = currentParams;
+
+        QVariantMap tokenParams;
+        tokenParams["conversationID"] = conversationID;
+        tokenParams["avatarUrl"] = avatarUrl;
+        prt.tokenParams = tokenParams;
+
+        this->map_idempotentCache[requestsID] = prt;
+    }
+
+    QJsonObject obj;
+    obj["Requests_id"] = requestsID;
+    obj["Type"] = "UpdateGroupAvatarRequest";
+    obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
+    obj["ConversationID"] = conversationID;
+    obj["AvatarUrl"] = avatarUrl;
+
+    QJsonDocument doc(obj);
+    QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
+    this->socket->write(data);
+    this->socket->flush();
+
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(5000,[this,requestsID, conversationID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            this->map_idempotentCache.remove(requestsID);
+            emit mainState(false, "连接超时，请稍后再试");
+        }
+    });
+}
+
 void TcpLongConnection::sendHandleNewFriendRequest(QString handle_uid, bool isAgree)
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
@@ -2156,6 +2227,72 @@ void TcpLongConnection::handleUpdateGroupNameRequestResp(QJsonObject obj)
     this->map_idempotentCache.remove(requestsID);
 }
 
+void TcpLongConnection::handleUpdateGroupAvatarRequestResp(QJsonObject obj)
+{
+    if(!obj.contains("Result") || !obj.value("Result").isBool() ||
+        !obj.contains("ConversationID") || !obj.value("ConversationID").isString())
+        return;
+
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+
+    bool success = obj.value("Result").toBool();
+    QString conversationID = obj.value("ConversationID").toString();
+
+    if(success)
+    {
+        QString avatarUrl = obj.value("AvatarUrl").toString();
+        emit updateGroupAvatar(conversationID, avatarUrl);
+        emit mainState(true, "更新成功");
+    }
+    else
+    {
+        if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
+        {
+            bool isExpired = obj.value("AccessTokenExpired").toBool();
+            if(isExpired)
+            {
+                sendRefreshToken([this, requestsID](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                    if(isSuccess)
+                    {
+                        if(newAccessToken.isEmpty())
+                        {
+                            emit refreshExpiredExit();
+                            this->map_idempotentCache.remove(requestsID);
+                            return;
+                        }
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        auto it = this->map_idempotentCache.find(requestsID);
+                        if(it != this->map_idempotentCache.end())
+                        {
+                            QString conversationID = it.value().tokenParams.value("conversationID").toString();
+                            QString avatarUrl = it.value().tokenParams.value("avatarUrl").toString();
+                            this->map_idempotentCache.remove(requestsID);
+                            sendUpdateGroupAvatar(conversationID, avatarUrl);
+                        }
+                        return;
+                    }
+                    else
+                    {
+                        if(isRefreshTokenExpired)
+                        {
+                            emit refreshExpiredExit();
+                            this->map_idempotentCache.remove(requestsID);
+                            return;
+                        }
+                        this->map_idempotentCache.remove(requestsID);
+                        emit mainState(false, "更新失败");
+                    }
+                });
+                return;
+            }
+        }
+        QString info = obj.value("Info").toString();
+        emit mainState(false, info.isEmpty() ? "更新失败" : info);
+    }
+    this->map_idempotentCache.remove(requestsID);
+}
+
 void TcpLongConnection::handleHandleNewFriendRequestResp(QJsonObject obj)
 {
     if(!obj.contains("Result") || !obj.value("Result").isBool() || !obj.contains("HandleUID") || !obj.value("HandleUID").isString())
@@ -2906,6 +3043,10 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
                     else if(type == "UpdateGroupNameRequestResp")
                     {
                         this->handleUpdateGroupNameRequestResp(obj);
+                    }
+                    else if(type == "UpdateGroupAvatarRequestResp")
+                    {
+                        this->handleUpdateGroupAvatarRequestResp(obj);
                     }
                     else
                     {

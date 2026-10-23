@@ -25,6 +25,20 @@ QList<GroupManager::GroupInfo> GroupManager::getAllGroups() const
     return list;
 }
 
+void GroupManager::setGroupAvatarUrl(const QString &conversationID, const QString &avatarUrl)
+{
+    if(conversationID.isEmpty() || !this->hash_groups.contains(conversationID))
+        return;
+
+    {
+        QWriteLocker locker(&(this->lock));
+        GroupInfo& info = this->hash_groups[conversationID];
+        info.avatarUrl = avatarUrl;
+    }
+
+    emit groupInfoUpdate(conversationID);
+}
+
 QPixmap GroupManager::getGroupAvatar(const QString &conversationID, const QSize &wantedSize)
 {
     QString url = getGroupInfo(conversationID).avatarUrl;
@@ -279,6 +293,19 @@ GroupManager::GroupManager(QObject *parent)
             QWriteLocker locker(&pointer->lock);
             GroupInfo& info = pointer->hash_groups[conversationID];
             info.groupName = groupName;
+        }
+
+        emit pointer->groupInfoUpdate(conversationID);
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::updateGroupAvatar, this, [pointer](const QString& conversationID, const QString& avatarUrl){
+        if(!pointer)
+            return;
+
+        {
+            QWriteLocker locker(&pointer->lock);
+            GroupInfo& info = pointer->hash_groups[conversationID];
+            info.avatarUrl = avatarUrl;
         }
 
         emit pointer->groupInfoUpdate(conversationID);

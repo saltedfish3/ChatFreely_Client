@@ -22,14 +22,22 @@ void GroupInfoWidget::changeInfo(const QString &conversationID, const QString &g
     this->label_groupID->setText("ID:" + groupID);
 
     if(UserInfo::getUserInfo().getUID() == ownerUID)
+    {
         this->btn_doneOrEdit->show();
+        this->label_camera_icon->show();
+        this->view_avatar->setAnimation(true);
+    }
     else
+    {
         this->btn_doneOrEdit->hide();
+        this->label_camera_icon->hide();
+        this->view_avatar->setAnimation(false);
+    }
 
     this->model->removeRows(0, this->model->rowCount());
 
     QPixmap avatar = pix;
-    setRadius(avatar, this->label_avatar, 64);
+    setRadius(avatar, this->view_avatar, 64);
 
     QFontMetrics fm(this->edit_groupName->font());
 
@@ -57,7 +65,7 @@ void GroupInfoWidget::changeInfo(const QString &conversationID, const QString &g
         {
             this->label_ownerUsername->setText(it.username);
             this->label_ownerSID->setText("ID:" + it.sid);
-            setRadius(defaultAvatar, this->label_ownerAvatar, 40);
+            setRadiusOnLabel(defaultAvatar, this->label_ownerAvatar, 40);
 
             if(ownerUID == UserInfo::getUserInfo().getUID())
                 this->btn_addFriend->hide();
@@ -95,7 +103,7 @@ void GroupInfoWidget::changeInfo(const QString &conversationID, const QString &g
 
             if(ownerUID == currentUID)
             {
-                setRadius(avatar, this->label_ownerAvatar, 40);
+                setRadiusOnLabel(avatar, this->label_ownerAvatar, 40);
                 return;
             }
             changeMemberAvatar(currentUID, avatar);
@@ -125,7 +133,7 @@ void GroupInfoWidget::changeSelectedGroupName(const QString& groupName)
 void GroupInfoWidget::changeSelectedAvatar(const QPixmap& avatar)
 {
     QPixmap avatar_ = avatar;
-    setRadius(avatar_, this->label_avatar, 64);
+    setRadius(avatar_, this->view_avatar, 64);
 }
 
 void GroupInfoWidget::changeMemberAvatar(const QString &uid, const QPixmap &avatar)
@@ -149,27 +157,52 @@ void GroupInfoWidget::init()
 
     this->area->setWidget(this->widget_holy);
 
-    this->label_avatar = new QLabel(this->widget_holy);
-    this->label_avatar->resize(136,136);
-    this->label_avatar->setObjectName("label_avatar");
-    this->label_avatar->move((this->widget_holy->width() - this->label_avatar->width())/2,64);
+    this->view_avatar = new AvatarView(0.95, this->widget_holy);
+    this->view_avatar->setObjectName("view_avatar");
+    this->view_avatar->resize(136, 136);
+    this->view_avatar->move((this->widget_holy->width() - this->view_avatar->width())/2,64);
+
     QPixmap defaultAvatar = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", 0, 0, QSize(128, 128));
     if(defaultAvatar.isNull())
     {
         ImageCacheManager::getManager().loadImage(":/default/images/defaultAvatar.png", [this](const QPixmap& pix){
             QPixmap p_ = pix;
-            setRadius(p_, this->label_avatar, 64);
+            setRadius(p_, this->view_avatar, 64);
         }, false, 0, 0, QSize(128, 128));
     }
     else
-        setRadius(defaultAvatar, this->label_avatar, 64);
+        setRadius(defaultAvatar, this->view_avatar, 64);
+
+    connect(this->view_avatar, &AvatarView::itemClicked, this, [this](){
+        if(UserInfo::getUserInfo().getUID() != GroupManager::getGroupManage().getGroupInfo(this->conversationID).ownerUID)
+            return;
+
+        QString filePath = QFileDialog::getOpenFileName(this,"选择图片","","图片文件 (*.png *.jpg *.jpeg)");
+        if(filePath.isEmpty())
+            return;
+        HttpShortConnection::getHttpClient().uploadGroupAvatar(this->conversationID, filePath);
+    });
+
+    this->label_camera_icon = new QLabel(this->view_avatar);
+    this->label_camera_icon->setObjectName("label_camera_icon");
+    this->label_camera_icon->resize(24,24);
+    this->label_camera_icon->setAlignment(Qt::AlignCenter);
+    this->label_camera_icon->setPixmap(QIcon(":/default/images/camera.png").pixmap(16));
+    this->label_camera_icon->move(this->view_avatar->width() - this->label_camera_icon->width(),
+                                  this->view_avatar->height()-this->label_camera_icon->height());
+
+    connect(this->view_avatar, &AvatarView::valueChanged, this, [this](const QRect& rect){
+        this->label_camera_icon->move(rect.right() - this->label_camera_icon->width(),
+                                      rect.bottom() - this->label_camera_icon->height());
+    });
 
     this->edit_groupName = new QLineEdit(this->widget_holy);
     this->edit_groupName->setText("群聊");
     this->edit_groupName->resize(this->width() - 120, 32);
     this->edit_groupName->setAlignment(Qt::AlignCenter);
     this->edit_groupName->setObjectName("edit_groupName");
-    this->edit_groupName->move((this->widget_holy->width() - this->edit_groupName->width()) / 2, this->label_avatar->pos().y() + this->label_avatar->height() + 10);
+    this->edit_groupName->move((this->widget_holy->width() - this->edit_groupName->width()) / 2,
+                               this->view_avatar->pos().y() + this->view_avatar->height() + 10);
     this->edit_groupName->setProperty("editing", false);
     this->edit_groupName->setDisabled(true);
 
@@ -292,7 +325,7 @@ void GroupInfoWidget::init()
     this->label_ownerAvatar = new QLabel(this->widget_memberRegion);
     this->label_ownerAvatar->resize(40, 40);
     QPixmap defAvatar(":/default/images/defaultAvatar.png");
-    setRadius(defAvatar, this->label_ownerAvatar, this->label_ownerAvatar->width() / 2);
+    setRadiusOnLabel(defAvatar, this->label_ownerAvatar, this->label_ownerAvatar->width() / 2);
     this->label_ownerAvatar->move(this->label_ownerName->x() + 10, this->label_ownerName->y() + this->label_ownerName->height() + 10);
 
     this->label_ownerUsername = new QLabel("群主名字", this->widget_memberRegion);
@@ -390,6 +423,16 @@ void GroupInfoWidget::initStyle()
                     {
                         background:transparent;
                         border:none;
+                    }
+                    #view_avatar
+                    {
+                        background-color: transparent;
+                    }
+                    #label_camera_icon
+                    {
+                        background-color: rgba(99, 102, 241, 255);
+                        border: 2px solid rgba(255, 255, 255, 255);
+                        border-radius: 12px;
                     }
                     #edit_groupName
                     {
@@ -534,7 +577,29 @@ void GroupInfoWidget::initStyle()
                         )"));
 }
 
-void GroupInfoWidget::setRadius(QPixmap& pix, QLabel *label, int radius)
+void GroupInfoWidget::setRadius(QPixmap& pix, AvatarView *view, int radius)
+{
+    if(pix.isNull())
+        return;
+
+    qreal dpr = view->devicePixelRatioF();
+    QPixmap rounded(view->size() * dpr);
+    rounded.fill(Qt::transparent);
+    rounded.setDevicePixelRatio(dpr);
+
+    QPainter painter(&rounded);
+    painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+
+    QPainterPath path;
+    path.addRoundedRect(view->rect(), radius, radius);
+    painter.setClipPath(path);
+    painter.drawPixmap(view->rect(), pix);
+    painter.end();
+
+    view->setAvatar(rounded);
+}
+
+void GroupInfoWidget::setRadiusOnLabel(QPixmap &pix, QLabel *label, int radius)
 {
     if(pix.isNull())
         return;
@@ -607,6 +672,6 @@ void GroupInfoWidget::updateEditPos()
 
     this->edit_groupName->resize(textWidth, this->edit_groupName->height());
     this->edit_groupName->move((this->widget_holy->width() - textWidth) / 2,
-                               this->label_avatar->pos().y() + this->label_avatar->height() + 10);
+                               this->view_avatar->pos().y() + this->view_avatar->height() + 10);
     this->btn_doneOrEdit->move(this->edit_groupName->pos().x() + this->edit_groupName->width() + 5, this->edit_groupName->pos().y());
 }

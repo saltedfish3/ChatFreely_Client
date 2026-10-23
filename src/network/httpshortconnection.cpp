@@ -58,6 +58,54 @@ void HttpShortConnection::uploadAvatar(const QString &filePath)
     }, false);
 }
 
+void HttpShortConnection::uploadGroupAvatar(const QString &conversationID, const QString &filePath)
+{
+    if(!TcpLongConnection::getTcpClient().isConnect())
+    {
+        emit mainState(false, "无法连接服务器，请稍后再试");
+        return;
+    }
+    if(conversationID.isEmpty() || filePath.isEmpty())
+    {
+        emit mainState(false, "上传失败，请稍后再试");
+        return;
+    }
+
+    QImage image(filePath);
+    if(image.isNull())
+    {
+        emit mainState(false, "上传失败，请稍后再试");
+        return;
+    }
+
+    QImage image_scaled = image.scaled(400, 400, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    QByteArray imgData;
+    QBuffer buffer(&imgData);
+    buffer.open(QIODevice::WriteOnly);
+    image_scaled.save(&buffer, "JPEG", 80);
+    buffer.close();
+
+    QString localUrl = "local://group_avatar_" + QUuid::createUuid().toString(QUuid::WithoutBraces);
+    ImageCacheManager::getManager().insertCache(localUrl, imgData);
+
+    QString cacheFilePath = ImageCacheManager::getManager().getCacheFilePath(localUrl);
+    if(cacheFilePath.isEmpty())
+    {
+        emit mainState(false, "无法连接服务器，请稍后再试");
+        ImageCacheManager::getManager().removeCache(localUrl);
+        return;
+    }
+
+    uploadMedia(MediaType::Image, cacheFilePath, [this, localUrl, conversationID](const UploadResult& result){
+        ImageCacheManager::getManager().migrateCache(localUrl, result.url);
+        TcpLongConnection::getTcpClient().sendUpdateGroupAvatar(conversationID, result.url);
+
+    }, true, [this, localUrl, conversationID](const QString& info){
+        ImageCacheManager::getManager().removeCache(localUrl);
+        emit mainState(false, info);
+    });
+}
+
 void HttpShortConnection::uploadMedia(MediaType type, const QString &filePath, std::function<void (const UploadResult&)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed, bool needServerThumbnail)
 {
     if(!TcpLongConnection::getTcpClient().isConnect())

@@ -63,8 +63,16 @@ void AvatarView::setAvatar(const QPixmap &pixmap)
     emit valueChanged(QRect(topLeft, bottomRight));
 }
 
+void AvatarView::setAnimation(bool start)
+{
+    this->startAnimation = start;
+}
+
 void AvatarView::enterEvent(QEnterEvent *event)
 {
+    if(!this->startAnimation)
+        return;
+
     this->animation->stop();
     this->animation->setStartValue(this->item->scale());
     this->animation->setEndValue(this->hoverScale);
@@ -74,6 +82,9 @@ void AvatarView::enterEvent(QEnterEvent *event)
 
 void AvatarView::leaveEvent(QEvent *event)
 {
+    if(!this->startAnimation)
+        return;
+
     this->animation->stop();
     this->animation->setStartValue(this->item->scale());
     this->animation->setEndValue(this->original);

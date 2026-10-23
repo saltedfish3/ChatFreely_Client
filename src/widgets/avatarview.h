@@ -14,6 +14,7 @@ class AvatarView : public QGraphicsView
 public:
     explicit AvatarView(qreal scaleFactor = 0.95, QWidget *parent = nullptr);
     void setAvatar(const QPixmap& pixmap);
+    void setAnimation(bool start);
 
 signals:
     void itemClicked();
@@ -33,6 +34,7 @@ private:
     qreal original;
     qreal hoverScale;
     qreal scaleFactor;
+    bool startAnimation = true;
 };
 
 #endif // AVATARVIEW_H

@@ -40,6 +40,7 @@ public:
     GroupManager::GroupInfo getGroupInfo(const QString& conversationID) const;
     QList<GroupManager::GroupInfo> getAllGroups() const;
 
+    void setGroupAvatarUrl(const QString& conversationID, const QString& avatarUrl);
     QPixmap getGroupAvatar(const QString& conversationID, const QSize& wantedSize);
     int64_t getGroupsCount();
 

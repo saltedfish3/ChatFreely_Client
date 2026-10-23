@@ -67,6 +67,7 @@ public:
 
     //上传
     void uploadAvatar(const QString& filePath);
+    void uploadGroupAvatar(const QString& conversationID, const QString &filePath);
     void uploadMedia(MediaType type, const QString& filePath, std::function<void(const UploadResult& result)> cb_success, bool failed_notice = false, std::function<void(const QString& info)> cb_failed = nullptr, bool needServerThumbnail = true);
 
     //下载
