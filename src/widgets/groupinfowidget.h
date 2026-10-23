@@ -12,6 +12,7 @@
 #include <QListView>
 #include <QStandardItemModel>
 #include <QScrollBar>
+#include <QLineEdit>
 #include "../utils/imagecachemanager.h"
 #include "groupmemberdelegate.h"
 #include "../utils/groupmanager.h"
@@ -39,12 +40,15 @@ private:
     void setRadius(QPixmap& pix, QLabel* label, int radius);
     void addGroupMemberItem(const QString& username, const QString& sid, const QString& uid, const QPixmap& avatar);
     void updateIsFriend();
+    void updateEditPos();
 
     QScrollArea* area;
     QWidget* widget_holy;
 
     QLabel* label_avatar;
-    QLabel* label_groupName;
+    // QLabel* label_groupName;
+    QLineEdit* edit_groupName;
+    QPushButton* btn_doneOrEdit;
     QLabel* label_groupID;
 
     QPushButton* btn_sendMsg;
@@ -67,6 +71,8 @@ private:
     QPushButton* btn_addFriend;
 
     QString conversationID;
+    QString currentGroupName;
+    int64_t currentMemberCount;
 };
 
 #endif // GROUPINFOWIDGET_H

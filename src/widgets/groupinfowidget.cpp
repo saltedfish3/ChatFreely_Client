@@ -17,20 +17,34 @@ GroupInfoWidget::GroupInfoWidget(int width, int height, QWidget *parent)
 void GroupInfoWidget::changeInfo(const QString &conversationID, const QString &groupID, const QString &groupName, const QString &ownerUID, const QHash<QString, GroupManager::GroupMemberInfo>& memberInfos, const QPixmap &pix)
 {
     this->conversationID = conversationID;
+    this->currentGroupName = groupName;
+    this->currentMemberCount = memberInfos.size();
+    this->label_groupID->setText("ID:" + groupID);
+
+    if(UserInfo::getUserInfo().getUID() == ownerUID)
+        this->btn_doneOrEdit->show();
+    else
+        this->btn_doneOrEdit->hide();
 
     this->model->removeRows(0, this->model->rowCount());
 
     QPixmap avatar = pix;
     setRadius(avatar, this->label_avatar, 64);
-    QFontMetrics fm(this->label_groupName->font());
 
-    QString memberCount = "(" + QString::number(memberInfos.size()) + ")";
+    QFontMetrics fm(this->edit_groupName->font());
+
+    QString memberCount = "(" + QString::number(this->currentMemberCount) + ")";
     int width_memberCount = fm.horizontalAdvance(memberCount);
 
-    QString showGroupName = fm.elidedText(groupName, Qt::ElideRight, this->label_groupName->width() - 20 - width_memberCount);
+    int width_groupName = fm.horizontalAdvance(this->currentGroupName);
+    if(width_groupName >= this->widget_holy->width() - width_memberCount - 120)
+        width_groupName = this->widget_holy->width() - width_memberCount - 120;
+
+    QString showGroupName = fm.elidedText(currentGroupName, Qt::ElideRight, width_groupName);
     showGroupName += memberCount;
-    this->label_groupName->setText(showGroupName);
-    this->label_groupID->setText("ID:" + groupID);
+    this->edit_groupName->setText(showGroupName);
+
+    updateEditPos();
 
     QPixmap defaultAvatar = ImageCacheManager::getManager().fastLoadImage(":/default/images/defaultAvatar.png", 0, 0, QSize(38, 38));
     if(defaultAvatar.isNull())
@@ -91,9 +105,21 @@ void GroupInfoWidget::changeInfo(const QString &conversationID, const QString &g
 
 void GroupInfoWidget::changeSelectedGroupName(const QString& groupName)
 {
-    QFontMetrics fm(font());
-    QString showUsername = fm.elidedText(groupName, Qt::ElideRight, this->label_groupName->width() - 20);
-    this->label_groupName->setText(showUsername);
+    this->currentGroupName = groupName;
+    QFontMetrics fm(this->edit_groupName->font());
+
+    QString memberCount = "(" + QString::number(this->currentMemberCount) + ")";
+    int width_memberCount = fm.horizontalAdvance(memberCount);
+
+    int width_groupName = fm.horizontalAdvance(this->currentGroupName);
+    if(width_groupName >= this->widget_holy->width() - width_memberCount - 120)
+        width_groupName = this->widget_holy->width() - width_memberCount - 120;
+
+    QString showGroupName = fm.elidedText(currentGroupName, Qt::ElideRight, width_groupName);
+    showGroupName += memberCount;
+    this->edit_groupName->setText(showGroupName);
+
+    updateEditPos();
 }
 
 void GroupInfoWidget::changeSelectedAvatar(const QPixmap& avatar)
@@ -138,17 +164,88 @@ void GroupInfoWidget::init()
     else
         setRadius(defaultAvatar, this->label_avatar, 64);
 
-    this->label_groupName = new QLabel("群聊", this->widget_holy);
-    this->label_groupName->resize(this->width(),32);
-    this->label_groupName->setAlignment(Qt::AlignCenter);
-    this->label_groupName->setObjectName("label_groupName");
-    this->label_groupName->move(0,this->label_avatar->pos().y() + this->label_avatar->height() + 10);
+    this->edit_groupName = new QLineEdit(this->widget_holy);
+    this->edit_groupName->setText("群聊");
+    this->edit_groupName->resize(this->width() - 120, 32);
+    this->edit_groupName->setAlignment(Qt::AlignCenter);
+    this->edit_groupName->setObjectName("edit_groupName");
+    this->edit_groupName->move((this->widget_holy->width() - this->edit_groupName->width()) / 2, this->label_avatar->pos().y() + this->label_avatar->height() + 10);
+    this->edit_groupName->setProperty("editing", false);
+    this->edit_groupName->setDisabled(true);
+
+    connect(this->edit_groupName, &QLineEdit::textChanged, this, [this](const QString& text){
+        updateEditPos();
+    });
+
+    this->btn_doneOrEdit = new QPushButton(this->widget_holy);
+    this->btn_doneOrEdit->setObjectName("btn_doneOrEdit");
+    this->btn_doneOrEdit->resize(this->edit_groupName->height(), this->edit_groupName->height());
+    this->btn_doneOrEdit->move(this->edit_groupName->pos().x() + this->edit_groupName->width() + 5, this->edit_groupName->pos().y());
+    this->btn_doneOrEdit->setIcon(QIcon(":/default/images/edit.png"));
+    this->btn_doneOrEdit->setIconSize(QSize(24, 24));
+    this->btn_doneOrEdit->setCheckable(true);
+
+    connect(this->btn_doneOrEdit, &QPushButton::clicked, this, [this](bool checked){
+        if(checked)
+        {
+            this->btn_doneOrEdit->setIcon(QIcon(":/default/images/done.png"));
+            this->edit_groupName->setProperty("editing", true);
+            this->edit_groupName->style()->unpolish(this->edit_groupName);
+            this->edit_groupName->style()->polish(this->edit_groupName);
+            this->edit_groupName->setDisabled(false);
+            this->edit_groupName->setText(this->currentGroupName);
+            this->edit_groupName->setFocus();
+            this->edit_groupName->setCursorPosition(this->edit_groupName->text().length());
+        }
+        else
+        {
+            this->btn_doneOrEdit->setIcon(QIcon(":/default/images/edit.png"));
+            this->edit_groupName->setProperty("editing", false);
+            this->edit_groupName->style()->unpolish(this->edit_groupName);
+            this->edit_groupName->style()->polish(this->edit_groupName);
+            this->edit_groupName->setDisabled(true);
+
+            QString newGroupName = this->edit_groupName->text().trimmed();
+            if(newGroupName == this->currentGroupName || newGroupName.size() > 64)
+            {
+                QFontMetrics fm(this->edit_groupName->font());
+
+                QString memberCount = "(" + QString::number(this->currentMemberCount) + ")";
+                int width_memberCount = fm.horizontalAdvance(memberCount);
+
+                int width_groupName = fm.horizontalAdvance(this->currentGroupName);
+                if(width_groupName >= this->widget_holy->width() - width_memberCount - 120)
+                    width_groupName = this->widget_holy->width() - width_memberCount - 120;
+
+                QString showGroupName = fm.elidedText(currentGroupName, Qt::ElideRight, width_groupName);
+                showGroupName += memberCount;
+                this->edit_groupName->setText(showGroupName);
+                return;
+            }
+
+            TcpLongConnection::getTcpClient().sendUpdateGroupName(this->conversationID, newGroupName);
+
+            QFontMetrics fm(this->edit_groupName->font());
+
+            QString memberCount = "(" + QString::number(this->currentMemberCount) + ")";
+            int width_memberCount = fm.horizontalAdvance(memberCount);
+
+            int width_groupName = fm.horizontalAdvance(newGroupName);
+            if(width_groupName >= this->widget_holy->width() - width_memberCount - 120)
+                width_groupName = this->widget_holy->width() - width_memberCount - 120;
+
+            QString showGroupName = fm.elidedText(newGroupName, Qt::ElideRight, width_groupName);
+            showGroupName += memberCount;
+            this->edit_groupName->setText(showGroupName);
+            return;
+        }
+    });
 
     this->label_groupID = new QLabel("ID:124216457457", this->widget_holy);
     this->label_groupID->resize(this->width(),16);
     this->label_groupID->setAlignment(Qt::AlignCenter);
     this->label_groupID->setObjectName("label_groupID");
-    this->label_groupID->move(0,this->label_groupName->pos().y() + this->label_groupName->height() + 4);
+    this->label_groupID->move(0,this->edit_groupName->pos().y() + this->edit_groupName->height() + 4);
 
     int pos_middle = this->width() / 2;
 
@@ -265,6 +362,24 @@ void GroupInfoWidget::init()
     connect(&FriendManage::getFriendManage(), &FriendManage::allFriendList, this, [this](){
         updateIsFriend();
     });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::updateGroupNameFailed, this, [this](const QString& conversationID){
+        if(this->conversationID != conversationID)
+            return;
+
+        QFontMetrics fm(this->edit_groupName->font());
+
+        QString memberCount = "(" + QString::number(this->currentMemberCount) + ")";
+        int width_memberCount = fm.horizontalAdvance(memberCount);
+
+        int width_groupName = fm.horizontalAdvance(this->currentGroupName);
+        if(width_groupName >= this->widget_holy->width() - width_memberCount - 120)
+            width_groupName = this->widget_holy->width() - width_memberCount - 120;
+
+        QString showGroupName = fm.elidedText(currentGroupName, Qt::ElideRight, width_groupName);
+        showGroupName += memberCount;
+        this->edit_groupName->setText(showGroupName);
+    });
 }
 
 void GroupInfoWidget::initStyle()
@@ -276,11 +391,29 @@ void GroupInfoWidget::initStyle()
                         background:transparent;
                         border:none;
                     }
-                    #label_groupName
+                    #edit_groupName
                     {
                         font-size: 24px;
                         font-weight:bold;
                         color:rgba(17, 24, 39, 255);
+                        border: none;
+                        border-radius: 0;
+                        background: transparent;
+                    }
+                    #edit_groupName[editing="true"]
+                    {
+                        border-bottom: 1px solid black;
+                        padding-bottom: 2px;
+                    }
+                    #edit_groupName[editing="false"]
+                    {
+                        border: none;
+                        padding: 0;
+                    }
+                    #btn_doneOrEdit
+                    {
+                        background: transparent;
+                        border: none;
                     }
                     #label_groupID
                     {
@@ -460,4 +593,20 @@ void GroupInfoWidget::updateIsFriend()
         this->btn_addFriend->show();
     else
         this->btn_addFriend->hide();
+}
+
+void GroupInfoWidget::updateEditPos()
+{
+    QFontMetrics fm(this->edit_groupName->fontMetrics());
+    int textWidth = fm.horizontalAdvance(this->edit_groupName->text());
+
+    if(textWidth > this->widget_holy->width() - 120)
+        textWidth = this->widget_holy->width() - 120;
+
+    textWidth += 10;
+
+    this->edit_groupName->resize(textWidth, this->edit_groupName->height());
+    this->edit_groupName->move((this->widget_holy->width() - textWidth) / 2,
+                               this->label_avatar->pos().y() + this->label_avatar->height() + 10);
+    this->btn_doneOrEdit->move(this->edit_groupName->pos().x() + this->edit_groupName->width() + 5, this->edit_groupName->pos().y());
 }

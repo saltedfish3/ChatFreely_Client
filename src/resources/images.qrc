@@ -33,6 +33,8 @@
         <file>images/download.png</file>
         <file>images/downloadSuccess.png</file>
         <file>images/group.png</file>
+        <file>images/done.png</file>
+        <file>images/edit.png</file>
     </qresource>
     <qresource prefix="/icon">
         <file>images/favicon.ico</file>

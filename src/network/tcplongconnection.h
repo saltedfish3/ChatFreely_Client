@@ -53,6 +53,7 @@ public:
     void getGroupInfo(const QString& conversationID);
     void getNewGroupJoinRequestsList();
     void sendApplyJoinGroupRequest(const QString& groupID, const QString& verMsg);
+    void sendUpdateGroupName(const QString& conversationID, const QString& groupName);
 
     //消息
     void sendMessageTo(QString conversationID, QString message, QString tempMsgID, ContentType type);
@@ -97,6 +98,8 @@ signals:
     void newGroup(const QString& conversationID, const QString& groupID, const QString& groupName,
                   const QString& avatarUrl, const QString& ownerUID, const QVariantList& memberInfos);
     void groupInfoFetched(const QVariantMap& memberInfos);
+    void updateGroupName(const QString& conversationID, const QString& newGroupName);
+    void updateGroupNameFailed(const QString& conversationID);
 
     //用于通知业务层getConversationsListAndSeq是否成功
     void newSyncConvStatus(bool isSuccess, const QList<QString>& conversations, int64_t newSyncConvSeq);
@@ -145,6 +148,7 @@ private:
     void handleHandleNewGroupJoinRequestResp(QJsonObject obj);
     void handlePushNewGroupResp(QJsonObject obj);
     void handleApplyJoinGroupRequestResp(QJsonObject obj);
+    void handleUpdateGroupNameRequestResp(QJsonObject obj);
 
     //消息
     void handleGetConversationsFriendUIDListAndSeqResp(QJsonObject obj);
@@ -180,7 +184,8 @@ private:
         UnLogin,
         HandleNewFriendRequest,
         HandleNewGroupJoinRequest,
-        ApplyJoinGroupRequest
+        ApplyJoinGroupRequest,
+        updateGroupNameRequest
     };
     struct PendingRequest
     {

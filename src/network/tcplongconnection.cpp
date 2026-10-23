@@ -831,6 +831,87 @@ void TcpLongConnection::sendApplyJoinGroupRequest(const QString &groupID, const 
     });
 }
 
+void TcpLongConnection::sendUpdateGroupName(const QString &conversationID, const QString &groupName)
+{
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        emit mainState(false, "无法连接服务器，请稍后再试");
+        emit updateGroupNameFailed(conversationID);
+        return;
+    }
+    if(conversationID.isEmpty())
+    {
+        emit mainState(false, "更新失败, 群聊错误");
+        emit updateGroupNameFailed(conversationID);
+        return;
+    }
+    if(groupName.isEmpty())
+    {
+        emit mainState(false, "更新失败, 群名不能为空");
+        emit updateGroupNameFailed(conversationID);
+        return;
+    }
+    if(groupName.size() > 64)
+    {
+        emit mainState(false, "更新失败, 群名称不能超过64个字符");
+        emit updateGroupNameFailed(conversationID);
+        return;
+    }
+
+    //幂等操作
+    QVariantMap currentParams;
+    QString requestsID;
+    currentParams["conversationID"] = conversationID;
+    currentParams["groupName"] = groupName;
+    for(auto it = this->map_idempotentCache.begin(); it != this->map_idempotentCache.end(); it++)
+    {
+        if(it.value().name == updateGroupNameRequest && it.value().params == currentParams)
+        {
+            requestsID = it.key();
+            break;
+        }
+    }
+
+    //是否复用幂等
+    if(requestsID.isEmpty())
+    {
+        requestsID = QString::number(getRequestsId());
+        PendingRequest prt;
+        prt.requestID = requestsID;
+        prt.name = updateGroupNameRequest;
+        prt.params = currentParams;
+
+        QVariantMap tokenParams;
+        tokenParams["conversationID"] = conversationID;
+        tokenParams["groupName"] = groupName;
+        prt.tokenParams = tokenParams;
+
+        this->map_idempotentCache[requestsID] = prt;
+    }
+
+    QJsonObject obj;
+    obj["Requests_id"] = requestsID;
+    obj["Type"] = "UpdateGroupNameRequest";
+    obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
+    obj["ConversationID"] = conversationID;
+    obj["GroupName"] = groupName;
+
+    QJsonDocument doc(obj);
+    QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
+    this->socket->write(data);
+    this->socket->flush();
+
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(5000,[this,requestsID, conversationID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            this->map_idempotentCache.remove(requestsID);
+            emit mainState(false, "连接超时，请稍后再试");
+            emit updateGroupNameFailed(conversationID);
+        }
+    });
+}
+
 void TcpLongConnection::sendHandleNewFriendRequest(QString handle_uid, bool isAgree)
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
@@ -2009,6 +2090,72 @@ void TcpLongConnection::handleApplyJoinGroupRequestResp(QJsonObject obj)
     this->map_idempotentCache.remove(requestsID);
 }
 
+void TcpLongConnection::handleUpdateGroupNameRequestResp(QJsonObject obj)
+{
+    if(!obj.contains("Result") || !obj.value("Result").isBool() ||
+        !obj.contains("ConversationID") || !obj.value("ConversationID").isString())
+        return;
+
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+
+    bool success = obj.value("Result").toBool();
+    QString conversationID = obj.value("ConversationID").toString();
+
+    if(success)
+    {
+        QString groupName = obj.value("GroupName").toString();
+        emit mainState(true, "更新成功");
+        emit updateGroupName(conversationID, groupName);
+    }
+    else
+    {
+        if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
+        {
+            bool isExpired = obj.value("AccessTokenExpired").toBool();
+            if(isExpired)
+            {
+                sendRefreshToken([this, requestsID](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                    if(isSuccess)
+                    {
+                        if(newAccessToken.isEmpty())
+                        {
+                            emit refreshExpiredExit();
+                            this->map_idempotentCache.remove(requestsID);
+                            return;
+                        }
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        auto it = this->map_idempotentCache.find(requestsID);
+                        if(it != this->map_idempotentCache.end())
+                        {
+                            QString conversationID = it.value().tokenParams.value("conversationID").toString();
+                            QString groupName = it.value().tokenParams.value("groupName").toString();
+                            this->map_idempotentCache.remove(requestsID);
+                            sendUpdateGroupName(conversationID, groupName);
+                        }
+                        return;
+                    }
+                    else
+                    {
+                        if(isRefreshTokenExpired)
+                        {
+                            emit refreshExpiredExit();
+                            this->map_idempotentCache.remove(requestsID);
+                            return;
+                        }
+                        this->map_idempotentCache.remove(requestsID);
+                        emit mainState(false, "更新失败");
+                    }
+                });
+                return;
+            }
+        }
+        QString info = obj.value("Info").toString();
+        emit mainState(false, info.isEmpty() ? "更新失败" : info);
+    }
+    this->map_idempotentCache.remove(requestsID);
+}
+
 void TcpLongConnection::handleHandleNewFriendRequestResp(QJsonObject obj)
 {
     if(!obj.contains("Result") || !obj.value("Result").isBool() || !obj.contains("HandleUID") || !obj.value("HandleUID").isString())
@@ -2755,6 +2902,10 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
                     else if(type == "GetGroupInfoRequestResp")
                     {
                         this->handleGetGroupInfoResp(obj);
+                    }
+                    else if(type == "UpdateGroupNameRequestResp")
+                    {
+                        this->handleUpdateGroupNameRequestResp(obj);
                     }
                     else
                     {

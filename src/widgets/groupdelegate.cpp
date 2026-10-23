@@ -71,7 +71,7 @@ void GroupDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option,
     QString memberCount = "(" + QString::number(index.data(MemberCountRole).toLongLong()) + ")";
     int width_memberCount = fm.horizontalAdvance(memberCount);
 
-    QString showText = fm.elidedText(text, Qt::ElideRight, username.width() - width_memberCount);
+    QString showText = fm.elidedText(text, Qt::ElideRight, username.width() - width_memberCount - 10);
     showText += memberCount;
 
     QFont font = option.font;

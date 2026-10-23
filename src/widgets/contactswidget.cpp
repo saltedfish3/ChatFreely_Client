@@ -187,6 +187,10 @@ void ContactsWidget::initSideUn()
     this->btn_newFriend->setChecked(false);
     connect(this->btn_newFriend,&QPushButton::clicked,this,[=](){
         this->listView_myFriend->clearSelection();
+        this->listView_myFriend->setCurrentIndex(QModelIndex());
+
+        this->selectedUID.clear();
+
         this->stackedWidget->setCurrentWidget(this->widget_newFriend);
     });
 
