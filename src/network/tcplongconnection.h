@@ -45,6 +45,7 @@ public:
     void sendHandleNewFriendRequest(QString handle_uid, bool isAgree);
     void getNewFriendRequestsList();
     void getFriendList();
+    void sendDeleteFriend(const QString& conversationID);
 
     //群聊
     void sendCreateGroupRequest(const QString& groupName, const QList<QString>& inviteUIDs, const QString& inviteMsg = "");
@@ -88,6 +89,7 @@ signals:
     void FriendStatus(const QString& uid, bool isOnline);
     void FriendUsername(const QString& uid, const QString& username);
     void FriendAvatar(const QString& uid, const QString& avatar);
+    void friendDeleted(const QString& conversationID);
 
     //群聊
     void createGroupSuccess(const QString& groupID, const QString& conversationID, const QString& groupName);
@@ -140,6 +142,7 @@ private:
     void handlePushFriendStatus(QJsonObject obj);
     void handlePushFriendUsername(QJsonObject obj);
     void handlePushFriendAvatar(QJsonObject obj);
+    void handleDeleteFriendResp(QJsonObject obj);
 
     //群聊
     void handleCreateGroupRequestResp(QJsonObject obj);
@@ -189,7 +192,8 @@ private:
         HandleNewGroupJoinRequest,
         ApplyJoinGroupRequest,
         updateGroupNameRequest,
-        updateGroupAvatarRequest
+        updateGroupAvatarRequest,
+        DeleteFriendRequest
     };
     struct PendingRequest
     {

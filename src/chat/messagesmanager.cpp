@@ -997,7 +997,7 @@ int MessagesManager::getConversationType() const
 {
     if(!GroupManager::getGroupManage().getGroupInfo(this->conversationID).conversationID.isEmpty())
         return static_cast<int>(ConversationItem::ConversationType::Group);
-    if(!FriendManage::getFriendManage().getFriendUIDByConversationID(this->conversationID).isEmpty())
+    if(!FriendManage::getFriendManage().getFriendInfo(this->conversationID).uid.isEmpty())
         return static_cast<int>(ConversationItem::ConversationType::Personal);
 
     return this->conversationType;

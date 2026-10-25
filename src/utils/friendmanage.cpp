@@ -10,21 +10,22 @@ FriendManage &FriendManage::getFriendManage()
 int64_t FriendManage::getFriendCount() const
 {
     QReadLocker locker(&(this->lock));
-    return this->map_friend.count();
+    return this->hash_friend.count();
 }
 
-FriendManage::FriendInfo FriendManage::getFriendInfo(const QString &uid) const
+FriendManage::FriendInfo FriendManage::getFriendInfo(const QString &conversationID) const
 {
     QReadLocker locker(&(this->lock));
-    auto it = this->map_friend.find(uid);
-    if(it == this->map_friend.end())
+    auto it = this->hash_friend.find(conversationID);
+    if(it == this->hash_friend.end())
         return {};
     return it.value();
 }
 
-QPixmap FriendManage::getFriendAvatar(const QString &uid, const QSize &wantedSize)
+QPixmap FriendManage::getFriendAvatar(const QString &conversationID, const QSize &wantedSize)
 {
-    QString url = getFriendInfo(uid).avatarUrl;
+    QString url = getFriendInfo(conversationID).avatarUrl;
+    QString uid = getFriendInfo(conversationID).uid;
     QString loadUrl = url.isEmpty() ? ":/default/images/defaultAvatar.png" : url;
     QString key = uid + QString("_%1x%2_%3").arg(wantedSize.width()).arg(wantedSize.height()).arg(loadUrl);
 
@@ -53,8 +54,8 @@ QPixmap FriendManage::getFriendAvatar(const QString &uid, const QSize &wantedSiz
         QPixmap original = ImageCacheManager::getManager().fastLoadImage(url, 1.0);
         if(!original.isNull())
         {
-            ImageCacheManager::getManager().loadImage(url, [this, uid, key, url, wantedSize](const QPixmap& pix){
-                QString currentUrl = getFriendInfo(uid).avatarUrl;
+            ImageCacheManager::getManager().loadImage(url, [this, uid, key, url, wantedSize, conversationID](const QPixmap& pix){
+                QString currentUrl = getFriendInfo(conversationID).avatarUrl;
                 {
                     QWriteLocker locker(&(this->lock));
                     this->set_paddingAvatarSize.remove(key);
@@ -69,7 +70,7 @@ QPixmap FriendManage::getFriendAvatar(const QString &uid, const QSize &wantedSiz
 
     //url为空 或 默认头像处理
     QPointer<FriendManage> pointer(this);
-    ImageCacheManager::getManager().loadImage(loadUrl, [this, pointer, uid, key, loadUrl, wantedSize](const QPixmap& pix){
+    ImageCacheManager::getManager().loadImage(loadUrl, [this, pointer, uid, key, loadUrl, wantedSize, conversationID](const QPixmap& pix){
         if(!pointer)
             return;
 
@@ -78,7 +79,7 @@ QPixmap FriendManage::getFriendAvatar(const QString &uid, const QSize &wantedSiz
             pointer->set_paddingAvatarSize.remove(key);
         }
 
-        QString current = pointer->getFriendInfo(uid).avatarUrl;
+        QString current = pointer->getFriendInfo(conversationID).avatarUrl;
         bool needUpdate = current.isEmpty() ? loadUrl == ":/default/images/defaultAvatar.png" : current == loadUrl;
 
         if(needUpdate)
@@ -102,11 +103,11 @@ QPixmap FriendManage::getFriendAvatar(const QString &uid, const QSize &wantedSiz
     return QPixmap(":/default/images/defaultAvatar.png");
 }
 
-QString FriendManage::getFriendUIDByConversationID(const QString &conversationID)
+QString FriendManage::getFriendConversationIDByUID(const QString &uid)
 {
     QReadLocker locker(&this->lock);
-    auto it = this->hash_conversationToUID.find(conversationID);
-    if(it == this->hash_conversationToUID.end())
+    auto it = this->hash_UIDToConversatioID.find(uid);
+    if(it == this->hash_UIDToConversatioID.end())
         return {};
     return it.value();
 }
@@ -114,7 +115,7 @@ QString FriendManage::getFriendUIDByConversationID(const QString &conversationID
 QString FriendManage::getFriendUIDBySID(const QString &SID)
 {
     QReadLocker locker(&(this->lock));
-    for(const auto& it : std::as_const(this->map_friend))
+    for(const auto& it : std::as_const(this->hash_friend))
     {
         if(it.sid == SID)
             return it.uid;
@@ -125,7 +126,7 @@ QString FriendManage::getFriendUIDBySID(const QString &SID)
 QList<FriendManage::FriendInfo> FriendManage::getAllFriend() const
 {
     QReadLocker locker(&(this->lock));
-    return this->map_friend.values();
+    return this->hash_friend.values();
 }
 
 void FriendManage::resetLoadState()
@@ -137,9 +138,9 @@ void FriendManage::resetLoadState()
 void FriendManage::cleanAll()
 {
     QWriteLocker locker(&(this->lock));
-    this->map_friend.clear();
+    this->hash_friend.clear();
     this->set_paddingAvatarSize.clear();
-    this->hash_conversationToUID.clear();
+    this->hash_UIDToConversatioID.clear();
     this->isFirstLoad = false;
 }
 
@@ -156,7 +157,7 @@ FriendManage::FriendManage(QObject *parent)
         {
             QWriteLocker locker(&(this->lock));
 
-            auto& info = this->map_friend[uid];
+            auto& info = this->hash_friend[conversationID];
 
             info.conversationID = conversationID;
             info.uid = uid;
@@ -167,7 +168,7 @@ FriendManage::FriendManage(QObject *parent)
             info.isOnline = isOnline;
 
             if(!conversationID.isEmpty())
-                this->hash_conversationToUID[conversationID] = uid;
+                this->hash_UIDToConversatioID[uid] = conversationID;
         }
         emit allFriendList();
 
@@ -182,10 +183,12 @@ FriendManage::FriendManage(QObject *parent)
         QPointer<FriendManage> pointer(this);
         if(!pointer)
             return;
+
+        QString conversationID = getFriendConversationIDByUID(UID);
         {
             QWriteLocker locker(&(this->lock));
-            auto it = this->map_friend.find(UID);
-            if(it == this->map_friend.end())
+            auto it = this->hash_friend.find(conversationID);
+            if(it == this->hash_friend.end())
                 return;
 
             it.value().isOnline = isOnline;
@@ -197,10 +200,12 @@ FriendManage::FriendManage(QObject *parent)
         QPointer<FriendManage> pointer(this);
         if(!pointer)
             return;
+
+        QString conversationID = getFriendConversationIDByUID(uid);
         {
             QWriteLocker locker(&(this->lock));
-            auto it = this->map_friend.find(uid);
-            if(it == this->map_friend.end())
+            auto it = this->hash_friend.find(conversationID);
+            if(it == this->hash_friend.end())
                 return;
 
             it.value().username = username;
@@ -212,10 +217,12 @@ FriendManage::FriendManage(QObject *parent)
         QPointer<FriendManage> pointer(this);
         if(!pointer)
             return;
+
+        QString conversationID = getFriendConversationIDByUID(uid);
         {
             QWriteLocker locker(&(this->lock));
-            auto it = this->map_friend.find(uid);
-            if(it == this->map_friend.end() || it.value().avatarUrl == avatarUrl)
+            auto it = this->hash_friend.find(conversationID);
+            if(it == this->hash_friend.end() || it.value().avatarUrl == avatarUrl)
                 return;
             it.value().avatarUrl = avatarUrl;
 
@@ -244,8 +251,9 @@ FriendManage::FriendManage(QObject *parent)
             return;
         {
             QWriteLocker locker(&(this->lock));
-            this->map_friend.clear();
+            this->hash_friend.clear();
             this->set_paddingAvatarSize.clear();
+            this->hash_UIDToConversatioID.clear();
 
             for(auto& var : std::as_const(list))
             {
@@ -257,10 +265,10 @@ FriendManage::FriendManage(QObject *parent)
                 info.email = var.value("Email").toString();
                 info.avatarUrl = var.value("Avatar_Url").toString();
                 info.isOnline = var.value("IsOnline").toBool();
-                this->map_friend[info.uid] = info;
+                this->hash_friend[info.conversationID] = info;
 
                 if(!info.conversationID.isEmpty())
-                    this->hash_conversationToUID[info.conversationID] = info.uid;
+                    this->hash_UIDToConversatioID[info.uid] = info.conversationID;
 
                 if(!info.avatarUrl.isEmpty())
                     avatarTasks[info.uid] = info.avatarUrl;
@@ -282,6 +290,23 @@ FriendManage::FriendManage(QObject *parent)
                 emit friendAvatarUpdate(uid, pix, QSize());
             });
         }
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::friendDeleted, this, [this](const QString& conversationID){
+        QPointer<FriendManage> pointer(this);
+        if(!pointer)
+            return;
+
+        FriendInfo info;
+        {
+            QWriteLocker locker(&(this->lock));
+            if(!this->hash_friend.contains(conversationID))
+                return;
+
+            info = this->hash_friend[conversationID];
+            this->hash_friend.remove(conversationID);
+        }
+        emit allFriendList();
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &FriendManage::cleanAll);

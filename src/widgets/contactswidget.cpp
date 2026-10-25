@@ -43,12 +43,12 @@ void ContactsWidget::addGroupItem(const QString &conversationID, const QString &
 
 void ContactsWidget::switchToInfoWidget(const QString &conversaionID)
 {
-    bool isFriend = !FriendManage::getFriendManage().getFriendUIDByConversationID(conversaionID).isEmpty();
+    bool isFriend = !FriendManage::getFriendManage().getFriendInfo(conversaionID).uid.isEmpty();
     if(isFriend)
     {
         this->btn_myFriend->click();
-        QString uid = FriendManage::getFriendManage().getFriendUIDByConversationID(conversaionID);
-        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
+        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversaionID);
+        QString uid = info.uid;
         for(int i = 0; i < this->model->rowCount(); i++)
         {
             QModelIndex index = this->model->index(i, 0);
@@ -57,7 +57,7 @@ void ContactsWidget::switchToInfoWidget(const QString &conversaionID)
                 this->listView_myFriend->setCurrentIndex(index);
                 this->listView_myFriend->selectionModel()->select(index, QItemSelectionModel::ClearAndSelect);
 
-                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(uid, QSize(128, 128));
+                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(conversaionID, QSize(128, 128));
                 avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
                 this->widget_contactsInfo->changeInfo(avatar,
                                                       info.username,
@@ -297,9 +297,10 @@ void ContactsWidget::initSideUn()
         this->btn_newFriend->setChecked(false);
 
         this->selectedUID = item.data(FriendDelegate::UIDRole).toString();
-        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(this->selectedUID);
+        QString conversationID = FriendManage::getFriendManage().getFriendConversationIDByUID(this->selectedUID);
+        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversationID);
 
-        this->widget_contactsInfo->changeInfo(FriendManage::getFriendManage().getFriendAvatar(item.data(FriendDelegate::UIDRole).toString(), QSize(128, 128)),
+        this->widget_contactsInfo->changeInfo(FriendManage::getFriendManage().getFriendAvatar(conversationID, QSize(128, 128)),
                                                   item.data(FriendDelegate::UsernameRole).toString(),
                                                   info.conversationID,
                                                   item.data(FriendDelegate::SIDRole).toString(),
@@ -392,7 +393,7 @@ void ContactsWidget::initSideUn()
                     }
                     else
                     {
-                        QPixmap newAvatar = FriendManage::getFriendManage().getFriendAvatar(uid, QSize(38, 38));
+                        QPixmap newAvatar = FriendManage::getFriendManage().getFriendAvatar(FriendManage::getFriendManage().getFriendConversationIDByUID(uid), QSize(38, 38));
                         if(!newAvatar.isNull())
                         {
                             newAvatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
@@ -412,7 +413,7 @@ void ContactsWidget::initSideUn()
         {
             if(uid == this->selectedUID)
             {
-                QPixmap bigAvatar = FriendManage::getFriendManage().getFriendAvatar(uid, QSize(128, 128));
+                QPixmap bigAvatar = FriendManage::getFriendManage().getFriendAvatar(FriendManage::getFriendManage().getFriendConversationIDByUID(uid), QSize(128, 128));
                 if(!bigAvatar.isNull())
                     this->widget_contactsInfo->changeSelectedAvatar(bigAvatar);
             }
@@ -784,7 +785,7 @@ void ContactsWidget::sortedFriendList()
             preGroup = thisGroup;
         }
 
-        QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(fi.uid, QSize(38, 38));
+        QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(fi.conversationID, QSize(38, 38));
         avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
         addFriendItem(fi.uid, fi.sid, fi.username, avatar, fi.email, fi.isOnline);
     }
@@ -839,7 +840,7 @@ void ContactsWidget::searchFriend(const QString& text)
     {
         if(fi.username.contains(text, Qt::CaseInsensitive))
         {
-            QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(fi.uid, QSize(38, 38));
+            QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(fi.conversationID, QSize(38, 38));
             avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
             addFriendItem(fi.uid, fi.sid, fi.username, avatar, fi.email, fi.isOnline);
         }
@@ -920,9 +921,10 @@ void ContactsWidget::restoreSelect()
     {
         if(isFriend)
         {
-            FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(this->selectedUID);
+            QString conversationID = FriendManage::getFriendManage().getFriendConversationIDByUID(this->selectedUID);
+            FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversationID);
 
-            this->widget_contactsInfo->changeInfo(FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(128, 128)), info.username, info.conversationID, info.sid,
+            this->widget_contactsInfo->changeInfo(FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(128, 128)), info.username, info.conversationID, info.sid,
                                                   info.email, info.isOnline);
         }
         else

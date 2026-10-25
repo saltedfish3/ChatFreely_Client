@@ -16,8 +16,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     ConversationItem::ConversationType type = item->getConversationType();
     if(type == ConversationItem::ConversationType::Personal)
     {
-        QString uid = FriendManage::getFriendManage().getFriendUIDByConversationID(item->getConversationID());
-        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
+        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(item->getConversationID());
         if(info.uid.isEmpty())
         {
             name = "未知用户";

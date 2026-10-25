@@ -229,7 +229,7 @@ void AddNewFriendWidget::initWidget()
         item->setData(info.uid, FriendDelegate::UIDRole);
         item->setData(info.sid, FriendDelegate::SIDRole);
         item->setData(info.username, FriendDelegate::UsernameRole);
-        QPixmap pix = FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(38, 38));
+        QPixmap pix = FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(38, 38));
         pix.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
         item->setData(pix, FriendDelegate::AvatarRole);
         item->setData(info.email, FriendDelegate::EmailRole);

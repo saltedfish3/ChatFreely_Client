@@ -316,7 +316,7 @@ void ChatWidget::initListWidget()
         QPixmap avatar_copy = avatar;
         avatar_copy.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
 
-        const QString conversationID = FriendManage::getFriendManage().getFriendInfo(uid).conversationID;
+        const QString conversationID = FriendManage::getFriendManage().getFriendConversationIDByUID(uid);
         if(conversationID.isEmpty())
             return;
 
@@ -330,7 +330,7 @@ void ChatWidget::initListWidget()
                     item->setData(avatar_copy, ConversationListDelegate::AvatarRole);
                 else
                 {
-                    QPixmap newAvatar = FriendManage::getFriendManage().getFriendAvatar(uid, QSize(36, 36));
+                    QPixmap newAvatar = FriendManage::getFriendManage().getFriendAvatar(conversationID, QSize(36, 36));
                     newAvatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
                     if(!newAvatar.isNull())
                         item->setData(newAvatar, ConversationListDelegate::AvatarRole);
@@ -348,7 +348,7 @@ void ChatWidget::initListWidget()
                     item->setData(avatar_copy, ConversationListDelegate::AvatarRole);
                 else
                 {
-                    QPixmap newAvatar = FriendManage::getFriendManage().getFriendAvatar(uid, QSize(36, 36));
+                    QPixmap newAvatar = FriendManage::getFriendManage().getFriendAvatar(conversationID, QSize(36, 36));
                     newAvatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
                     if(!newAvatar.isNull())
                         item->setData(newAvatar, ConversationListDelegate::AvatarRole);
@@ -366,7 +366,7 @@ void ChatWidget::initListWidget()
                     item->setData(avatar_copy, SearchResultListDelegate::AvatarRole);
                 else
                 {
-                    QPixmap newAvatar = FriendManage::getFriendManage().getFriendAvatar(uid, QSize(36, 36));
+                    QPixmap newAvatar = FriendManage::getFriendManage().getFriendAvatar(conversationID, QSize(36, 36));
                     newAvatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
                     if(!newAvatar.isNull())
                         item->setData(newAvatar, SearchResultListDelegate::AvatarRole);
@@ -376,7 +376,7 @@ void ChatWidget::initListWidget()
     });
 
     connect(&FriendManage::getFriendManage(), &FriendManage::friendStatusUpdate, this, [this](const QString& uid, bool isOnline){
-        const QString conversationID = FriendManage::getFriendManage().getFriendInfo(uid).conversationID;
+        const QString conversationID = FriendManage::getFriendManage().getFriendConversationIDByUID(uid);
         if(conversationID.isEmpty())
             return;
 
@@ -396,7 +396,7 @@ void ChatWidget::initListWidget()
     });
 
     connect(&FriendManage::getFriendManage(), &FriendManage::friendUsernameUpdate, this, [this](const QString& uid, const QString& username){
-        const QString conversationID = FriendManage::getFriendManage().getFriendInfo(uid).conversationID;
+        const QString conversationID = FriendManage::getFriendManage().getFriendConversationIDByUID(uid);
         if(conversationID.isEmpty())
             return;
 
@@ -512,15 +512,14 @@ void ChatWidget::initListWidget()
         {
             QModelIndex index = this->model->index(i, 0);
             QString conversationID = index.data(ConversationListDelegate::ConversationIDRole).toString();
-            QString uid = FriendManage::getFriendManage().getFriendUIDByConversationID(conversationID);
-            FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
+            FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversationID);
 
             if(!info.uid.isEmpty())
             {
                 QStandardItem* item = this->model->itemFromIndex(index);
                 item->setData(info.username, ConversationListDelegate::UsernameRole);
 
-                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(36, 36));
+                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(36, 36));
                 avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
                 item->setData(avatar, ConversationListDelegate::AvatarRole);
 
@@ -532,15 +531,14 @@ void ChatWidget::initListWidget()
         {
             QModelIndex index = this->model_searchConversation->index(i, 0);
             QString conversationID = index.data(ConversationListDelegate::ConversationIDRole).toString();
-            QString uid = FriendManage::getFriendManage().getFriendUIDByConversationID(conversationID);
-            FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
+            FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversationID);
 
             if(!info.uid.isEmpty())
             {
                 QStandardItem* item = this->model_searchConversation->itemFromIndex(index);
                 item->setData(info.username, ConversationListDelegate::UsernameRole);
 
-                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(36, 36));
+                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(36, 36));
                 avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
                 item->setData(avatar, ConversationListDelegate::AvatarRole);
             }
@@ -550,13 +548,14 @@ void ChatWidget::initListWidget()
         {
             QModelIndex index = this->model_searchMsg->index(i, 0);
             QString uid = index.data(SearchResultListDelegate::SenderUIDRole).toString();
-            FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
+            QString conversationID = FriendManage::getFriendManage().getFriendConversationIDByUID(uid);
+            FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversationID);
             if(!info.uid.isEmpty())
             {
                 QStandardItem* item = this->model_searchMsg->itemFromIndex(index);
                 item->setData(info.username, SearchResultListDelegate::UsernameRole);
 
-                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(36, 36));
+                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(36, 36));
                 avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
                 item->setData(avatar, SearchResultListDelegate::AvatarRole);
             }
@@ -885,10 +884,9 @@ void ChatWidget::appendSearchConvItem(const DatabaseManager::SearchConvResult &r
     }
     else
     {
-        QString uid = FriendManage::getFriendManage().getFriendUIDByConversationID(result.conversationID);
-        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(uid);
+        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(result.conversationID);
         username = info.username;
-        avatar = info.uid.isEmpty() ? QPixmap(":/default/images/defaultAvatar.png") : FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(36, 36));
+        avatar = info.uid.isEmpty() ? QPixmap(":/default/images/defaultAvatar.png") : FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(36, 36));
     }
 
     QStandardItem* item = new QStandardItem;
@@ -998,11 +996,12 @@ void ChatWidget::appendSearchMsgItem(const Message &msg)
     }
     else
     {
-        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(msg.senderUID);
+        QString conversationID = FriendManage::getFriendManage().getFriendConversationIDByUID(msg.senderUID);
+        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversationID);
         if (!info.uid.isEmpty())
         {
             name = info.username;
-            avatar = FriendManage::getFriendManage().getFriendAvatar(info.uid, QSize(36, 36));
+            avatar = FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(36, 36));
         }
         else
         {
@@ -1119,12 +1118,11 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
     ConversationItem::ConversationType type = item->getConversationType();
     if(type == ConversationItem::ConversationType::Personal)
     {
-        QString uid = FriendManage::getFriendManage().getFriendUIDByConversationID(conversationID);
-        FriendManage::FriendInfo friend_info = FriendManage::getFriendManage().getFriendInfo(uid);
+        FriendManage::FriendInfo friend_info = FriendManage::getFriendManage().getFriendInfo(conversationID);
         if(friend_info.conversationID.isEmpty() || friend_info.uid.isEmpty())
             return;
         name = friend_info.username;
-        avatar = FriendManage::getFriendManage().getFriendAvatar(friend_info.uid, QSize(36, 36));
+        avatar = FriendManage::getFriendManage().getFriendAvatar(friend_info.conversationID, QSize(36, 36));
         avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
         isOnline = friend_info.isOnline;
     }

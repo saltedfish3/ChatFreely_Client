@@ -71,7 +71,7 @@ void GroupInfoWidget::changeInfo(const QString &conversationID, const QString &g
                 this->btn_addFriend->hide();
             else
             {
-                if(FriendManage::getFriendManage().getFriendInfo(it.uid).conversationID.isEmpty())
+                if(FriendManage::getFriendManage().getFriendInfo(FriendManage::getFriendManage().getFriendConversationIDByUID(it.uid)).uid.isEmpty())
                     this->btn_addFriend->show();
                 else
                     this->btn_addFriend->hide();
@@ -631,7 +631,7 @@ void GroupInfoWidget::addGroupMemberItem(const QString &username, const QString 
 
     bool canAdd = true;
     if(uid != UserInfo::getUserInfo().getUID())
-        canAdd = !FriendManage::getFriendManage().getFriendInfo(uid).uid.isEmpty();
+        canAdd = !FriendManage::getFriendManage().getFriendInfo(FriendManage::getFriendManage().getFriendConversationIDByUID(uid)).uid.isEmpty();
 
     item->setData(canAdd, GroupMemberDelegate::IsFriendRole);
 
@@ -643,7 +643,8 @@ void GroupInfoWidget::updateIsFriend()
     for(int i = 0; i < this->model->rowCount(); i++)
     {
         QModelIndex index = this->model->index(i, 0);
-        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(index.data(GroupMemberDelegate::UIDRole).toString());
+        QString conversationID = FriendManage::getFriendManage().getFriendConversationIDByUID(index.data(GroupMemberDelegate::UIDRole).toString());
+        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversationID);
         if(info.conversationID.isEmpty())
             continue;
         QStandardItem* item = this->model->itemFromIndex(index);

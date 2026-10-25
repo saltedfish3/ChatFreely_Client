@@ -14,7 +14,7 @@ ConversationItem *ConversationManager::getOrCreateConversationItem(const QString
 
         if(!GroupManager::getGroupManage().getGroupInfo(conversationID).conversationID.isEmpty())
             type = ConversationItem::ConversationType::Group;
-        else if(!FriendManage::getFriendManage().getFriendUIDByConversationID(conversationID).isEmpty())
+        else if(!FriendManage::getFriendManage().getFriendInfo(conversationID).uid.isEmpty())
             type = ConversationItem::ConversationType::Personal;
 
         ConversationItem* item = new ConversationItem(conversationID, type, this);

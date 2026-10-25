@@ -41,7 +41,7 @@ QVariant MessageModel::data(const QModelIndex &index, int role) const
         return msg.senderUID == UserInfo::getUserInfo().getUID();
     case AvatarRole:
     {
-        QPixmap avatar = msg.senderUID == UserInfo::getUserInfo().getUID() ? UserInfo::getUserInfo().getAvatar(QSize(40, 40)) : FriendManage::getFriendManage().getFriendAvatar(msg.senderUID, QSize(40, 40));
+        QPixmap avatar = msg.senderUID == UserInfo::getUserInfo().getUID() ? UserInfo::getUserInfo().getAvatar(QSize(40, 40)) : FriendManage::getFriendManage().getFriendAvatar(FriendManage::getFriendManage().getFriendConversationIDByUID(msg.senderUID), QSize(40, 40));
         avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
         return avatar;
     }

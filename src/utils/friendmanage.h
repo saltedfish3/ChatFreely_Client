@@ -33,9 +33,9 @@ public:
     FriendManage(const FriendManage&) = delete;
 
     int64_t getFriendCount() const;
-    FriendManage::FriendInfo getFriendInfo(const QString& uid) const;
-    QPixmap getFriendAvatar(const QString& uid, const QSize& wantedSize);
-    QString getFriendUIDByConversationID(const QString& conversationID);
+    FriendManage::FriendInfo getFriendInfo(const QString& conversationID) const;
+    QPixmap getFriendAvatar(const QString& conversationID, const QSize& wantedSize);
+    QString getFriendConversationIDByUID(const QString& uid);
     QString getFriendUIDBySID(const QString& SID);
 
     QList<FriendManage::FriendInfo> getAllFriend() const;
@@ -58,8 +58,8 @@ private slots:
 
 private:
     explicit FriendManage(QObject *parent = nullptr);
-    QMap<QString, FriendInfo> map_friend;
-    QHash<QString, QString> hash_conversationToUID;//conversationID - UID
+    QHash<QString, FriendInfo> hash_friend;//conversationID
+    QHash<QString, QString> hash_UIDToConversatioID;//UID - conversationID
     QSet<QString> set_paddingAvatarSize;
 
     mutable QReadWriteLock lock;
