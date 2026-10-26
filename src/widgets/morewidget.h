@@ -13,7 +13,8 @@ class MoreWidget : public QWidget
 {
     Q_OBJECT
 public:
-    explicit MoreWidget(bool isFriend = true, QWidget *parent = nullptr);
+    explicit MoreWidget(bool isFriend = true, bool isOwner = false, QWidget *parent = nullptr);
+    void setIsGroupOwner(bool isOwner);
 
 signals:
     void closed();
@@ -26,7 +27,7 @@ protected:
     void paintEvent(QPaintEvent* event) override;
 
 private:
-    void initMore(bool isFriend);
+    void initMore(bool isFriend, bool isOwner);
     void initStyle();
 };
 

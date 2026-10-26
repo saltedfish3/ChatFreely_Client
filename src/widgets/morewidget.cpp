@@ -1,6 +1,6 @@
 #include "morewidget.h"
 
-MoreWidget::MoreWidget(bool isFriend, QWidget *parent)
+MoreWidget::MoreWidget(bool isFriend, bool isOwner, QWidget *parent)
     : QWidget{parent}
 {
     this->setMaximumWidth(150);
@@ -8,7 +8,7 @@ MoreWidget::MoreWidget(bool isFriend, QWidget *parent)
     this->setWindowFlags(Qt::Tool | Qt::FramelessWindowHint);
     this->setAttribute(Qt::WA_TranslucentBackground, true);
     this->setFocusPolicy(Qt::StrongFocus);
-    initMore(isFriend);
+    initMore(isFriend, isOwner);
     initStyle();
 }
 
@@ -31,7 +31,7 @@ void MoreWidget::paintEvent(QPaintEvent *event)
     painter.drawPath(path);
 }
 
-void MoreWidget::initMore(bool isFriend)
+void MoreWidget::initMore(bool isFriend, bool isOwner)
 {
     QString showText = isFriend ? "用户" : "群聊";
     QPushButton* show_user_info = new QPushButton("查看" + showText + "信息",this);
@@ -57,7 +57,9 @@ void MoreWidget::initMore(bool isFriend)
     line->resize(this->width() - 20, 1);
     line->move(10, clear_msg->pos().y() + clear_msg->height() + 4);
 
-    QPushButton* delete_user = new QPushButton("删除用户",this);
+    QString showDeleteText = isFriend ? "删除用户" : "群聊";
+    showDeleteText.push_front(isOwner ? "解散" : "退出");
+    QPushButton* delete_user = new QPushButton(showDeleteText,this);
     delete_user->resize(this->width() - 2,30);
     delete_user->move(1, line->pos().y() + line->height() + 4);
 

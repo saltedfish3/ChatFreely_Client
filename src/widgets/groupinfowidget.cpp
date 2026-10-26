@@ -26,12 +26,14 @@ void GroupInfoWidget::changeInfo(const QString &conversationID, const QString &g
         this->btn_doneOrEdit->show();
         this->label_camera_icon->show();
         this->view_avatar->setAnimation(true);
+        this->btn_exitGroup->setText("解散群聊");
     }
     else
     {
         this->btn_doneOrEdit->hide();
         this->label_camera_icon->hide();
         this->view_avatar->setAnimation(false);
+        this->btn_exitGroup->setText("退出群聊");
     }
 
     this->model->removeRows(0, this->model->rowCount());

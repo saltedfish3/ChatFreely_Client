@@ -279,7 +279,8 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     updateDeletedState(item->getIsDeleted());
 
     //初始化更多弹窗
-    this->widget_menu = new MoreWidget(item->getConversationType() == ConversationItem::ConversationType::Personal, this);
+    GroupManager::GroupInfo info = GroupManager::getGroupManage().getGroupInfo(this->item->getConversationID());
+    this->widget_menu = new MoreWidget(item->getConversationType() == ConversationItem::ConversationType::Personal, info.ownerUID == UserInfo::getUserInfo().getUID(), this);
 
     connect(this->btn_more,&QPushButton::toggled,this,[=](bool checked){
         if(checked)
