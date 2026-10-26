@@ -92,6 +92,15 @@ bool DatabaseManager::changeToCurrentUser()
                                    "key TEXT PRIMARY KEY, "
                                    "value TEXT)");
 
+            isSuccess &= sqlq.exec("CREATE TABLE IF NOT EXISTS deleted_conversations("
+                                   "conversation_id INTEGER PRIMARY KEY,"
+                                   "conversation_type INTEGER NOT NULL DEFAULT 0,"
+                                   "peer_id INTEGER,"
+                                   "peer_sid INTEGER,"
+                                   "display_name TEXT,"
+                                   "avatar_url TEXT,"
+                                   "deleted_at INTEGER)");
+
             if(!isSuccess)
             {
                 qWarning() << "初始化数据表失败" << sqlq.lastError().text();
@@ -256,6 +265,91 @@ bool DatabaseManager::getConversationsLastConvSeq(const QString &conversationID,
     return true;
 }
 
+bool DatabaseManager::upsertDeletedConversation(const DeletedConversationIDInfo &info)
+{
+    qint64 conversationID = toInt64(info.conversationID);
+    if(conversationID == 0)
+        return false;
+
+    QString connName = QUuid::createUuid().toString(QUuid::Id128);
+    bool ok = false;
+    {
+        QSqlDatabase db = openConnection(connName);
+        if(db.isOpen())
+        {
+            QSqlQuery q(db);
+            q.prepare("INSERT OR REPLACE INTO deleted_conversations"
+                      "(conversation_id, conversation_type, peer_id, peer_sid, display_name, avatar_url, deleted_at) "
+                      "VALUES(?, ?, ?, ?, ?, ?, strftime('%s', 'now'))");
+            q.addBindValue(conversationID);
+            q.addBindValue(info.conversationType);
+            q.addBindValue(toInt64(info.peerID));
+            q.addBindValue(toInt64(info.peerSID));
+            q.addBindValue(info.displayName);
+            q.addBindValue(info.avatarUrl);
+
+            if(!q.exec())
+                qWarning() << "写入 deleted_conversations 失败:" << q.lastError().text();
+            else
+                ok = true;
+
+            q.finish();
+        }
+        else
+            qWarning() << "打开数据库失败";
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(connName);
+    return ok;
+}
+
+void DatabaseManager::loadAllDeletedConversations(std::function<void (const QList<DeletedConversationIDInfo> &)> callback)
+{
+    auto future = QtConcurrent::run([this, callback](){
+        QList<DeletedConversationIDInfo> list;
+        QString connName = QUuid::createUuid().toString(QUuid::Id128);
+        {
+            QSqlDatabase db = openConnection(connName);
+            if(db.isOpen())
+            {
+                QSqlQuery q(db);
+                QString sql = "SELECT conversation_id, conversation_type, peer_id, peer_sid, display_name, avatar_url "
+                              "FROM deleted_conversations";
+                if(q.exec(sql))
+                {
+                    while(q.next())
+                    {
+                        DeletedConversationIDInfo info;
+                        info.conversationID = q.value(0).toString();
+                        info.conversationType = q.value(1).toInt();
+
+                        qint64 peerID = q.value(2).toLongLong();
+                        qint64 peerSID = q.value(3).toLongLong();
+                        info.peerID = peerID == 0 ? QString() : QString::number(peerID);
+                        info.peerSID = peerSID == 0 ? QString() : QString::number(peerSID);
+
+                        info.displayName = q.value(4).toString();
+                        info.avatarUrl = q.value(5).toString();
+                        list.append(info);
+                    }
+                }
+                else
+                    qWarning() << "查询 deleted_conversations 失败:" << q.lastError().text();
+            }
+            else
+                qWarning() << "打开数据库失败";
+
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(connName);
+
+        QMetaObject::invokeMethod(QCoreApplication::instance(), [callback, list](){
+            if(callback)
+                callback(list);
+        }, Qt::QueuedConnection);
+    });
+}
+
 void DatabaseManager::loadAllConversationsList(std::function<void (const QList<ConversationInfo>&)> callback)
 {
     auto future = QtConcurrent::run([this, callback](){
@@ -266,15 +360,6 @@ void DatabaseManager::loadAllConversationsList(std::function<void (const QList<C
             if(db.isOpen())
             {
                 QSqlQuery q(db);
-                // QString sql = "SELECT cp.conversation_id, COALESCE(c.unread_count, 0), COALESCE(c.type, 0), m.type, m.content, m.timestamp "
-                //               "FROM conversation_checkpoint cp "
-                //               "LEFT JOIN conversations c ON cp.conversation_id = c.conversation_id "
-                //               "LEFT JOIN messages m ON cp.conversation_id = m.conversation_id "
-                //               "AND m.conv_seq = ("
-                //               "SELECT MAX(m2.conv_seq) FROM messages m2 "
-                //               "WHERE m2.conversation_id = cp.conversation_id) "
-                //               "GROUP BY cp.conversation_id "
-                //               "ORDER BY m.timestamp DESC";
 
                 QString sql = "SELECT c.conversation_id, c.unread_count, c.type, m.type, m.content, m.timestamp "
                               "FROM conversations c "

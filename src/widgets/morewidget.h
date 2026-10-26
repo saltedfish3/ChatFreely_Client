@@ -19,6 +19,7 @@ signals:
     void closed();
     void switchToInfoWidget();
     void clearMessages();
+    void deletedConversation();
 
 protected:
     void focusOutEvent(QFocusEvent* event) override;

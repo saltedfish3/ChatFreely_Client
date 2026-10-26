@@ -53,6 +53,7 @@ private:
     void initStyle();
     void startReFlashTimeStamp();
     void updateStatusIconPos();
+    void updateDeletedState(bool isDeleted);
     void handleNextBlock();
 
     QWidget* widget_header;
@@ -66,6 +67,8 @@ private:
     ChatTextEdit* edit_message;
     QPushButton* btn_send;
     QPushButton* btn_file;
+
+    QLabel* label_deletedTip;
 
     QTimer* timer_loading;
     int loadingCount = 0;

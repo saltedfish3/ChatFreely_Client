@@ -10,6 +10,7 @@
 #include <QPointer>
 #include "../network/httpshortconnection.h"
 #include "../utils/imagecachemanager.h"
+#include "../database/databasemanager.h"
 
 class TcpLongConnection;
 
@@ -25,7 +26,8 @@ public:
         QString username;
         QString avatarUrl;
         QString email;
-        bool isOnline;
+        bool isOnline = false;
+        bool isDeleted = false;
     };
 
     static FriendManage& getFriendManage();
@@ -41,6 +43,7 @@ public:
     QList<FriendManage::FriendInfo> getAllFriend() const;
 
     void resetLoadState();
+    void initDeletedFromDatabase(const QList<DatabaseManager::DeletedConversationIDInfo>& list);
 
 signals:
     //用于更新全部好友列表
@@ -60,6 +63,7 @@ private:
     explicit FriendManage(QObject *parent = nullptr);
     QHash<QString, FriendInfo> hash_friend;//conversationID
     QHash<QString, QString> hash_UIDToConversatioID;//UID - conversationID
+    QHash<QString, FriendInfo> hash_deleted;//conversationID
     QSet<QString> set_paddingAvatarSize;
 
     mutable QReadWriteLock lock;

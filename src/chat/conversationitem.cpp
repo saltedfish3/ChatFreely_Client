@@ -1,7 +1,7 @@
 #include "conversationitem.h"
 
-ConversationItem::ConversationItem(const QString& conversationID, ConversationType type, QObject *parent)
-    : conversationID(conversationID), QObject{parent}, msgManager(conversationID, static_cast<int>(type), this), type(type)
+ConversationItem::ConversationItem(const QString& conversationID, ConversationType type, bool isDeleted, QObject *parent)
+    : conversationID(conversationID), QObject{parent}, msgManager(conversationID, static_cast<int>(type), this), type(type), isDeleted(isDeleted)
 {
     connect(&this->msgManager, &MessagesManager::finishLoadedImage, this, [this](){
         emit finishLoadedImage();
@@ -51,6 +51,20 @@ Message ConversationItem::getLastMessage() const
 int ConversationItem::getUnReadCount() const
 {
     return this->unRead;
+}
+
+bool ConversationItem::getIsDeleted() const
+{
+    return this->isDeleted;
+}
+
+void ConversationItem::setIsDeleted(bool isDeleted)
+{
+    if(this->isDeleted == isDeleted)
+        return;
+
+    this->isDeleted = isDeleted;
+    emit deletedStateChanged(this->isDeleted);
 }
 
 ConversationItem::ConversationType ConversationItem::getConversationType()

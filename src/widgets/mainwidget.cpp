@@ -85,9 +85,9 @@ void MainWidget::buttonColorChange(QAbstractButton* button)
 void MainWidget::handleMainState(bool isSuccess, QString info)
 {
     if(isSuccess)
-        ToastManager::getToastManager(this).success(info, this->stackedWidget_Chat);
+        ToastManager::getToastManager(this->stackedWidget_Chat).success(info);
     else
-        ToastManager::getToastManager(this).error(info, this->stackedWidget_Chat);
+        ToastManager::getToastManager(this->stackedWidget_Chat).error(info);
 }
 
 void MainWidget::initSideBar()
@@ -263,6 +263,8 @@ void MainWidget::initStackedChat()
 
 void MainWidget::initPage()
 {
+    ToastManager::registerAnchor(this->stackedWidget_Chat);
+
     //初始化预热页面
     QPixmap warmup(this->stackedWidget_Chat->size());
     warmup.fill(Qt::transparent);

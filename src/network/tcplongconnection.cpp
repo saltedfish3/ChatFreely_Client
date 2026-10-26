@@ -2897,6 +2897,17 @@ void TcpLongConnection::handleDeleteFriendResp(QJsonObject obj)
     }
 }
 
+void TcpLongConnection::handlePushFriendDeleted(QJsonObject obj)
+{
+    if(!obj.contains("ConversationID") || !obj.value("ConversationID").isString())
+    {
+        getFriendList();
+        return;
+    }
+
+    emit friendDeleted(obj.value("ConversationID").toString());
+}
+
 void TcpLongConnection::handleSendMessageResp(QJsonObject obj)
 {
     if(!obj.contains("Result") || !obj.value("Result").isBool() ||
@@ -3142,6 +3153,12 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
                         //125433708
                         if(obj.value("Requests_id").toString() == "125433708")
                             this->handlePushNewGroupResp(obj);
+                    }
+                    else if(type == "PushFriendDeleted")
+                    {
+                        //125433709
+                        if(obj.value("Requests_id").toString() == "125433709")
+                            this->handlePushFriendDeleted(obj);
                     }
                     else if(type == "CreateGroupRequestResp")
                     {

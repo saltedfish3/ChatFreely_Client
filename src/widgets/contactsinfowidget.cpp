@@ -139,6 +139,10 @@ void ContactsInfoWidget::init()
     this->btn_deleteFriend->move(pos_middle + 10,
                                  this->label_status->pos().y() + this->label_status->height() + 32);
 
+    connect(this->btn_deleteFriend, &QPushButton::clicked, this, [this](){
+        emit deleteConversation(this->conversationID);
+    });
+
     this->label_deleteFriend = new QLabel(this->btn_deleteFriend);
     this->label_deleteFriend->setObjectName("label_deleteFriend");
     this->label_deleteFriend->resize(20,20);

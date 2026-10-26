@@ -15,7 +15,7 @@ public:
         Personal,
         Group
     };
-    explicit ConversationItem(const QString& conversationID, ConversationType type, QObject *parent = nullptr);
+    explicit ConversationItem(const QString& conversationID, ConversationType type, bool isDeleted, QObject *parent = nullptr);
 
     const MessagesManager& getMessagesManager() const;
     MessagesManager& getMessagesManager();
@@ -23,6 +23,9 @@ public:
     QString getConversationID() const;
     int getUnReadCount() const;
     ConversationType getConversationType();
+
+    bool getIsDeleted() const;
+    void setIsDeleted(bool isDeleted);
 
     void addNewMessage(Message msg);
 
@@ -53,12 +56,15 @@ signals:
     void jumpToFinished(int row, const QString& msgID);
     void jumpToFailed(const QString& msgID);
 
+    void deletedStateChanged(bool isDeleted);
+
 private:
     QString conversationID;
     MessagesManager msgManager;
     int unRead = 0;
     bool active = false;
     bool isFirstLoad = false;
+    bool isDeleted = false;
 
     ConversationType type = ConversationType::Personal;
 

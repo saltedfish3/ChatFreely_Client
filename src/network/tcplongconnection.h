@@ -143,6 +143,7 @@ private:
     void handlePushFriendUsername(QJsonObject obj);
     void handlePushFriendAvatar(QJsonObject obj);
     void handleDeleteFriendResp(QJsonObject obj);
+    void handlePushFriendDeleted(QJsonObject obj);
 
     //群聊
     void handleCreateGroupRequestResp(QJsonObject obj);

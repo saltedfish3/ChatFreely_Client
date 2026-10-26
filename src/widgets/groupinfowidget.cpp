@@ -71,7 +71,8 @@ void GroupInfoWidget::changeInfo(const QString &conversationID, const QString &g
                 this->btn_addFriend->hide();
             else
             {
-                if(FriendManage::getFriendManage().getFriendInfo(FriendManage::getFriendManage().getFriendConversationIDByUID(it.uid)).uid.isEmpty())
+                FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(FriendManage::getFriendManage().getFriendConversationIDByUID(it.uid));
+                if(info.uid.isEmpty() || info.isDeleted)
                     this->btn_addFriend->show();
                 else
                     this->btn_addFriend->hide();
@@ -631,7 +632,10 @@ void GroupInfoWidget::addGroupMemberItem(const QString &username, const QString 
 
     bool canAdd = true;
     if(uid != UserInfo::getUserInfo().getUID())
-        canAdd = !FriendManage::getFriendManage().getFriendInfo(FriendManage::getFriendManage().getFriendConversationIDByUID(uid)).uid.isEmpty();
+    {
+        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(FriendManage::getFriendManage().getFriendConversationIDByUID(uid));
+        canAdd = !info.uid.isEmpty() && !info.isDeleted;
+    }
 
     item->setData(canAdd, GroupMemberDelegate::IsFriendRole);
 
@@ -645,17 +649,26 @@ void GroupInfoWidget::updateIsFriend()
         QModelIndex index = this->model->index(i, 0);
         QString conversationID = FriendManage::getFriendManage().getFriendConversationIDByUID(index.data(GroupMemberDelegate::UIDRole).toString());
         FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversationID);
-        if(info.conversationID.isEmpty())
-            continue;
+
+        bool isFriend = !info.uid.isEmpty() && !info.isDeleted;
         QStandardItem* item = this->model->itemFromIndex(index);
-        item->setData(true, GroupMemberDelegate::IsFriendRole);
+        item->setData(isFriend, GroupMemberDelegate::IsFriendRole);
     }
 
     QString sid = this->label_ownerSID->text().mid(3);
     if(sid.isEmpty() || sid == UserInfo::getUserInfo().getSID())
         return;
 
-    if(FriendManage::getFriendManage().getFriendUIDBySID(sid).isEmpty())
+    QString uid = FriendManage::getFriendManage().getFriendUIDBySID(sid);
+    bool isFriend = false;
+
+    if(!uid.isEmpty())
+    {
+        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(FriendManage::getFriendManage().getFriendConversationIDByUID(uid));
+        isFriend = !info.uid.isEmpty() && !info.isDeleted;
+    }
+
+    if(!isFriend)
         this->btn_addFriend->show();
     else
         this->btn_addFriend->hide();

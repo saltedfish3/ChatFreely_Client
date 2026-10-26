@@ -17,9 +17,14 @@ FriendManage::FriendInfo FriendManage::getFriendInfo(const QString &conversation
 {
     QReadLocker locker(&(this->lock));
     auto it = this->hash_friend.find(conversationID);
-    if(it == this->hash_friend.end())
-        return {};
-    return it.value();
+    if(it != this->hash_friend.end())
+        return it.value();
+
+    auto dit = this->hash_deleted.find(conversationID);
+    if(dit != this->hash_deleted.end())
+        return dit.value();
+
+    return {};
 }
 
 QPixmap FriendManage::getFriendAvatar(const QString &conversationID, const QSize &wantedSize)
@@ -107,9 +112,16 @@ QString FriendManage::getFriendConversationIDByUID(const QString &uid)
 {
     QReadLocker locker(&this->lock);
     auto it = this->hash_UIDToConversatioID.find(uid);
-    if(it == this->hash_UIDToConversatioID.end())
-        return {};
-    return it.value();
+    if(it != this->hash_UIDToConversatioID.end())
+        return it.value();
+
+    for(auto dit = this->hash_deleted.constBegin(); dit != this->hash_deleted.constEnd(); dit++)
+    {
+        if(dit.value().uid == uid)
+            return dit.key();
+    }
+
+    return {};
 }
 
 QString FriendManage::getFriendUIDBySID(const QString &SID)
@@ -135,12 +147,32 @@ void FriendManage::resetLoadState()
     this->isFirstLoad = false;
 }
 
+void FriendManage::initDeletedFromDatabase(const QList<DatabaseManager::DeletedConversationIDInfo> &list)
+{
+    QWriteLocker locker(&(this->lock));
+    this->hash_deleted.clear();
+    for(const auto& in : list)
+    {
+        FriendInfo info;
+        info.conversationID = in.conversationID;
+        info.uid = in.peerID;
+        info.sid = in.peerSID;
+        info.username = in.displayName;
+        info.avatarUrl = in.avatarUrl;
+        info.isOnline = false;
+        info.isDeleted = true;
+
+        this->hash_deleted[in.conversationID] = info;
+    }
+}
+
 void FriendManage::cleanAll()
 {
     QWriteLocker locker(&(this->lock));
     this->hash_friend.clear();
     this->set_paddingAvatarSize.clear();
     this->hash_UIDToConversatioID.clear();
+    this->hash_deleted.clear();
     this->isFirstLoad = false;
 }
 
@@ -166,6 +198,7 @@ FriendManage::FriendManage(QObject *parent)
             info.email = email;
             info.avatarUrl = avatar_url;
             info.isOnline = isOnline;
+            info.isDeleted = false;
 
             if(!conversationID.isEmpty())
                 this->hash_UIDToConversatioID[uid] = conversationID;
@@ -265,10 +298,13 @@ FriendManage::FriendManage(QObject *parent)
                 info.email = var.value("Email").toString();
                 info.avatarUrl = var.value("Avatar_Url").toString();
                 info.isOnline = var.value("IsOnline").toBool();
+                info.isDeleted = false;
                 this->hash_friend[info.conversationID] = info;
 
                 if(!info.conversationID.isEmpty())
                     this->hash_UIDToConversatioID[info.uid] = info.conversationID;
+
+                this->hash_deleted.remove(info.conversationID);
 
                 if(!info.avatarUrl.isEmpty())
                     avatarTasks[info.uid] = info.avatarUrl;
@@ -304,8 +340,33 @@ FriendManage::FriendManage(QObject *parent)
                 return;
 
             info = this->hash_friend[conversationID];
+            info.isDeleted = true;
+            info.isOnline = false;
+
+            this->hash_UIDToConversatioID.remove(info.uid);
             this->hash_friend.remove(conversationID);
+
+            this->hash_deleted[conversationID] = info;
+
+            QString pre = info.uid + "_";
+            for(auto it = this->set_paddingAvatarSize.begin(); it != this->set_paddingAvatarSize.end();)
+            {
+                if(it->startsWith(pre))
+                    it = this->set_paddingAvatarSize.erase(it);
+                else
+                    it++;
+            }
         }
+
+        DatabaseManager::DeletedConversationIDInfo info_deleted;
+        info_deleted.conversationID = info.conversationID;
+        info_deleted.conversationType = 0;
+        info_deleted.peerID = info.uid;
+        info_deleted.peerSID = info.sid;
+        info_deleted.displayName = info.username;
+        info_deleted.avatarUrl = info.avatarUrl;
+        DatabaseManager::getDatabaseManager().upsertDeletedConversation(info_deleted);
+
         emit allFriendList();
     });
 

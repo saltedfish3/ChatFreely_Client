@@ -519,11 +519,18 @@ void ChatWidget::initListWidget()
                 QStandardItem* item = this->model->itemFromIndex(index);
                 item->setData(info.username, ConversationListDelegate::UsernameRole);
 
-                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(36, 36));
-                avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
-                item->setData(avatar, ConversationListDelegate::AvatarRole);
+                if(!info.isDeleted)
+                {
+                    QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(36, 36));
+                    avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                    item->setData(avatar, ConversationListDelegate::AvatarRole);
+                }
 
                 item->setData(info.isOnline, ConversationListDelegate::IsOnlineRole);
+
+                auto it = this->map_conversation.find(conversationID);
+                if(it != this->map_conversation.end())
+                    it.value()->updateFriendStatus(info.isOnline);
             }
         }
 
@@ -538,9 +545,12 @@ void ChatWidget::initListWidget()
                 QStandardItem* item = this->model_searchConversation->itemFromIndex(index);
                 item->setData(info.username, ConversationListDelegate::UsernameRole);
 
-                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(36, 36));
-                avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
-                item->setData(avatar, ConversationListDelegate::AvatarRole);
+                if(!info.isDeleted)
+                {
+                    QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(36, 36));
+                    avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                    item->setData(avatar, ConversationListDelegate::AvatarRole);
+                }
             }
         }
 
@@ -555,9 +565,12 @@ void ChatWidget::initListWidget()
                 QStandardItem* item = this->model_searchMsg->itemFromIndex(index);
                 item->setData(info.username, SearchResultListDelegate::UsernameRole);
 
-                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(36, 36));
-                avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
-                item->setData(avatar, SearchResultListDelegate::AvatarRole);
+                if(!info.isDeleted)
+                {
+                    QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(36, 36));
+                    avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                    item->setData(avatar, SearchResultListDelegate::AvatarRole);
+                }
             }
         }
     });

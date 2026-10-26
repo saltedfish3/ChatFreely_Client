@@ -11,13 +11,21 @@ ConversationItem *ConversationManager::getOrCreateConversationItem(const QString
     auto it = this->conversations.find(conversationID);
     if(it == this->conversations.end())
     {
+        bool isDeleted = false;
 
         if(!GroupManager::getGroupManage().getGroupInfo(conversationID).conversationID.isEmpty())
             type = ConversationItem::ConversationType::Group;
-        else if(!FriendManage::getFriendManage().getFriendInfo(conversationID).uid.isEmpty())
-            type = ConversationItem::ConversationType::Personal;
+        else
+        {
+            FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversationID);
+            if(!info.uid.isEmpty())
+            {
+                type = ConversationItem::ConversationType::Personal;
+                isDeleted = info.isDeleted;
+            }
+        }
 
-        ConversationItem* item = new ConversationItem(conversationID, type, this);
+        ConversationItem* item = new ConversationItem(conversationID, type, isDeleted, this);
         this->conversations[conversationID] = item;
 
         emit conversationCreated(item);
@@ -89,6 +97,17 @@ ConversationManager::ConversationManager(QObject *parent)
             return;
 
         ConversationItem* item = getOrCreateConversationItem(conversationID, ConversationItem::ConversationType::Group);
+    });
+
+    connect(&FriendManage::getFriendManage(), &FriendManage::allFriendList, this, [this](){
+        for(auto* item : std::as_const(this->conversations))
+        {
+            if(!item || item->getConversationType() != ConversationItem::ConversationType::Personal)
+                continue;
+
+            FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(item->getConversationID());
+            item->setIsDeleted(info.isDeleted);
+        }
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &ConversationManager::cleanAll);

@@ -43,11 +43,11 @@ void ContactsWidget::addGroupItem(const QString &conversationID, const QString &
 
 void ContactsWidget::switchToInfoWidget(const QString &conversaionID)
 {
-    bool isFriend = !FriendManage::getFriendManage().getFriendInfo(conversaionID).uid.isEmpty();
+    FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversaionID);
+    bool isFriend = !info.uid.isEmpty() && !info.isDeleted;
     if(isFriend)
     {
         this->btn_myFriend->click();
-        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversaionID);
         QString uid = info.uid;
         for(int i = 0; i < this->model->rowCount(); i++)
         {
@@ -73,8 +73,12 @@ void ContactsWidget::switchToInfoWidget(const QString &conversaionID)
     }
     else
     {
-        this->btn_myGroups->click();
         GroupManager::GroupInfo info = GroupManager::getGroupManage().getGroupInfo(conversaionID);
+        if(info.conversationID.isEmpty())
+            return;
+
+        this->btn_myGroups->click();
+
         for(int i = 0; i < this->model_group->rowCount(); i++)
         {
             QModelIndex index = this->model_group->index(i, 0);
@@ -706,6 +710,10 @@ void ContactsWidget::initStacked()
         //转发信号
         emit openConversation(conversationID);
     });
+
+    connect(this->widget_contactsInfo, &ContactsInfoWidget::deleteConversation, this, [this](const QString& conversationID){
+        TcpLongConnection::getTcpClient().sendDeleteFriend(conversationID);
+    });
 }
 
 void ContactsWidget::cleanAll()
@@ -871,13 +879,14 @@ void ContactsWidget::restoreSelect()
 
     if(isFriend)
     {
-        if(FriendManage::getFriendManage().getFriendCount() == 0)
+        QString conversationID = FriendManage::getFriendManage().getFriendConversationIDByUID(this->selectedUID);
+        FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversationID);
+        if(info.uid.isEmpty() || info.isDeleted)
+        {
+            this->selectedUID.clear();
+            this->stackedWidget->setCurrentWidget(this->widget_noSelect);
             return;
-    }
-    else
-    {
-        if(GroupManager::getGroupManage().getGroupsCount() == 0)
-            return;
+        }
     }
 
     if(isFriend)
@@ -929,7 +938,12 @@ void ContactsWidget::restoreSelect()
         }
         else
         {
-            //设置群聊info界面
+            GroupManager::GroupInfo info = GroupManager::getGroupManage().getGroupInfo(this->selectedUID);
+            if(info.conversationID.isEmpty())
+                return;
+
+            QPixmap avatar = GroupManager::getGroupManage().getGroupAvatar(info.conversationID, QSize(128, 128));
+            this->widget_groupInfo->changeInfo(info.conversationID, info.groupID, info.groupName, info.ownerUID, info.memberInfos, avatar);
         }
     }
 }

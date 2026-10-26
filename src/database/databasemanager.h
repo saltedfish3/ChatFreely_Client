@@ -28,6 +28,16 @@ public:
         int conversationType;
     };
 
+    struct DeletedConversationIDInfo
+    {
+        QString conversationID;
+        int conversationType = 0;
+        QString peerID;
+        QString peerSID;
+        QString displayName;
+        QString avatarUrl;
+    };
+
     enum Type
     {
         InsertMessage = 0,
@@ -78,6 +88,9 @@ public:
     bool getMeta(MetaType type, QString& outValue);
     bool getConversationsLastConvSeq(const QString& conversationsID, qint64& outValue);
 
+    bool upsertDeletedConversation(const DeletedConversationIDInfo& info);
+
+    void loadAllDeletedConversations(std::function<void(const QList<DeletedConversationIDInfo>&)> callback);
     void loadAllConversationsList(std::function<void(const QList<ConversationInfo>&)> callback);
     void loadConversationMessages(const QString& conversationID, qint64 cursorConvSeq, MessageQueryDir dir, int limit = 20, std::function<void(const QList<Message>&)> callback = nullptr);
 

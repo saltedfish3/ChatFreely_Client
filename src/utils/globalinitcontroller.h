@@ -16,6 +16,7 @@ public:
     enum class Step
     {
         Free,
+        LoadingDeletedConversations,
         LoadingFriends,
         LoadingNewFriendRequests,
         LoadingGroups,
@@ -34,6 +35,8 @@ public:
     Step step() const;
     bool restartFromLogin();
 
+    //加载已删除会话
+    void loadDeletedConversations();
     //加载好友列表
     void loadFriendList();
     //加载新好友申请列表
@@ -75,6 +78,8 @@ private:
     QSet<QString> waitingSyncConversationID;
     QSet<QString> syncingConversationID;
     QHash<QString, int> retryCounts;
+
+    quint64 gen_deletedConversations = 0;
 };
 
 #endif // GLOBALINITCONTROLLER_H

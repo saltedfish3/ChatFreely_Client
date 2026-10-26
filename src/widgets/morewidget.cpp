@@ -77,7 +77,7 @@ void MoreWidget::initMore(bool isFriend)
     });
 
     connect(delete_user,&QPushButton::clicked,this,[=](){
-        qDebug()<<"delete_user";
+        emit deletedConversation();
         this->hide();
     });
 

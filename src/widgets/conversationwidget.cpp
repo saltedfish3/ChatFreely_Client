@@ -271,6 +271,13 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         this->listView_messages->scrollToBottom();
     });
 
+    this->label_deletedTip = new QLabel("对方已不是您的好友，无法发送消息", this->widget_editRegion);
+    this->label_deletedTip->setObjectName("label_deletedTip");
+    this->label_deletedTip->resize(this->widget_editRegion->width(), this->widget_editRegion->height());
+    this->label_deletedTip->move(0, 0);
+    this->label_deletedTip->setAlignment(Qt::AlignCenter);
+    updateDeletedState(item->getIsDeleted());
+
     //初始化更多弹窗
     this->widget_menu = new MoreWidget(item->getConversationType() == ConversationItem::ConversationType::Personal, this);
 
@@ -295,6 +302,11 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     });
 
     connect(this->widget_menu, &MoreWidget::switchToInfoWidget, this, [this](){
+        if(this->item->getIsDeleted())
+        {
+            ToastManager::getToastManager(this).error("对方已不是您的好友");
+            return;
+        }
         emit switchToInfoWidget();
     });
 
@@ -310,6 +322,13 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         this->isLoadingNewer = false;
         this->isWaitingJump = false;
         this->listView_messages->scrollToBottom();
+    });
+
+    connect(this->widget_menu, &MoreWidget::deletedConversation, this, [this](){
+        if(this->item->getConversationType() == ConversationItem::ConversationType::Personal)
+            TcpLongConnection::getTcpClient().sendDeleteFriend(this->item->getConversationID());
+        else
+            ;//群聊
     });
 
     initStyle();
@@ -336,7 +355,14 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         }
     });
 
+    connect(this->item, &ConversationItem::deletedStateChanged, this, [this](bool isDeleted){
+        updateDeletedState(isDeleted);
+    });
+
     connect(this->delegate, &ConversationDelegate::ReSendClicked, this, [this](const QString& tempMsgID){
+        if(this->item->getIsDeleted())
+            return;
+
         int index = this->item->getMessagesManager().indexOfMsg(tempMsgID);
         if(index < 0)
             return;
@@ -566,6 +592,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     this->edit_message->installEventFilter(this);
     this->widget_header->installEventFilter(this);
     this->widget_editRegion->installEventFilter(this);
+    this->label_deletedTip->installEventFilter(this);
 
     this->item->getMessagesManager().loadMessages(MessagesManager::LoadDir::Older, INT64_MAX, 20);
 }
@@ -749,10 +776,16 @@ void ConversationWidget::initStyle()
                                 {
                                     background: none;
                                 }
-                            #widget_editRegion
+                            #widget_editRegion[deleted="false"]
                             {
                                 background-color: #ffffff;
                                 border: 1px solid rgba(99, 102, 241, 255);
+                                border-radius: 8px;
+                            }
+                            #widget_editRegion[deleted="true"]
+                            {
+                                background-color: #ffffff;
+                                border: 1px solid rgba(229, 231, 235, 255);
                                 border-radius: 8px;
                             }
                             #edit_message QScrollBar:vertical
@@ -827,6 +860,13 @@ void ConversationWidget::initStyle()
                             {
                                 background-color: rgba(67, 56, 202, 255);
                             }
+                            #label_deletedTip
+                            {
+                                color: rgba(107, 114, 128, 255);
+                                font-size: 13px;
+                                font-weight: 600;
+                                background: transparent;
+                            }
                                 )");
 }
 
@@ -856,6 +896,18 @@ void ConversationWidget::updateStatusIconPos()
     this->label_statusIcon->move(textEndX + 8, (this->widget_header->height() - this->label_statusIcon->height()) / 2);
     this->label_statusText->move(this->label_statusIcon->pos().x() + this->label_statusIcon->width() + 8,
                                  (this->widget_header->height() - this->label_statusText->height()) / 2);
+}
+
+void ConversationWidget::updateDeletedState(bool isDeleted)
+{
+    this->edit_message->setVisible(!isDeleted);
+    this->btn_file->setVisible(!isDeleted);
+    this->btn_send->setVisible(!isDeleted);
+    this->label_deletedTip->setVisible(isDeleted);
+
+    this->widget_editRegion->setProperty("deleted", isDeleted);
+    this->widget_editRegion->style()->unpolish(this->widget_editRegion);
+    this->widget_editRegion->style()->polish(this->widget_editRegion);
 }
 
 void ConversationWidget::handleNextBlock()

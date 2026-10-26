@@ -11,7 +11,7 @@ void GlobalInitController::start()
     if(this->nowStep != Step::Free)
         return;
 
-    loadFriendList();
+    loadDeletedConversations();
 }
 
 bool GlobalInitController::restartFromLogin()
@@ -36,7 +36,30 @@ bool GlobalInitController::restartFromLogin()
     GroupManager::getGroupManage().resetLoadState();
 
     start();
+
     return true;
+}
+
+void GlobalInitController::loadDeletedConversations()
+{
+    if(this->nowStep == Step::LoadingDeletedConversations)
+        return;
+
+    quint64 gen = ++this->gen_deletedConversations;
+    this->nowStep = Step::LoadingDeletedConversations;
+    DatabaseManager::getDatabaseManager().loadAllDeletedConversations([this, gen](const QList<DatabaseManager::DeletedConversationIDInfo>& list){
+        if(this->nowStep != Step::LoadingDeletedConversations || gen != this->gen_deletedConversations)
+            return;
+
+        QList<DatabaseManager::DeletedConversationIDInfo> list_deletedFriend;
+        for(const auto& info : std::as_const(list))
+        {
+            if(static_cast<ConversationItem::ConversationType>(info.conversationType) == ConversationItem::ConversationType::Personal)
+                list_deletedFriend.append(info);
+        }
+        FriendManage::getFriendManage().initDeletedFromDatabase(list_deletedFriend);
+        loadFriendList();
+    });
 }
 
 void GlobalInitController::loadFriendList()
