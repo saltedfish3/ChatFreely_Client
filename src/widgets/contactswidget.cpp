@@ -74,7 +74,7 @@ void ContactsWidget::switchToInfoWidget(const QString &conversaionID)
     else
     {
         GroupManager::GroupInfo info = GroupManager::getGroupManage().getGroupInfo(conversaionID);
-        if(info.conversationID.isEmpty())
+        if(info.conversationID.isEmpty() || info.isDeleted)
             return;
 
         this->btn_myGroups->click();
@@ -714,6 +714,11 @@ void ContactsWidget::initStacked()
     connect(this->widget_contactsInfo, &ContactsInfoWidget::deleteConversation, this, [this](const QString& conversationID){
         TcpLongConnection::getTcpClient().sendDeleteFriend(conversationID);
     });
+
+    connect(this->widget_groupInfo, &GroupInfoWidget::exitGroup, this, [this](const QString &conversationID){
+        //未来区分解散还是退出
+        TcpLongConnection::getTcpClient().sendExitGroup(conversationID);
+    });
 }
 
 void ContactsWidget::cleanAll()
@@ -882,6 +887,16 @@ void ContactsWidget::restoreSelect()
         QString conversationID = FriendManage::getFriendManage().getFriendConversationIDByUID(this->selectedUID);
         FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversationID);
         if(info.uid.isEmpty() || info.isDeleted)
+        {
+            this->selectedUID.clear();
+            this->stackedWidget->setCurrentWidget(this->widget_noSelect);
+            return;
+        }
+    }
+    else
+    {
+        GroupManager::GroupInfo info = GroupManager::getGroupManage().getGroupInfo(this->selectedUID);
+        if(info.conversationID.isEmpty() || info.isDeleted)
         {
             this->selectedUID.clear();
             this->stackedWidget->setCurrentWidget(this->widget_noSelect);

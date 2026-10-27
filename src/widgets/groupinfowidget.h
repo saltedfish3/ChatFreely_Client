@@ -34,6 +34,7 @@ public:
 
 signals:
     void openConversation(const QString &conversationID);
+    void exitGroup(const QString& conversationID);
 
 private:
     void init();

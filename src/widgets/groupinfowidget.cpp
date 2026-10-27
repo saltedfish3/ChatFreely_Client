@@ -307,6 +307,10 @@ void GroupInfoWidget::init()
     this->btn_exitGroup->move(pos_middle + 10,
                                  this->label_groupID->pos().y() + this->label_groupID->height() + 32);
 
+    connect(this->btn_exitGroup, &QPushButton::clicked, this, [this](){
+        emit exitGroup(this->conversationID);
+    });
+
     this->label_exitGroup = new QLabel(this->btn_exitGroup);
     this->label_exitGroup->setObjectName("label_exitGroup");
     this->label_exitGroup->resize(20,20);

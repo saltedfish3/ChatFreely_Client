@@ -305,7 +305,10 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     connect(this->widget_menu, &MoreWidget::switchToInfoWidget, this, [this](){
         if(this->item->getIsDeleted())
         {
-            ToastManager::getToastManager(this).error("对方已不是您的好友");
+            if(this->item->getConversationType() == ConversationItem::ConversationType::Group)
+                ToastManager::getToastManager(this).error("您已不在该群聊中");
+            else
+                ToastManager::getToastManager(this).error("对方已不是您的好友");
             return;
         }
         emit switchToInfoWidget();
@@ -326,10 +329,18 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     });
 
     connect(this->widget_menu, &MoreWidget::deletedConversation, this, [this](){
+        if(this->item->getIsDeleted())
+            return;
+
         if(this->item->getConversationType() == ConversationItem::ConversationType::Personal)
             TcpLongConnection::getTcpClient().sendDeleteFriend(this->item->getConversationID());
         else
-            ;//群聊
+        {
+            if(GroupManager::getGroupManage().getGroupInfo(this->item->getConversationID()).ownerUID == UserInfo::getUserInfo().getUID())
+                ;//解散
+            else
+                TcpLongConnection::getTcpClient().sendExitGroup(this->item->getConversationID());
+        }
     });
 
     initStyle();
@@ -905,6 +916,14 @@ void ConversationWidget::updateDeletedState(bool isDeleted)
     this->btn_file->setVisible(!isDeleted);
     this->btn_send->setVisible(!isDeleted);
     this->label_deletedTip->setVisible(isDeleted);
+
+    if(isDeleted)
+    {
+        if(this->item->getConversationType() == ConversationItem::ConversationType::Group)
+            this->label_deletedTip->setText("您已退出该群聊，无法发送消息");
+        else
+            this->label_deletedTip->setText("对方已不是您的好友，无法发送消息");
+    }
 
     this->widget_editRegion->setProperty("deleted", isDeleted);
     this->widget_editRegion->style()->unpolish(this->widget_editRegion);

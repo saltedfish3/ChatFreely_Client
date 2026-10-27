@@ -52,12 +52,16 @@ void GlobalInitController::loadDeletedConversations()
             return;
 
         QList<DatabaseManager::DeletedConversationIDInfo> list_deletedFriend;
+        QList<DatabaseManager::DeletedConversationIDInfo> list_exitGroup;
         for(const auto& info : std::as_const(list))
         {
             if(static_cast<ConversationItem::ConversationType>(info.conversationType) == ConversationItem::ConversationType::Personal)
                 list_deletedFriend.append(info);
+            else if(static_cast<ConversationItem::ConversationType>(info.conversationType) == ConversationItem::ConversationType::Group)
+                list_exitGroup.append(info);
         }
         FriendManage::getFriendManage().initDeletedFromDatabase(list_deletedFriend);
+        GroupManager::getGroupManage().initLeftFromDatabase(list_exitGroup);
         loadFriendList();
     });
 }

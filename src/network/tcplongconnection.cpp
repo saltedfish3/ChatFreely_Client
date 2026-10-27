@@ -1042,6 +1042,68 @@ void TcpLongConnection::sendUpdateGroupAvatar(const QString &conversationID, con
     });
 }
 
+void TcpLongConnection::sendExitGroup(const QString &conversationID)
+{
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        emit mainState(false, "无法连接服务器，请稍后再试");
+        return;
+    }
+    if(conversationID.isEmpty())
+    {
+        emit mainState(false, "退出失败, 群聊错误");
+        return;
+    }
+
+    //幂等操作
+    QVariantMap currentParams;
+    QString requestsID;
+    currentParams["conversationID"] = conversationID;
+    for(auto it = this->map_idempotentCache.begin(); it != this->map_idempotentCache.end(); it++)
+    {
+        if(it.value().name == ExitGroup && it.value().params == currentParams)
+        {
+            requestsID = it.key();
+            break;
+        }
+    }
+
+    //是否复用幂等
+    if(requestsID.isEmpty())
+    {
+        requestsID = QString::number(getRequestsId());
+        PendingRequest prt;
+        prt.requestID = requestsID;
+        prt.name = ExitGroup;
+        prt.params = currentParams;
+
+        QVariantMap tokenParams;
+        tokenParams["conversationID"] = conversationID;
+        prt.tokenParams = tokenParams;
+
+        this->map_idempotentCache[requestsID] = prt;
+    }
+
+    QJsonObject obj;
+    obj["Requests_id"] = requestsID;
+    obj["Type"] = "ExitGroup";
+    obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
+    obj["ConversationID"] = conversationID;
+
+    QJsonDocument doc(obj);
+    QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
+    this->socket->write(data);
+    this->socket->flush();
+
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(5000,[this,requestsID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            emit mainState(false, "连接超时，请稍后再试");
+        }
+    });
+}
+
 void TcpLongConnection::sendHandleNewFriendRequest(QString handle_uid, bool isAgree)
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
@@ -2352,6 +2414,70 @@ void TcpLongConnection::handleUpdateGroupAvatarRequestResp(QJsonObject obj)
     this->map_idempotentCache.remove(requestsID);
 }
 
+void TcpLongConnection::handleExitGroupResp(QJsonObject obj)
+{
+    if(!obj.contains("Result") || !obj.value("Result").isBool() ||
+        !obj.contains("ConversationID") || !obj.value("ConversationID").isString())
+        return;
+
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+
+    bool success = obj.value("Result").toBool();
+    QString conversationID = obj.value("ConversationID").toString();
+
+    if(success)
+    {
+        emit exitGroup(conversationID);
+        emit mainState(true, "退出成功");
+    }
+    else
+    {
+        if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
+        {
+            bool isExpired = obj.value("AccessTokenExpired").toBool();
+            if(isExpired)
+            {
+                sendRefreshToken([this, requestsID](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                    if(isSuccess)
+                    {
+                        if(newAccessToken.isEmpty())
+                        {
+                            emit refreshExpiredExit();
+                            this->map_idempotentCache.remove(requestsID);
+                            return;
+                        }
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        auto it = this->map_idempotentCache.find(requestsID);
+                        if(it != this->map_idempotentCache.end())
+                        {
+                            QString conversationID = it.value().tokenParams.value("conversationID").toString();
+                            this->map_idempotentCache.remove(requestsID);
+                            sendExitGroup(conversationID);
+                        }
+                        return;
+                    }
+                    else
+                    {
+                        if(isRefreshTokenExpired)
+                        {
+                            emit refreshExpiredExit();
+                            this->map_idempotentCache.remove(requestsID);
+                            return;
+                        }
+                        this->map_idempotentCache.remove(requestsID);
+                        emit mainState(false, "退出失败");
+                    }
+                });
+                return;
+            }
+        }
+        QString info = obj.value("Info").toString();
+        emit mainState(false, info.isEmpty() ? "退出失败" : info);
+    }
+    this->map_idempotentCache.remove(requestsID);
+}
+
 void TcpLongConnection::handleHandleNewFriendRequestResp(QJsonObject obj)
 {
     if(!obj.contains("Result") || !obj.value("Result").isBool() || !obj.contains("HandleUID") || !obj.value("HandleUID").isString())
@@ -3195,6 +3321,10 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
                     else if(type == "DeleteFriendResp")
                     {
                         this->handleDeleteFriendResp(obj);
+                    }
+                    else if(type == "ExitGroupResp")
+                    {
+                        this->handleExitGroupResp(obj);
                     }
                     else
                     {

@@ -8,6 +8,7 @@
 #include <QReadWriteLock>
 #include "../utils/imagecachemanager.h"
 #include "../utils/GlobalVariable.h"
+#include "../database/databasemanager.h"
 
 class TcpLongConnection;
 
@@ -31,6 +32,7 @@ public:
         QString avatarUrl;
         QString ownerUID;
         QHash<QString, GroupMemberInfo> memberInfos;//UID -> Info
+        bool isDeleted = false;
     };
 
     static GroupManager& getGroupManage();
@@ -43,6 +45,8 @@ public:
     void setGroupAvatarUrl(const QString& conversationID, const QString& avatarUrl);
     QPixmap getGroupAvatar(const QString& conversationID, const QSize& wantedSize);
     int64_t getGroupsCount();
+
+    void initLeftFromDatabase(const QList<DatabaseManager::DeletedConversationIDInfo>& list);
 
     void resetLoadState();
 
@@ -60,8 +64,9 @@ private slots:
 private:
     explicit GroupManager(QObject *parent = nullptr);
 
-    QHash<QString, GroupInfo> hash_groups;
+    QHash<QString, GroupInfo> hash_groups;//conversationID
     QSet<QString> set_paddingAvatarSize;
+    QHash<QString, GroupInfo> hash_left;//conversationID
 
     mutable QReadWriteLock lock;
     bool isFirstLoad = false;

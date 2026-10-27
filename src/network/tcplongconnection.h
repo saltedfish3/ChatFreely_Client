@@ -56,6 +56,7 @@ public:
     void sendApplyJoinGroupRequest(const QString& groupID, const QString& verMsg);
     void sendUpdateGroupName(const QString& conversationID, const QString& groupName);
     void sendUpdateGroupAvatar(const QString& conversationID, const QString& avatarUrl);
+    void sendExitGroup(const QString& conversationID);
 
     //消息
     void sendMessageTo(QString conversationID, QString message, QString tempMsgID, ContentType type);
@@ -104,6 +105,7 @@ signals:
     void updateGroupName(const QString& conversationID, const QString& newGroupName);
     void updateGroupNameFailed(const QString& conversationID);
     void updateGroupAvatar(const QString& conversationID, const QString& avatarUrl);
+    void exitGroup(const QString& conversationID);
 
     //用于通知业务层getConversationsListAndSeq是否成功
     void newSyncConvStatus(bool isSuccess, const QList<QString>& conversations, int64_t newSyncConvSeq);
@@ -156,6 +158,7 @@ private:
     void handleApplyJoinGroupRequestResp(QJsonObject obj);
     void handleUpdateGroupNameRequestResp(QJsonObject obj);
     void handleUpdateGroupAvatarRequestResp(QJsonObject obj);
+    void handleExitGroupResp(QJsonObject obj);
 
     //消息
     void handleGetConversationsFriendUIDListAndSeqResp(QJsonObject obj);
@@ -194,7 +197,8 @@ private:
         ApplyJoinGroupRequest,
         updateGroupNameRequest,
         updateGroupAvatarRequest,
-        DeleteFriendRequest
+        DeleteFriendRequest,
+        ExitGroup
     };
     struct PendingRequest
     {

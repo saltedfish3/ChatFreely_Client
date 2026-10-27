@@ -12,9 +12,12 @@ ConversationItem *ConversationManager::getOrCreateConversationItem(const QString
     if(it == this->conversations.end())
     {
         bool isDeleted = false;
-
-        if(!GroupManager::getGroupManage().getGroupInfo(conversationID).conversationID.isEmpty())
+        GroupManager::GroupInfo groupInfo = GroupManager::getGroupManage().getGroupInfo(conversationID);
+        if(!groupInfo.conversationID.isEmpty())
+        {
             type = ConversationItem::ConversationType::Group;
+            isDeleted = groupInfo.isDeleted;
+        }
         else
         {
             FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(conversationID);
@@ -106,6 +109,17 @@ ConversationManager::ConversationManager(QObject *parent)
                 continue;
 
             FriendManage::FriendInfo info = FriendManage::getFriendManage().getFriendInfo(item->getConversationID());
+            item->setIsDeleted(info.isDeleted);
+        }
+    });
+
+    connect(&GroupManager::getGroupManage(), &GroupManager::allGroupList, this, [this](){
+        for(auto* item : std::as_const(this->conversations))
+        {
+            if(!item || item->getConversationType() != ConversationItem::ConversationType::Group)
+                continue;
+
+            GroupManager::GroupInfo info = GroupManager::getGroupManage().getGroupInfo(item->getConversationID());
             item->setIsDeleted(info.isDeleted);
         }
     });
