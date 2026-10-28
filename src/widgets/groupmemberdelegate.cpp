@@ -4,14 +4,21 @@ GroupMemberDelegate::GroupMemberDelegate(QObject *parent)
     : QStyledItemDelegate{parent}
 {}
 
+void GroupMemberDelegate::setIsOwner(bool isOwner)
+{
+    this->isOwner = isOwner;
+}
+
 void GroupMemberDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const
 {
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing, true);
     QRect contain = option.rect.adjusted(-1, 0, 1, 0);
 
-    bool isHovered = this->addFriendIndex == index && this->addFriendState == Hover;
-    bool isPressed = this->addFriendIndex == index && this->addFriendState == Pressed;
+    bool isAddFriendHovered = this->addFriendIndex == index && this->addFriendState == Hover;
+    bool isAddFriendPressed = this->addFriendIndex == index && this->addFriendState == Pressed;
+    bool isRemoveMemberHovered = this->removeMemberIndex == index && this->removeMemberState == Hover;
+    bool isRemoveMemberPressed = this->removeMemberIndex == index && this->removeMemberState == Pressed;
 
     QSize avatarSize(38, 38);
     QRect avatar(contain.topLeft() + QPoint(10, (contain.height() - avatarSize.height())/2), avatarSize);
@@ -31,7 +38,8 @@ void GroupMemberDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
     painter->restore();
 
     QRect rect_addFriend;
-    getButtonsRect(contain, rect_addFriend);
+    QRect rect_removeMember;
+    getButtonsRect(contain, rect_addFriend, rect_removeMember);
 
     if(!index.data(IsFriendRole).toBool())
     {
@@ -41,10 +49,10 @@ void GroupMemberDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
         QColor color_addFriendBorder(99, 102, 241);
         QColor color_addFriendText(99, 102, 241);
 
-        if(isHovered)
+        if(isAddFriendHovered)
             color_addFriendBackground = QColor(99, 102, 241, 20);
 
-        if(isPressed)
+        if(isAddFriendPressed)
             color_addFriendBackground = QColor(99, 102, 241, 50);
 
         painter->setPen(QPen(color_addFriendBorder, 1));
@@ -58,6 +66,35 @@ void GroupMemberDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
         painter->setPen(color_addFriendText);
 
         painter->drawText(rect_addFriend, Qt::AlignCenter, "添加");
+
+        painter->restore();
+    }
+
+    if(isOwner)
+    {
+        painter->save();
+
+        QColor color_removeBackground(Qt::transparent);
+        QColor color_removeBorder(220, 38, 38);
+        QColor color_removeText(220, 38, 38);
+
+        if(isRemoveMemberHovered)
+            color_removeBackground = QColor(220, 38, 38, 20);
+
+        if(isRemoveMemberPressed)
+            color_removeBackground = QColor(220, 38, 38, 50);
+
+        painter->setPen(QPen(color_removeBorder, 1));
+        painter->setBrush(color_removeBackground);
+        painter->drawRoundedRect(rect_removeMember, 4, 4);
+
+        QFont btnFont = option.font;
+        btnFont.setPointSize(9);
+        btnFont.setBold(false);
+        painter->setFont(btnFont);
+        painter->setPen(color_removeText);
+
+        painter->drawText(rect_removeMember, Qt::AlignCenter, "踢出");
 
         painter->restore();
     }
@@ -105,7 +142,7 @@ bool GroupMemberDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, 
         return false;
 
     QRect contain = option.rect.adjusted(-1, 0, 1, 0);
-    if(!index.data(IsFriendRole).toBool())
+    if(!index.data(IsFriendRole).toBool() || this->isOwner)
     {
         if(event->type() == QEvent::MouseMove)
         {
@@ -113,18 +150,28 @@ bool GroupMemberDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, 
             QMouseEvent* mouse = static_cast<QMouseEvent*>(event);
 
             QRect rect_addFriend;
-            getButtonsRect(contain, rect_addFriend);
+            QRect rect_removeMember;
+            getButtonsRect(contain, rect_addFriend, rect_removeMember);
 
             ButtonState newAddFriendState = None;
+            ButtonState newRemoveMemberState = None;
 
             if(rect_addFriend.contains(mouse->pos()))
                 newAddFriendState = this->isAddFriendPressed ? Pressed : Hover;
+            else if(rect_removeMember.contains(mouse->pos()))
+                newRemoveMemberState = this->isRemoveMemberPressed ? Pressed : Hover;
 
             bool needUpdate = false;
             if(this->addFriendState != newAddFriendState || this->addFriendIndex != index)
             {
                 this->addFriendState = newAddFriendState;
                 this->addFriendIndex = index;
+                needUpdate = true;
+            }
+            else if(this->removeMemberState != newRemoveMemberState || this->removeMemberIndex != index)
+            {
+                this->removeMemberState = newRemoveMemberState;
+                this->removeMemberIndex = index;
                 needUpdate = true;
             }
 
@@ -139,14 +186,21 @@ bool GroupMemberDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, 
             if(mouse->button() == Qt::LeftButton)
             {
                 QRect rect_addFriend;
-                getButtonsRect(contain, rect_addFriend);
+                QRect rect_removeMember;
+                getButtonsRect(contain, rect_addFriend, rect_removeMember);
 
                 ButtonState newAddFriendState = None;
+                ButtonState newRemoveMemberState = None;
 
                 if(rect_addFriend.contains(mouse->pos()))
                 {
                     newAddFriendState = Pressed;
                     this->isAddFriendPressed = true;
+                }
+                else if(rect_removeMember.contains(mouse->pos()))
+                {
+                    newRemoveMemberState = Pressed;
+                    this->isRemoveMemberPressed = true;
                 }
 
                 bool needUpdate = false;
@@ -154,6 +208,12 @@ bool GroupMemberDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, 
                 {
                     this->addFriendState = newAddFriendState;
                     this->addFriendIndex = index;
+                    needUpdate = true;
+                }
+                else if(this->removeMemberState != newRemoveMemberState || this->removeMemberIndex != index)
+                {
+                    this->removeMemberState = newRemoveMemberState;
+                    this->removeMemberIndex = index;
                     needUpdate = true;
                 }
 
@@ -169,9 +229,11 @@ bool GroupMemberDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, 
             QMouseEvent* mouse = static_cast<QMouseEvent*>(event);
 
             QRect rect_addFriend;
-            getButtonsRect(contain, rect_addFriend);
+            QRect rect_removeMember;
+            getButtonsRect(contain, rect_addFriend, rect_removeMember);
 
             ButtonState newAddFriendState = None;
+            ButtonState newRemoveMemberState = None;
 
             if(rect_addFriend.contains(mouse->pos()))
             {
@@ -181,14 +243,28 @@ bool GroupMemberDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, 
                 }
                 newAddFriendState = Hover;
             }
+            else if(rect_removeMember.contains(mouse->pos()))
+            {
+                if(this->isRemoveMemberPressed)
+                {
+                    emit removeMemberClicked(index.data(UIDRole).toString(), index);
+                }
+                newRemoveMemberState = Hover;
+            }
 
-            this->isAddFriendPressed = false;
+            this->isRemoveMemberPressed = false;
 
             bool needUpdate = false;
             if(this->addFriendState != newAddFriendState || this->addFriendIndex != index)
             {
                 this->addFriendState = newAddFriendState;
                 this->addFriendIndex = index;
+                needUpdate = true;
+            }
+            else if(this->removeMemberState != newRemoveMemberState || this->removeMemberIndex != index)
+            {
+                this->removeMemberState = newRemoveMemberState;
+                this->removeMemberIndex = index;
                 needUpdate = true;
             }
 
@@ -201,12 +277,15 @@ bool GroupMemberDelegate::editorEvent(QEvent *event, QAbstractItemModel *model, 
     return QStyledItemDelegate::editorEvent(event, model, option, index);
 }
 
-void GroupMemberDelegate::getButtonsRect(const QRect &containRect, QRect &outAddFriendRect) const
+void GroupMemberDelegate::getButtonsRect(const QRect &containRect, QRect &outAddFriendRect, QRect& outRemoveMember) const
 {
     if(containRect.isNull() || containRect.isEmpty())
         return;
 
     int marginRight = 10;
-    QSize size_addFriend(40, 24);
-    outAddFriendRect = QRect(containRect.topRight() - QPoint(marginRight + size_addFriend.width(), -(containRect.height() - size_addFriend.height()) / 2), size_addFriend);
+    QSize size_btn(40, 24);
+    outRemoveMember = QRect();
+    if(this->isOwner)
+        outRemoveMember = QRect(containRect.topRight() - QPoint(marginRight + size_btn.width(), -(containRect.height() - size_btn.height()) / 2), size_btn);
+    outAddFriendRect = QRect(containRect.topRight() - QPoint(marginRight + size_btn.width() + outRemoveMember.width() + (this->isOwner ? 10 : 0), -(containRect.height() - size_btn.height()) / 2), size_btn);
 }

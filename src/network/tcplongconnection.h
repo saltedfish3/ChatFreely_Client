@@ -58,6 +58,7 @@ public:
     void sendUpdateGroupAvatar(const QString& conversationID, const QString& avatarUrl);
     void sendExitGroup(const QString& conversationID);
     void sendDismissGroup(const QString& conversationID);
+    void sendRemoveGroupMember(const QString& conversationID, const QString& removeUID);
 
     //信息获取
     void getDeletedConversationInfo(const QStringList& friendConversationIDs, const QStringList& groupConversationIDs);
@@ -110,6 +111,7 @@ signals:
     void updateGroupNameFailed(const QString& conversationID);
     void updateGroupAvatar(const QString& conversationID, const QString& avatarUrl);
     void exitGroup(const QString& conversationID);
+    void groupMemberLeft(const QString& conversationID, const QString& uid);
 
     //信息获取
     void groupDeletedConversationInfo(const QList<QVariantMap>& list, bool isSuccess);
@@ -169,6 +171,8 @@ private:
     void handleExitGroupResp(QJsonObject obj);
     void handleDismissGroupResp(QJsonObject obj);
     void handlePushGroupDismissResp(QJsonObject obj);
+    void handleRemoveGroupMemberResp(QJsonObject obj);
+    void handlePushRemoveGroupMemberResp(QJsonObject obj);
 
     //信息获取
     void handleGetDeletedConversationInfoResp(QJsonObject obj);
@@ -213,7 +217,8 @@ private:
         DeleteFriendRequest,
         ExitGroup,
         GetDeletedConversationInfo,
-        DismissGroup
+        DismissGroup,
+        RemoveGroupMember
     };
     struct PendingRequest
     {

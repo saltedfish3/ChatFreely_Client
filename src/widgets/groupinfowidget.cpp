@@ -27,6 +27,7 @@ void GroupInfoWidget::changeInfo(const QString &conversationID, const QString &g
         this->label_camera_icon->show();
         this->view_avatar->setAnimation(true);
         this->btn_exitGroup->setText("解散群聊");
+        this->delegate->setIsOwner(true);
     }
     else
     {
@@ -34,6 +35,7 @@ void GroupInfoWidget::changeInfo(const QString &conversationID, const QString &g
         this->label_camera_icon->hide();
         this->view_avatar->setAnimation(false);
         this->btn_exitGroup->setText("退出群聊");
+        this->delegate->setIsOwner(false);
     }
 
     this->model->removeRows(0, this->model->rowCount());
@@ -398,6 +400,10 @@ void GroupInfoWidget::init()
 
     connect(this->delegate, &GroupMemberDelegate::addFriendClicked, this, [this](const QString& SID, const QModelIndex& index){
         TcpLongConnection::getTcpClient().sendAddNewFriendRequest(SID);
+    });
+
+    connect(this->delegate, &GroupMemberDelegate::removeMemberClicked, this, [this](const QString& UID, const QModelIndex& index){
+        TcpLongConnection::getTcpClient().sendRemoveGroupMember(this->conversationID, UID);
     });
 
     connect(this->btn_addFriend, &QPushButton::clicked, this, [this](){

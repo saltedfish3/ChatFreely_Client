@@ -126,7 +126,12 @@ void FriendApplyDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
     painter->setFont(nameFont);
     painter->setPen(QColor(17, 24, 39));
 
-    int width_nameText = cardRect.width() - (pos_avatarRect.topRight() + QPoint(15, 5)).x() - (cardRect.width() - pos_agreeRect.left() - 10);
+    fm = painter->fontMetrics();
+
+    int width_nameText = pos_agreeRect.left() - pos_avatarRect.right() - 25;
+    if(width_nameText < 0)
+        width_nameText = 0;
+
     int height_nameText = fm.height();
     int margin_verMsg = 0;
 
@@ -138,8 +143,10 @@ void FriendApplyDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
         name_sid += " (ID:" + index.data(SIDRole).toString() + ")";
         int width_nameSID = fm.horizontalAdvance(name_sid);
 
-        name = fm.elidedText(name, Qt::ElideRight, width_nameText - width_nameSID);
-        name += name_sid;
+        if(width_nameText > width_nameSID)
+            name = fm.elidedText(name, Qt::ElideRight, width_nameText - width_nameSID) + name_sid;
+        else
+            name = name_sid;
 
         QRect pos_nameRect = QRect(pos_avatarRect.topRight() + QPoint(15, 5), QSize(width_nameText, height_nameText));
         painter->drawText(pos_nameRect, Qt::AlignLeft | Qt::AlignVCenter, name);
@@ -148,7 +155,7 @@ void FriendApplyDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
     {
         int source = index.data(Source).toInt();
         QRect rect_name = QRect(pos_avatarRect.topRight() + QPoint(15, 0), QSize(width_nameText, height_nameText));
-        QRect rect_sourceTitle = QRect(rect_name.bottomLeft() + QPoint(0, 5), QSize(width_nameText, height_nameText));
+        QRect rect_sourceTitle = QRect(rect_name.bottomLeft() + QPoint(0, 2), QSize(width_nameText, height_nameText));
         margin_verMsg = 10;
 
         QString groupName = index.data(GroupName).toString();

@@ -25,9 +25,11 @@ public:
     };
 
     explicit GroupMemberDelegate(QObject *parent = nullptr);
+    void setIsOwner(bool isOwner);
 
 signals:
     void addFriendClicked(const QString& SID, const QModelIndex& index);
+    void removeMemberClicked(const QString& UID, const QModelIndex& index);
 
 protected:
     void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
@@ -42,11 +44,17 @@ private:
         Pressed
     };
 
-    void getButtonsRect(const QRect& containRect, QRect& outAddFriendRect) const;
+    void getButtonsRect(const QRect& containRect, QRect& outAddFriendRect, QRect& outRemoveMember) const;
 
     QPersistentModelIndex addFriendIndex;
     ButtonState addFriendState = None;
     bool isAddFriendPressed = false;
+
+    QPersistentModelIndex removeMemberIndex;
+    ButtonState removeMemberState = None;
+    bool isRemoveMemberPressed = false;
+
+    bool isOwner = false;
 };
 
 #endif // GROUPMEMBERDELEGATE_H

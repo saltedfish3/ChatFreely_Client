@@ -1168,6 +1168,77 @@ void TcpLongConnection::sendDismissGroup(const QString &conversationID)
     });
 }
 
+void TcpLongConnection::sendRemoveGroupMember(const QString &conversationID, const QString &removeUID)
+{
+    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    {
+        emit mainState(false, "无法连接服务器，请稍后再试");
+        return;
+    }
+    if(conversationID.isEmpty())
+    {
+        emit mainState(false, "踢出成员失败, 群聊错误");
+        return;
+    }
+    if(removeUID.isEmpty())
+    {
+        emit mainState(false, "踢出成员失败, 成员错误");
+        return;
+    }
+
+    //幂等操作
+    QVariantMap currentParams;
+    QString requestsID;
+    currentParams["conversationID"] = conversationID;
+    currentParams["removeUID"] = removeUID;
+    for(auto it = this->map_idempotentCache.begin(); it != this->map_idempotentCache.end(); it++)
+    {
+        if(it.value().name == RemoveGroupMember && it.value().params == currentParams)
+        {
+            requestsID = it.key();
+            break;
+        }
+    }
+
+    //是否复用幂等
+    if(requestsID.isEmpty())
+    {
+        requestsID = QString::number(getRequestsId());
+        PendingRequest prt;
+        prt.requestID = requestsID;
+        prt.name = RemoveGroupMember;
+        prt.params = currentParams;
+
+        QVariantMap tokenParams;
+        tokenParams["conversationID"] = conversationID;
+        tokenParams["removeUID"] = removeUID;
+        prt.tokenParams = tokenParams;
+
+        this->map_idempotentCache[requestsID] = prt;
+    }
+
+    QJsonObject obj;
+    obj["Requests_id"] = requestsID;
+    obj["Type"] = "RemoveGroupMember";
+    obj["AccessToken"] = UserInfo::getUserInfo().getAccessToken();
+    obj["ConversationID"] = conversationID;
+    obj["RemoveUID"] = removeUID;
+
+    QJsonDocument doc(obj);
+    QByteArray data = doc.toJson(QJsonDocument::Compact) + "\n";
+    this->socket->write(data);
+    this->socket->flush();
+
+    this->waiting_requestsID.insert(requestsID.toStdString());
+    QTimer::singleShot(5000,[this,requestsID](){
+        if(this->waiting_requestsID.erase(requestsID.toStdString()))
+        {
+            this->map_idempotentCache.remove(requestsID);
+            emit mainState(false, "连接超时，请稍后再试");
+        }
+    });
+}
+
 void TcpLongConnection::getDeletedConversationInfo(const QStringList &friendConversationIDs, const QStringList &groupConversationIDs)
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
@@ -2189,7 +2260,7 @@ void TcpLongConnection::handleGetNewGroupJoinRequestsListResp(QJsonObject obj)
                                          obj.value("VerMsg").toString(),
                                          "",
                                          obj.value("InviterName").toString());
-                return;
+                continue;
             }
             else if(source == 1 && obj.contains("ApplicantSID") && obj.value("ApplicantSID").isString())
             {
@@ -2201,7 +2272,7 @@ void TcpLongConnection::handleGetNewGroupJoinRequestsListResp(QJsonObject obj)
                                          obj.value("VerMsg").toString(),
                                          obj.value("ApplicantSID").toString(),
                                          "");
-                return;
+                continue;
             }
         }
     }
@@ -2676,6 +2747,81 @@ void TcpLongConnection::handleDismissGroupResp(QJsonObject obj)
 }
 
 void TcpLongConnection::handlePushGroupDismissResp(QJsonObject obj)
+{
+    if(!obj.contains("ConversationID") || !obj.value("ConversationID").isString())
+        return;
+
+    emit exitGroup(obj.value("ConversationID").toString());
+}
+
+void TcpLongConnection::handleRemoveGroupMemberResp(QJsonObject obj)
+{
+    if(!obj.contains("Result") || !obj.value("Result").isBool() ||
+        !obj.contains("ConversationID") || !obj.value("ConversationID").isString() ||
+        !obj.contains("RemoveUID") || !obj.value("RemoveUID").isString())
+        return;
+
+    QString requestsID = obj.value("Requests_id").toString();
+    this->waiting_requestsID.erase(requestsID.toStdString());
+
+    bool success = obj.value("Result").toBool();
+    QString conversationID = obj.value("ConversationID").toString();
+    QString removeUID = obj.value("RemoveUID").toString();
+
+    if(success)
+    {
+        emit groupMemberLeft(conversationID, removeUID);
+        emit mainState(true, "踢出成功");
+    }
+    else
+    {
+        if(obj.contains("AccessTokenExpired") && obj.value("AccessTokenExpired").isBool())
+        {
+            bool isExpired = obj.value("AccessTokenExpired").toBool();
+            if(isExpired)
+            {
+                sendRefreshToken([this, requestsID](bool isSuccess, const QString& newAccessToken, bool isRefreshTokenExpired){
+                    if(isSuccess)
+                    {
+                        if(newAccessToken.isEmpty())
+                        {
+                            emit refreshExpiredExit();
+                            this->map_idempotentCache.remove(requestsID);
+                            return;
+                        }
+                        UserInfo::getUserInfo().setAccessToken(newAccessToken);
+                        auto it = this->map_idempotentCache.find(requestsID);
+                        if(it != this->map_idempotentCache.end())
+                        {
+                            QString conversationID = it.value().tokenParams.value("conversationID").toString();
+                            QString removeUID = it.value().tokenParams.value("removeUID").toString();
+                            this->map_idempotentCache.remove(requestsID);
+                            sendRemoveGroupMember(conversationID, removeUID);
+                        }
+                        return;
+                    }
+                    else
+                    {
+                        if(isRefreshTokenExpired)
+                        {
+                            emit refreshExpiredExit();
+                            this->map_idempotentCache.remove(requestsID);
+                            return;
+                        }
+                        this->map_idempotentCache.remove(requestsID);
+                        emit mainState(false, "踢出失败");
+                    }
+                });
+                return;
+            }
+        }
+        QString info = obj.value("Info").toString();
+        emit mainState(false, info.isEmpty() ? "踢出失败" : info);
+    }
+    this->map_idempotentCache.remove(requestsID);
+}
+
+void TcpLongConnection::handlePushRemoveGroupMemberResp(QJsonObject obj)
 {
     if(!obj.contains("ConversationID") || !obj.value("ConversationID").isString())
         return;
@@ -3432,7 +3578,7 @@ void TcpLongConnection::handleSendMessageResp(QJsonObject obj)
 uint64_t TcpLongConnection::getRequestsId()
 {
     static std::atomic<uint64_t> requestsid{0};
-    while(requestsid >= 125433700 && requestsid <= 125433710)
+    while(requestsid >= 125433700 && requestsid <= 125433720)
         requestsid++;
     return requestsid++;
 }
@@ -3610,6 +3756,12 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
                         if(obj.value("Requests_id").toString() == "125433710")
                             this->handlePushGroupDismissResp(obj);
                     }
+                    else if(type == "PushRemoveGroupMember")
+                    {
+                        //125433711
+                        if(obj.value("Requests_id").toString() == "125433711")
+                            this->handlePushRemoveGroupMemberResp(obj);
+                    }
                     else if(type == "CreateGroupRequestResp")
                     {
                         handleCreateGroupRequestResp(obj);
@@ -3657,6 +3809,10 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
                     else if(type == "DismissGroupResp")
                     {
                         this->handleDismissGroupResp(obj);
+                    }
+                    else if(type == "RemoveGroupMemberResp")
+                    {
+                        this->handleRemoveGroupMemberResp(obj);
                     }
                     else
                     {

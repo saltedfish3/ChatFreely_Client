@@ -473,6 +473,22 @@ GroupManager::GroupManager(QObject *parent)
             emit pointer->allGroupList();
     });
 
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::groupMemberLeft, this, [pointer](const QString& conversationID, const QString& uid){
+        if(!pointer)
+            return;
+
+        {
+            QWriteLocker locker(&(pointer->lock));
+            if(!pointer->hash_groups.contains(conversationID))
+                return;
+
+            GroupInfo& info = pointer->hash_groups[conversationID];
+            info.memberInfos.remove(uid);
+        }
+
+        emit pointer->groupInfoUpdate(conversationID);
+    });
+
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &GroupManager::cleanAll);
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::refreshExpiredExit, this, &GroupManager::cleanAll);
     connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::refreshExpiredExit, this, &GroupManager::cleanAll);
