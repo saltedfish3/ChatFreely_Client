@@ -30,7 +30,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
     else if(type == ConversationItem::ConversationType::Group)
     {
         GroupManager::GroupInfo info = GroupManager::getGroupManage().getGroupInfo(this->item->getConversationID());
-        name = info.groupName;
+        name = info.groupName.isEmpty() ? "未知群聊" : info.groupName;
     }
 
     //初始化 更多 按钮
@@ -337,7 +337,7 @@ ConversationWidget::ConversationWidget(int width, int height, ConversationItem* 
         else
         {
             if(GroupManager::getGroupManage().getGroupInfo(this->item->getConversationID()).ownerUID == UserInfo::getUserInfo().getUID())
-                ;//解散
+                TcpLongConnection::getTcpClient().sendDismissGroup(this->item->getConversationID());//解散
             else
                 TcpLongConnection::getTcpClient().sendExitGroup(this->item->getConversationID());
         }
@@ -920,7 +920,7 @@ void ConversationWidget::updateDeletedState(bool isDeleted)
     if(isDeleted)
     {
         if(this->item->getConversationType() == ConversationItem::ConversationType::Group)
-            this->label_deletedTip->setText("您已退出该群聊，无法发送消息");
+            this->label_deletedTip->setText("您已不在该群聊中，无法发送消息");
         else
             this->label_deletedTip->setText("对方已不是您的好友，无法发送消息");
     }

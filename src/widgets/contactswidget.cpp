@@ -716,8 +716,10 @@ void ContactsWidget::initStacked()
     });
 
     connect(this->widget_groupInfo, &GroupInfoWidget::exitGroup, this, [this](const QString &conversationID){
-        //未来区分解散还是退出
-        TcpLongConnection::getTcpClient().sendExitGroup(conversationID);
+        if(GroupManager::getGroupManage().getGroupInfo(conversationID).ownerUID == UserInfo::getUserInfo().getUID())
+            TcpLongConnection::getTcpClient().sendDismissGroup(conversationID);
+        else
+            TcpLongConnection::getTcpClient().sendExitGroup(conversationID);
     });
 }
 

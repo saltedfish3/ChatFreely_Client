@@ -57,6 +57,10 @@ public:
     void sendUpdateGroupName(const QString& conversationID, const QString& groupName);
     void sendUpdateGroupAvatar(const QString& conversationID, const QString& avatarUrl);
     void sendExitGroup(const QString& conversationID);
+    void sendDismissGroup(const QString& conversationID);
+
+    //信息获取
+    void getDeletedConversationInfo(const QStringList& friendConversationIDs, const QStringList& groupConversationIDs);
 
     //消息
     void sendMessageTo(QString conversationID, QString message, QString tempMsgID, ContentType type);
@@ -83,7 +87,7 @@ signals:
     void newFriendRequestsHandleResult(const QString& handleUID, bool isSuccess);
     void newFriendRequests(const QString& uid, const QString& sid, const QString& username, const QString& avatar_url, const QString& verMsg);
     //全量获取好友列表
-    void allFriendList(const QList<QVariantMap>& list);
+    void allFriendList(const QList<QVariantMap>& list, bool isSuccess);
     //接收服务器的push
     void newFriend(const QString& conversationID, const QString& uid, const QString& sid, const QString& username, const QString& avatar_url, const QString& email, bool isOnline);
     //更新好友的状态信息
@@ -94,7 +98,7 @@ signals:
 
     //群聊
     void createGroupSuccess(const QString& groupID, const QString& conversationID, const QString& groupName);
-    void allGroupList(const QList<QVariantMap>& list);
+    void allGroupList(const QList<QVariantMap>& list, bool isSuccess);
     void newGroupJoinRequestsState(bool isEmpty);
     void newGroupJoinRequest(const QString& requestID, const QString& groupName, int source, const QString& displayName,
                              const QString& displayAvatarUrl, const QString& verMsg, const QString& applicantSID, const QString& inviterName);
@@ -106,6 +110,10 @@ signals:
     void updateGroupNameFailed(const QString& conversationID);
     void updateGroupAvatar(const QString& conversationID, const QString& avatarUrl);
     void exitGroup(const QString& conversationID);
+
+    //信息获取
+    void groupDeletedConversationInfo(const QList<QVariantMap>& list, bool isSuccess);
+    void friendDeletedConversationInfo(const QList<QVariantMap>& list, bool isSuccess);
 
     //用于通知业务层getConversationsListAndSeq是否成功
     void newSyncConvStatus(bool isSuccess, const QList<QString>& conversations, int64_t newSyncConvSeq);
@@ -159,6 +167,11 @@ private:
     void handleUpdateGroupNameRequestResp(QJsonObject obj);
     void handleUpdateGroupAvatarRequestResp(QJsonObject obj);
     void handleExitGroupResp(QJsonObject obj);
+    void handleDismissGroupResp(QJsonObject obj);
+    void handlePushGroupDismissResp(QJsonObject obj);
+
+    //信息获取
+    void handleGetDeletedConversationInfoResp(QJsonObject obj);
 
     //消息
     void handleGetConversationsFriendUIDListAndSeqResp(QJsonObject obj);
@@ -198,7 +211,9 @@ private:
         updateGroupNameRequest,
         updateGroupAvatarRequest,
         DeleteFriendRequest,
-        ExitGroup
+        ExitGroup,
+        GetDeletedConversationInfo,
+        DismissGroup
     };
     struct PendingRequest
     {

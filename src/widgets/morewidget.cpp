@@ -58,7 +58,8 @@ void MoreWidget::initMore(bool isFriend, bool isOwner)
     line->move(10, clear_msg->pos().y() + clear_msg->height() + 4);
 
     QString showDeleteText = isFriend ? "删除用户" : "群聊";
-    showDeleteText.push_front(isOwner ? "解散" : "退出");
+    if(!isFriend)
+        showDeleteText.push_front(isOwner ? "解散" : "退出");
     QPushButton* delete_user = new QPushButton(showDeleteText,this);
     delete_user->resize(this->width() - 2,30);
     delete_user->move(1, line->pos().y() + line->height() + 4);

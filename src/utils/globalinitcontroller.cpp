@@ -110,6 +110,9 @@ void GlobalInitController::loadLocalConversations()
     this->nowStep = Step::LoadingLocalConversations;
     DatabaseManager::getDatabaseManager().loadAllConversationsList([this](const QList<DatabaseManager::ConversationInfo>& list){
         QList<QPair<ConversationItem*, DatabaseManager::ConversationInfo>> ls;
+        QStringList needGetGroupConversationIDs;
+        QStringList needGetFriendConversationIDs;
+
         for(const auto& info : list)
         {
             ConversationItem::ConversationType type = info.conversationType == 1 ?
@@ -118,8 +121,24 @@ void GlobalInitController::loadLocalConversations()
             if(!item)
                 continue;
             ls.append({item, info});
+
+            if(type == ConversationItem::ConversationType::Group)
+            {
+                if(GroupManager::getGroupManage().getGroupInfo(info.conversationID).conversationID.isEmpty())
+                    needGetGroupConversationIDs.append(info.conversationID);
+            }
+            else
+            {
+                if(FriendManage::getFriendManage().getFriendInfo(info.conversationID).uid.isEmpty())
+                    needGetFriendConversationIDs.append(info.conversationID);
+            }
         }
+
         emit allConversationsLoaded(ls);
+
+        if(!needGetFriendConversationIDs.isEmpty() || !needGetGroupConversationIDs.isEmpty())
+            TcpLongConnection::getTcpClient().getDeletedConversationInfo(needGetFriendConversationIDs, needGetGroupConversationIDs);
+
         syncGlobalSeq();
     });
 }

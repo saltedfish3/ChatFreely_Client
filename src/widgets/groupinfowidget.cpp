@@ -47,10 +47,14 @@ void GroupInfoWidget::changeInfo(const QString &conversationID, const QString &g
     int width_memberCount = fm.horizontalAdvance(memberCount);
 
     int width_groupName = fm.horizontalAdvance(this->currentGroupName);
-    if(width_groupName >= this->widget_holy->width() - width_memberCount - 120)
-        width_groupName = this->widget_holy->width() - width_memberCount - 120;
+    int availableWidth = this->widget_holy->width() - width_memberCount - 120;
 
-    QString showGroupName = fm.elidedText(currentGroupName, Qt::ElideRight, width_groupName);
+    QString showGroupName;
+    if(width_groupName <= availableWidth)
+        showGroupName = this->currentGroupName;
+    else
+        showGroupName = fm.elidedText(currentGroupName, Qt::ElideRight, width_groupName);
+
     showGroupName += memberCount;
     this->edit_groupName->setText(showGroupName);
 
@@ -123,10 +127,14 @@ void GroupInfoWidget::changeSelectedGroupName(const QString& groupName)
     int width_memberCount = fm.horizontalAdvance(memberCount);
 
     int width_groupName = fm.horizontalAdvance(this->currentGroupName);
-    if(width_groupName >= this->widget_holy->width() - width_memberCount - 120)
-        width_groupName = this->widget_holy->width() - width_memberCount - 120;
+    int availableWidth = this->widget_holy->width() - width_memberCount - 120;
 
-    QString showGroupName = fm.elidedText(currentGroupName, Qt::ElideRight, width_groupName);
+    QString showGroupName;
+    if(width_groupName <= availableWidth)
+        showGroupName = this->currentGroupName;
+    else
+        showGroupName = fm.elidedText(currentGroupName, Qt::ElideRight, width_groupName);
+
     showGroupName += memberCount;
     this->edit_groupName->setText(showGroupName);
 

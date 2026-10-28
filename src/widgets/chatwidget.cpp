@@ -519,18 +519,18 @@ void ChatWidget::initListWidget()
                 QStandardItem* item = this->model->itemFromIndex(index);
                 item->setData(info.username, ConversationListDelegate::UsernameRole);
 
-                if(!info.isDeleted)
-                {
-                    QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(36, 36));
-                    avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
-                    item->setData(avatar, ConversationListDelegate::AvatarRole);
-                }
+                QPixmap avatar = FriendManage::getFriendManage().getFriendAvatar(info.conversationID, QSize(36, 36));
+                avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+                item->setData(avatar, ConversationListDelegate::AvatarRole);
 
                 item->setData(info.isOnline, ConversationListDelegate::IsOnlineRole);
 
                 auto it = this->map_conversation.find(conversationID);
                 if(it != this->map_conversation.end())
+                {
+                    it.value()->updateFriendUsername(info.username);
                     it.value()->updateFriendStatus(info.isOnline);
+                }
             }
         }
 
@@ -892,8 +892,9 @@ void ChatWidget::appendSearchConvItem(const DatabaseManager::SearchConvResult &r
     QPixmap avatar;
     if(isGroup)
     {
-        username = GroupManager::getGroupManage().getGroupInfo(result.conversationID).groupName;
-        avatar = GroupManager::getGroupManage().getGroupAvatar(result.conversationID, QSize(36, 36));
+        GroupManager::GroupInfo group_info = GroupManager::getGroupManage().getGroupInfo(result.conversationID);
+        username = group_info.groupName.isEmpty() ? "未知群聊" : group_info.groupName;
+        avatar = group_info.conversationID.isEmpty() ? QPixmap(":/default/images/defaultAvatar.png") : GroupManager::getGroupManage().getGroupAvatar(result.conversationID, QSize(36, 36));
     }
     else
     {
@@ -1132,21 +1133,26 @@ void ChatWidget::createConversationListItem(ConversationItem *item, const Databa
     if(type == ConversationItem::ConversationType::Personal)
     {
         FriendManage::FriendInfo friend_info = FriendManage::getFriendManage().getFriendInfo(conversationID);
-        if(friend_info.conversationID.isEmpty() || friend_info.uid.isEmpty())
-            return;
-        name = friend_info.username;
-        avatar = FriendManage::getFriendManage().getFriendAvatar(friend_info.conversationID, QSize(36, 36));
-        avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
+
+        name = friend_info.username.isEmpty() ? "未知用户" : friend_info.username;
         isOnline = friend_info.isOnline;
+
+        if(!friend_info.uid.isEmpty())
+            avatar = FriendManage::getFriendManage().getFriendAvatar(friend_info.conversationID, QSize(36, 36));
+        else
+            avatar = QPixmap(":/default/images/defaultAvatar.png");
+        avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
     }
     else if(type == ConversationItem::ConversationType::Group)
     {
         GroupManager::GroupInfo group_info = GroupManager::getGroupManage().getGroupInfo(conversationID);
-        if(group_info.conversationID.isEmpty())
-            return;
 
-        name = group_info.groupName;
-        avatar = GroupManager::getGroupManage().getGroupAvatar(conversationID, QSize(36, 36));
+        name = group_info.groupName.isEmpty() ? "未知群聊" : group_info.groupName;
+
+        if(!group_info.conversationID.isEmpty())
+            avatar = GroupManager::getGroupManage().getGroupAvatar(conversationID, QSize(36, 36));
+        else
+            avatar = QPixmap(":/default/images/defaultAvatar.png");
         avatar.setDevicePixelRatio(GlobalVariable::getMaxDevicePixelRatio());
     }
 

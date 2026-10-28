@@ -183,22 +183,69 @@ GroupManager::GroupManager(QObject *parent)
         info.groupName = groupName;
         info.ownerUID = UserInfo::getUserInfo().getUID();
 
+        GroupMemberInfo ownerMember;
+        ownerMember.uid = UserInfo::getUserInfo().getUID();
+        ownerMember.sid = UserInfo::getUserInfo().getSID();
+        ownerMember.username = UserInfo::getUserInfo().getUsername();
+        ownerMember.avatarUrl = UserInfo::getUserInfo().getAvatarUrl();
+        info.memberInfos[ownerMember.uid] = ownerMember;
+
         {
             QWriteLocker locker(&pointer->lock);
             pointer->hash_groups[conversationID] = info;
+            pointer->hash_left.remove(conversationID);
         }
 
         emit pointer->groupCreated(conversationID);
+        emit pointer->groupInfoUpdate(conversationID);
         emit pointer->allGroupList();
     });
 
-    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::allGroupList, this, [pointer](const QList<QVariantMap>& list){
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::allGroupList, this, [pointer](const QList<QVariantMap>& list, bool isSuccess){
         if(!pointer)
             return;
 
+        if(!isSuccess)
+        {
+            if(!pointer->isFirstLoad)
+            {
+                pointer->isFirstLoad = true;
+                emit pointer->loadFirstAllGroupList();
+            }
+            return;
+        }
+
+        QList<DatabaseManager::DeletedConversationIDInfo> paddingDeleted;
         QMap<QString, QString> avatarTasks;
         {
             QWriteLocker locker(&pointer->lock);
+
+            QSet<QString> newMembers;
+            for(const auto& var : list)
+                newMembers.insert(var.value("ConversationID").toString());
+
+            for(auto it = pointer->hash_groups.begin(); it != pointer->hash_groups.end(); it++)
+            {
+                if(newMembers.contains(it.key()))
+                    continue;
+
+                if(pointer->hash_left.contains(it.key()))
+                    continue;
+
+                GroupInfo info = it.value();
+                info.isDeleted = true;
+                pointer->hash_left[it.key()] = info;
+
+                DatabaseManager::DeletedConversationIDInfo in;
+                in.conversationID = it.key();
+                in.conversationType = 1;
+                in.peerID = info.groupID;
+                in.displayName = info.groupName;
+                in.avatarUrl = info.avatarUrl;
+
+                paddingDeleted.append(in);
+            }
+
             pointer->hash_groups.clear();
             pointer->set_paddingAvatarSize.clear();
 
@@ -247,6 +294,9 @@ GroupManager::GroupManager(QObject *parent)
                 emit pointer->groupAvatarUpdate(conversationID, pix, QSize());
             });
         }
+
+        for(const auto& in : paddingDeleted)
+            DatabaseManager::getDatabaseManager().upsertDeletedConversation(in);
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::newGroup, this, [pointer](const QString& conversationID, const QString& groupID, const QString& groupName,
@@ -291,6 +341,10 @@ GroupManager::GroupManager(QObject *parent)
 
         {
             QWriteLocker locker(&pointer->lock);
+
+            if(pointer->hash_left.contains(conversationID))
+                return;
+
             GroupInfo& info_g = pointer->hash_groups[conversationID];
             info_g.groupID = info.value("GroupID").toString().isEmpty() ? info_g.groupID : info.value("GroupID").toString();
             info_g.groupName = info.value("GroupName").toString().isEmpty() ? info_g.groupName : info.value("GroupName").toString();
@@ -370,7 +424,53 @@ GroupManager::GroupManager(QObject *parent)
         in.avatarUrl = info.avatarUrl;
         DatabaseManager::getDatabaseManager().upsertDeletedConversation(in);
 
+        emit pointer->groupInfoUpdate(conversationID);
         emit pointer->allGroupList();
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::groupDeletedConversationInfo, this, [pointer](const QList<QVariantMap>& list, bool isSuccess){
+        if(!pointer || !isSuccess || list.isEmpty())
+            return;
+
+        QList<DatabaseManager::DeletedConversationIDInfo> list_deleted;
+        {
+            QWriteLocker locker(&(pointer->lock));
+            for(const auto& var : list)
+            {
+                QString conversationID = var.value("ConversationID").toString();
+                if(conversationID.isEmpty())
+                    continue;
+
+                if(pointer->hash_groups.contains(conversationID))
+                    continue;
+
+                GroupInfo info = pointer->hash_left[conversationID];
+                info.conversationID = conversationID;
+                info.groupName = var.value("GroupName").toString();
+                info.avatarUrl = var.value("AvatarUrl").toString();
+                info.groupID = var.value("GroupID").toString();
+                info.isDeleted = true;
+                pointer->hash_left[conversationID] = info;
+
+                DatabaseManager::DeletedConversationIDInfo in;
+                in.conversationID = conversationID;
+                in.conversationType = 1;
+                in.peerID = info.groupID;
+                in.displayName = info.groupName;
+                in.avatarUrl = info.avatarUrl;
+
+                list_deleted.append(in);
+            }
+        }
+
+        for(const auto& in : list_deleted)
+            DatabaseManager::getDatabaseManager().upsertDeletedConversation(in);
+
+        for(const auto& in : list_deleted)
+            emit pointer->groupInfoUpdate(in.conversationID);
+
+        if(!list_deleted.isEmpty())
+            emit pointer->allGroupList();
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &GroupManager::cleanAll);

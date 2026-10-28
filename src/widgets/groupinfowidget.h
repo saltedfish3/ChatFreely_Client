@@ -49,7 +49,6 @@ private:
     QScrollArea* area;
     QWidget* widget_holy;
 
-    // QLabel* label_avatar;
     AvatarView* view_avatar;
     QLabel* label_camera_icon;
 

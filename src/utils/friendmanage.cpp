@@ -200,6 +200,8 @@ FriendManage::FriendManage(QObject *parent)
             info.isOnline = isOnline;
             info.isDeleted = false;
 
+            this->hash_deleted.remove(conversationID);
+
             if(!conversationID.isEmpty())
                 this->hash_UIDToConversatioID[uid] = conversationID;
         }
@@ -277,13 +279,45 @@ FriendManage::FriendManage(QObject *parent)
     });
 
     //全量更新
-    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::allFriendList, this, [this](const QList<QVariantMap>& list){
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::allFriendList, this, [this](const QList<QVariantMap>& list, bool isSuccess){
         QMap<QString, QString> avatarTasks;
         QPointer<FriendManage> pointer(this);
         if(!pointer)
             return;
+
+        if(!isSuccess)
+        {
+            if(!this->isFirstLoad)
+            {
+                this->isFirstLoad = true;
+                emit loadFirstAllFriendList();
+            }
+            return;
+        }
+
+        QList<FriendInfo> paddingDeleted;
         {
             QWriteLocker locker(&(this->lock));
+
+            QSet<QString> newFriends;
+            for(const auto& var : std::as_const(list))
+                newFriends.insert(var.value("ConversationID").toString());
+
+            for(auto it = this->hash_friend.constBegin(); it != this->hash_friend.constEnd(); it++)
+            {
+                if(newFriends.contains(it.key()))
+                    continue;
+
+                if(this->hash_deleted.contains(it.key()))
+                    continue;
+
+                FriendInfo info = it.value();
+                info.isDeleted = true;
+                info.isOnline = false;
+
+                paddingDeleted.append(info);
+            }
+
             this->hash_friend.clear();
             this->set_paddingAvatarSize.clear();
             this->hash_UIDToConversatioID.clear();
@@ -309,7 +343,23 @@ FriendManage::FriendManage(QObject *parent)
                 if(!info.avatarUrl.isEmpty())
                     avatarTasks[info.uid] = info.avatarUrl;
             }
+
+            for(const auto& info : paddingDeleted)
+                this->hash_deleted[info.conversationID] = info;
         }
+
+        for(const auto& info : paddingDeleted)
+        {
+            DatabaseManager::DeletedConversationIDInfo in;
+            in.conversationID = info.conversationID;
+            in.conversationType = 0;
+            in.peerID = info.uid;
+            in.peerSID = info.sid;
+            in.displayName = info.username;
+            in.avatarUrl = info.avatarUrl;
+            DatabaseManager::getDatabaseManager().upsertDeletedConversation(in);
+        }
+
         emit allFriendList();
         if(!this->isFirstLoad)
         {
@@ -368,6 +418,52 @@ FriendManage::FriendManage(QObject *parent)
         DatabaseManager::getDatabaseManager().upsertDeletedConversation(info_deleted);
 
         emit allFriendList();
+    });
+
+    connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::friendDeletedConversationInfo, this, [this](const QList<QVariantMap>& list, bool isSuccess){
+        QPointer pointer(this);
+        if(!pointer || !isSuccess || list.isEmpty())
+            return;
+
+        QList<DatabaseManager::DeletedConversationIDInfo> list_deleted;
+        {
+            QWriteLocker locker(&(pointer->lock));
+            for(const auto& var : list)
+            {
+                QString conversationID = var.value("ConversationID").toString();
+                if(conversationID.isEmpty())
+                    continue;
+
+                if(pointer->hash_friend.contains(conversationID))
+                    continue;
+
+                FriendInfo info = pointer->hash_deleted[conversationID];
+                info.conversationID = conversationID;
+                info.uid = var.value("UID").toString();
+                info.avatarUrl = var.value("AvatarUrl").toString();
+                info.sid = var.value("SID").toString();
+                info.username = var.value("Username").toString();
+                info.isOnline = false;
+                info.isDeleted = true;
+                pointer->hash_deleted[conversationID] = info;
+
+                DatabaseManager::DeletedConversationIDInfo in;
+                in.conversationID = conversationID;
+                in.conversationType = 0;
+                in.peerID = info.uid;
+                in.peerSID = info.sid;
+                in.displayName = info.username;
+                in.avatarUrl = info.avatarUrl;
+
+                list_deleted.append(in);
+            }
+        }
+
+        for(const auto& in : list_deleted)
+            DatabaseManager::getDatabaseManager().upsertDeletedConversation(in);
+
+        if(!list_deleted.isEmpty())
+            emit pointer->allFriendList();
     });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, &FriendManage::cleanAll);

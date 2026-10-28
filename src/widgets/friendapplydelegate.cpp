@@ -201,7 +201,18 @@ void FriendApplyDelegate::paint(QPainter *painter, const QStyleOptionViewItem &o
     QString msg = "验证信息：";
     QString verMsg = index.data(VerMsgRole).toString();
     if(verMsg.isEmpty())
-        msg += "加个好友认识一下!";
+    {
+        if(isGroup)
+        {
+            int source = index.data(Source).toInt();
+            if(source == 0)
+                msg += "邀请你加入群聊";
+            else
+                msg += "请求加入群聊";
+        }
+        else
+            msg += "加个好友认识一下!";
+    }
     else
         msg += fm.elidedText(verMsg, Qt::ElideRight, width_nameText);
 
