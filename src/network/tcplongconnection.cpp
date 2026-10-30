@@ -525,6 +525,7 @@ void TcpLongConnection::sendHello()
     QJsonObject obj;
     obj["Requests_id"] = requestsID;
     obj["Type"] = "Hello";
+    obj["ClientSessionID"] = this->client_session_id;
 
     QJsonDocument doc(obj);
     QByteArray data =doc.toJson(QJsonDocument::Compact) + "\n";
@@ -3591,6 +3592,7 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
     this->clock_heartbeat = new QTimer(this);
     this->clock_retry->setInterval(5000);
 
+    this->client_session_id = QUuid::createUuid().toString(QUuid::WithoutBraces);
 
     //连接成功处理
     connect(this->socket, &QTcpSocket::connected, this, [this](){

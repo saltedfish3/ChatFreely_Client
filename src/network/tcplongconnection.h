@@ -236,6 +236,9 @@ private:
     QMap<QString, PendingRequest> map_idempotentCache;//QString是RequestID
     QMap<QString, MessageRequest> map_messageCache;//QString是tempMsgID
 
+    //启动会话ID
+    QString client_session_id;
+
 };
 
 #endif // TCPLONGCONNECTION_H
