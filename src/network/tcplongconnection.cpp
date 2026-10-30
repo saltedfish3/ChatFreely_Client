@@ -542,6 +542,17 @@ void TcpLongConnection::sendHello()
     });
 }
 
+void TcpLongConnection::handleHeartBeatResp(QJsonObject obj)
+{
+    if(obj.contains("SessionExpired"))
+    {
+        emit refreshExpiredExit();
+        return;
+    }
+
+    this->clock_heartbeat->start();
+}
+
 void TcpLongConnection::sendAddNewFriendRequest(QString sid, QString email, QString verMsg)
 {
     if(this->socket->state() != QAbstractSocket::ConnectedState)
@@ -3634,7 +3645,7 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
                     }
                     else if(type == "HeartbeatResp")
                     {
-                        this->clock_heartbeat->start();
+                        this->handleHeartBeatResp(obj);
                     }
                     else if(type == "LoginResp")
                     {

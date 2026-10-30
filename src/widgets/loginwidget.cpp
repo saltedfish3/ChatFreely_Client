@@ -126,6 +126,9 @@ void LoginWidget::initWidget()
         this->btn_loginNow->setText("立即登录中...");
         this->animation_loading->start();
         this->label_loading->show();
+
+        clearError(this->edit_loginEmail, this->label_emailError);
+        clearError(this->edit_loginPassd, this->label_passdError);
         TcpLongConnection::getTcpClient().sendLogin(email, password);
     });
 

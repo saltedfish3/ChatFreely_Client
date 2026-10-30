@@ -133,6 +133,7 @@ private:
 
     void startConnect();
     void sendHello();
+    void handleHeartBeatResp(QJsonObject obj);
 
     //账号
     void handleHelloResp(QJsonObject obj);
