@@ -585,8 +585,13 @@ void HttpShortConnection::checkUrlExists(const QString &url, std::function<void 
             callback(true);
         else if(err == QNetworkReply::ContentNotFoundError && status == 404)
             callback(false);
-        else
+        else if(status == 403 || status == 401)
+        {
             callback(true);
+            return;
+        }
+        else
+            callback(false);
     });
 }
 
@@ -614,6 +619,13 @@ HttpShortConnection::HttpShortConnection(QObject *parent)
     : QObject{parent}
 {
     httpmanager = new QNetworkAccessManager(this);
+
+    connect(httpmanager, &QNetworkAccessManager::sslErrors, this, [this](QNetworkReply* reply, const QList<QSslError>& errors){
+        for (const QSslError &error : errors) {
+            qWarning() << "SSL Error Ignored:" << error.errorString();
+        }
+        reply->ignoreSslErrors();
+    });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, [this](){
         cleanALL();
