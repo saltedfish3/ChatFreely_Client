@@ -1,18 +1,19 @@
 #include "GlobalVariable.h"
 
-GlobalVariable GlobalVariable::myself;
-QString GlobalVariable::pos_ini;
 QString GlobalVariable::pos_downloadFile;
 QString GlobalVariable::pos_chatRecord;
 QString GlobalVariable::pos_imageCache;
 bool GlobalVariable::isHaveGPU = false;
+QString GlobalVariable::serverHost = "chatfreely.test";
+int GlobalVariable::tcpPort = 9002;
+bool GlobalVariable::useHttps = true;
+QReadWriteLock GlobalVariable::rwLock;
 
-GlobalVariable::GlobalVariable()
+void GlobalVariable::initGlobalSettings()
 {
     //初始化 配置文件
     QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
     QDir().mkpath(configDir);
-    this->pos_ini = configDir + "/config.ini";
 
     QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/record";
     QDir().mkpath(dataDir);
@@ -21,60 +22,52 @@ GlobalVariable::GlobalVariable()
     QString imageCacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/images";
     QDir().mkpath(imageCacheDir);
 
-    if(!QFileInfo::exists(this->pos_ini))
-    {
-        QSettings settings(this->pos_ini,QSettings::IniFormat);
-        settings.setValue("pos_downloadFile",downloadDir);
-        settings.setValue("pos_chatRecord",dataDir);
-        settings.setValue("pos_imageCache",imageCacheDir);
-        this->pos_downloadFile = downloadDir;
-        this->pos_chatRecord = dataDir;
-        this->pos_imageCache = imageCacheDir;
-    }
-    else
-    {
-        QSettings settings(this->pos_ini,QSettings::IniFormat);
-        this->pos_downloadFile = settings.value("pos_downloadFile").toString();
-        if(this->pos_downloadFile.isEmpty())
-        {
-            settings.setValue("pos_downloadFile",downloadDir);
-            this->pos_downloadFile = downloadDir;
-        }
-        this->pos_chatRecord = settings.value("pos_chatRecord").toString();
-        if(this->pos_chatRecord.isEmpty())
-        {
-            settings.setValue("pos_chatRecord",dataDir);
-            this->pos_chatRecord = dataDir;
-        }
-        this->pos_imageCache = settings.value("pos_imageCache").toString();
-        if(this->pos_imageCache.isEmpty())
-        {
-            settings.setValue("pos_imageCache",imageCacheDir);
-            this->pos_imageCache = imageCacheDir;
-        }
-    }
-}
+    QSettings settings(QSettings::NativeFormat, QSettings::UserScope, "ChatFreelyOrg", "ChatClient");
+    if(!settings.contains("pos_downloadFile"))
+        settings.setValue("pos_downloadFile", downloadDir);
 
-GlobalVariable &GlobalVariable::initGlobalSettings()
-{
-    static GlobalVariable myself;
-    return myself;
+    if(!settings.contains("pos_chatRecord"))
+        settings.setValue("pos_chatRecord", dataDir);
+
+    if(!settings.contains("pos_imageCache"))
+        settings.setValue("pos_imageCache", imageCacheDir);
+
+    pos_downloadFile = settings.value("pos_downloadFile").toString();
+    pos_chatRecord = settings.value("pos_chatRecord").toString();
+    pos_imageCache = settings.value("pos_imageCache").toString();
+
+    if(!settings.contains("serverHost"))
+        settings.setValue("serverHost", serverHost);
+
+    if(!settings.contains("tcpPort"))
+        settings.setValue("tcpPort", tcpPort);
+
+    if(!settings.contains("useHttps"))
+        settings.setValue("useHttps", useHttps);
+
+    serverHost = settings.value("serverHost").toString();
+    tcpPort = settings.value("tcpPort").toInt();
+    useHttps = settings.value("useHttps").toBool();
 }
 
 QString GlobalVariable::getPosOfDownloadFile()
 {
+    QReadLocker locker(&rwLock);
     return pos_downloadFile;
 }
 
 void GlobalVariable::setPosOfDownloadFile(const QString &dir)
 {
-    QSettings settings(pos_ini,QSettings::IniFormat);
+    QWriteLocker locker(&rwLock);
+    QSettings settings(QSettings::NativeFormat, QSettings::UserScope, "ChatFreelyOrg", "ChatClient");
     settings.setValue("pos_downloadFile", dir);
     pos_downloadFile = dir;
+    settings.sync();
 }
 
 bool GlobalVariable::isDownloadFileExists(const QString &filename)
 {
+    QReadLocker locker(&rwLock);
     QFileInfo info(pos_downloadFile + "/" + filename);
     if(info.exists())
         return true;
@@ -83,23 +76,28 @@ bool GlobalVariable::isDownloadFileExists(const QString &filename)
 
 QString GlobalVariable::getPosOfChatRecord()
 {
+    QReadLocker locker(&rwLock);
     return pos_chatRecord;
 }
 
 void GlobalVariable::setPosOfChatRecord(const QString &dir)
 {
-    QSettings settings(pos_ini,QSettings::IniFormat);
+    QWriteLocker locker(&rwLock);
+    QSettings settings(QSettings::NativeFormat, QSettings::UserScope, "ChatFreelyOrg", "ChatClient");
     settings.setValue("pos_chatRecord", dir + "/record");
     pos_chatRecord = dir + "/record";
+    settings.sync();
 }
 
 QString GlobalVariable::getPosOfImageCache()
 {
+    QReadLocker locker(&rwLock);
     return pos_imageCache;
 }
 
 QString GlobalVariable::getChatRecordSize()
 {
+    QReadLocker locker(&rwLock);
     qint64 totalSize = 0;
     QDirIterator it(pos_chatRecord,QDir::Files|QDir::Hidden|QDir::NoSymLinks,QDirIterator::Subdirectories);
     while(it.hasNext())
@@ -122,6 +120,7 @@ QString GlobalVariable::getChatRecordSize()
 
 QString GlobalVariable::getImageCacheSize()
 {
+    QReadLocker locker(&rwLock);
     qint64 totalSize = 0;
     QDirIterator it(pos_imageCache,QDir::Files|QDir::Hidden|QDir::NoSymLinks,QDirIterator::Subdirectories);
     while(it.hasNext())
@@ -144,6 +143,7 @@ QString GlobalVariable::getImageCacheSize()
 
 void GlobalVariable::clearImageCache()
 {
+    QWriteLocker locker(&rwLock);
     if(pos_imageCache.isEmpty())
         return;
 
@@ -157,7 +157,8 @@ void GlobalVariable::clearImageCache()
 
 void GlobalVariable::setMigrationState(bool isMigrating, const QString &oldPath, const QString &newPath)
 {
-    QSettings settings(pos_ini, QSettings::IniFormat);
+    QWriteLocker locker(&rwLock);
+    QSettings settings(QSettings::NativeFormat, QSettings::UserScope, "ChatFreelyOrg", "ChatClient");
     settings.setValue("isMigrating", isMigrating);
     if(isMigrating)
     {
@@ -169,23 +170,28 @@ void GlobalVariable::setMigrationState(bool isMigrating, const QString &oldPath,
         settings.remove("migrating_old");
         settings.remove("migrating_new");
     }
+    settings.sync();
 }
 
 bool GlobalVariable::isMigrating()
 {
-    QSettings settings(pos_ini, QSettings::IniFormat);
+    QReadLocker locker(&rwLock);
+    QSettings settings(QSettings::NativeFormat, QSettings::UserScope, "ChatFreelyOrg", "ChatClient");
+
     return settings.value("isMigrating", false).toBool();
 }
 
 QString GlobalVariable::getMigratingOldPath()
 {
-    QSettings settings(pos_ini, QSettings::IniFormat);
+    QReadLocker locker(&rwLock);
+    QSettings settings(QSettings::NativeFormat, QSettings::UserScope, "ChatFreelyOrg", "ChatClient");
     return settings.value("migrating_old", "").toString();
 }
 
 QString GlobalVariable::getMigratingNewPath()
 {
-    QSettings settings(pos_ini, QSettings::IniFormat);
+    QReadLocker locker(&rwLock);
+    QSettings settings(QSettings::NativeFormat, QSettings::UserScope, "ChatFreelyOrg", "ChatClient");
     return settings.value("migrating_new", "").toString();
 }
 
@@ -205,10 +211,47 @@ qreal GlobalVariable::getMaxDevicePixelRatio()
 
 bool GlobalVariable::hasGPU()
 {
+    QReadLocker locker(&rwLock);
     return isHaveGPU;
 }
 
 void GlobalVariable::setHasGPU(bool gpu)
 {
+    QWriteLocker locker(&rwLock);
     isHaveGPU = gpu;
+}
+
+QString GlobalVariable::getServerHost()
+{
+    QReadLocker locker(&rwLock);
+    return serverHost;
+}
+
+int GlobalVariable::getTcpPort()
+{
+    QReadLocker locker(&rwLock);
+    return tcpPort;
+}
+
+QString GlobalVariable::getHttpBaseUrl()
+{
+    QReadLocker locker(&rwLock);
+    QString pre = useHttps ? "https://" : "http://";
+    return pre + serverHost;
+}
+
+void GlobalVariable::updateServerConfig(const QString &host, int tcpPort, bool useHttps)
+{
+    if(host.isEmpty() || tcpPort <= 0)
+        return;
+
+    GlobalVariable::serverHost = host;
+    GlobalVariable::tcpPort = tcpPort;
+    GlobalVariable::useHttps = useHttps;
+
+    QSettings settings(QSettings::NativeFormat, QSettings::UserScope, "ChatFreelyOrg", "ChatClient");
+    settings.setValue("serverHost", GlobalVariable::serverHost);
+    settings.setValue("tcpPort", GlobalVariable::tcpPort);
+    settings.setValue("useHttps", GlobalVariable::useHttps);
+    settings.sync();
 }

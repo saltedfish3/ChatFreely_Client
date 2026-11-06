@@ -81,6 +81,9 @@ public:
 
     void checkUrlExists(const QString& url, std::function<void(bool isExists)> callback);
 
+    //下发
+    void getBootstrapConfig();
+
 signals:
     void mainState(bool isSuccess, QString info);
     void refreshExpiredExit();

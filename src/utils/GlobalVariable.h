@@ -13,6 +13,8 @@
 #include <QDirIterator>
 #include <QGuiApplication>
 #include <QSCreen>
+#include <QReadWriteLock>
+#include <QMutex>
 
 class GlobalVariable
 {
@@ -27,7 +29,7 @@ public:
     GlobalVariable(const GlobalVariable&) = delete;
     GlobalVariable& operator=(const GlobalVariable&) = delete;
 
-    static GlobalVariable& initGlobalSettings();
+    static void initGlobalSettings();
     static QString getPosOfDownloadFile();
     static void setPosOfDownloadFile(const QString& dir);
     static bool isDownloadFileExists(const QString& filename);
@@ -51,16 +53,25 @@ public:
     static bool hasGPU();
     static void setHasGPU(bool gpu);
 
+    static QString getServerHost();
+    static int getTcpPort();
+    static QString getHttpBaseUrl();
+
+    static void updateServerConfig(const QString& host, int tcpPort, bool useHttps);
+
 private:
-    GlobalVariable();
+    GlobalVariable() = delete;
 
-    static GlobalVariable myself;
-
-    static QString pos_ini;
     static QString pos_downloadFile;
     static QString pos_chatRecord;
     static QString pos_imageCache;
     static bool isHaveGPU;
+
+    static QString serverHost;
+    static int tcpPort;
+    static bool useHttps;
+
+    static QReadWriteLock rwLock;
 };
 
 

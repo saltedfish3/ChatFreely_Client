@@ -595,6 +595,36 @@ void HttpShortConnection::checkUrlExists(const QString &url, std::function<void 
     });
 }
 
+void HttpShortConnection::getBootstrapConfig()
+{
+    QNetworkRequest request(QUrl("https://chatfreely.test/config"));
+    QNetworkReply* reply = this->httpmanager->get(request);
+
+    connect(reply, &QNetworkReply::sslErrors, this, [reply](const QList<QSslError> &errors){
+        reply->ignoreSslErrors();
+    });
+
+    connect(reply, &QNetworkReply::finished, this, [reply](){
+        reply->deleteLater();
+
+        if(reply->error() != QNetworkReply::NoError)
+        {
+            qWarning() << "获取动态配置失败，使用本地缓存";
+            return;
+        }
+
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        QJsonObject obj = doc.object();
+
+        QString newHost = obj.value("serverHost").toString();
+        int newPort = obj.value("tcpPort").toString().toInt();
+        bool newHttps = obj.value("useHttps").toBool();
+
+        if(!newHost.isEmpty() && newPort > 0)
+            GlobalVariable::updateServerConfig(newHost, newPort, newHttps);
+    });
+}
+
 HttpShortConnection::DownloadStatus HttpShortConnection::getDownloadStatus(const QString &url) const
 {
     auto it = this->hash_downloadTasks.find(url);
@@ -678,7 +708,7 @@ QString HttpShortConnection::isVideo(const QByteArray &data) const
 
 void HttpShortConnection::sendUploadInit(MediaType type, const QString &filePath, qint64 fileSize, const QByteArray &md5, const QString &suffix, const QString &mimeType, const QByteArray &fileData, std::function<void (const UploadResult&)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed, bool needServerThumbnail)
 {
-    QNetworkRequest request(QUrl("http://192.168.153.128:9003/upload/init"));
+    QNetworkRequest request(QUrl(GlobalVariable::getHttpBaseUrl() + "/upload/init"));
     request.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
@@ -1000,7 +1030,7 @@ void HttpShortConnection::uploadOnePart(const QString &filePath, qint64 partSize
     QByteArray partData = file.read(partSize);
     file.close();
 
-    QUrl url("http://192.168.153.128:9003/upload/part");
+    QUrl url(GlobalVariable::getHttpBaseUrl() + "/upload/part");
     QUrlQuery query;
     query.addQueryItem("ObjectKey", objectKey);
     query.addQueryItem("UploadId", uploadId);
@@ -1098,7 +1128,7 @@ void HttpShortConnection::uploadOnePart(const QString &filePath, qint64 partSize
 
 void HttpShortConnection::sendComplete(const QString& filePath, const QString &objectKey, const QString &uploadId, const QJsonArray &parts, const QString &finalUrl, std::function<void (const UploadResult&)> cb_success, bool failed_notice, std::function<void (const QString &)> cb_failed)
 {
-    QNetworkRequest req(QUrl("http://192.168.153.128:9003/upload/complete"));
+    QNetworkRequest req(QUrl(GlobalVariable::getHttpBaseUrl() + "/upload/complete"));
     req.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
     req.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 

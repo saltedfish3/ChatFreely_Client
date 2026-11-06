@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
     qDebug()<< "是否使用GPU: " << GlobalVariable::hasGPU();
 
     TcpLongConnection::getTcpClient();
-    HttpShortConnection::getHttpClient();
+    HttpShortConnection::getHttpClient().getBootstrapConfig();
     DatabaseManager::getDatabaseManager();
     FriendManage::getFriendManage();
     UserInfo::getUserInfo();
