@@ -221,39 +221,64 @@ void GlobalInitController::startMigrateFile(const QString &newDBPath)
 
     DatabaseManager::getDatabaseManager().stopHandleTask();
 
-    bool success = false;
-    QString oldDBPath = GlobalVariable::getPosOfChatRecord();
-    QString fullyPath = newDBPath + "/record";
-    QString tempNewPath = fullyPath + ".tmp";
+    QDir oldDir(GlobalVariable::getPosOfChatRecord());
+    QDir targetDir(QDir(newDBPath).filePath("record"));
+
+    QString oldDBPath = oldDir.absolutePath();
+    QString fullyPath = targetDir.absolutePath();
+
+    if(oldDBPath.compare(fullyPath, Qt::CaseInsensitive) == 0)
+    {
+        this->nowStep = oldStep;
+        DatabaseManager::getDatabaseManager().startHandleTask();
+        emit migrateFinished(true);
+        return;
+    }
+
+    if(fullyPath.startsWith(oldDBPath + "/", Qt::CaseInsensitive))
+    {
+        this->nowStep = oldStep;
+        DatabaseManager::getDatabaseManager().startHandleTask();
+        emit migrateFinished(false);
+        return;
+    }
+
+    QString backupPath;
+    if(QDir(fullyPath).exists())
+    {
+        backupPath = fullyPath + "_bak_" + QDateTime::currentDateTime().toString("yyyyMMddHHmmss");
+
+        if(!QDir().rename(fullyPath, backupPath))
+        {
+            this->nowStep = oldStep;
+            DatabaseManager::getDatabaseManager().startHandleTask();
+            emit migrateFinished(false);
+            return;
+        }
+    }
 
     GlobalVariable::setMigrationState(true, oldDBPath, fullyPath);
 
-    if(oldDBPath != fullyPath)
-    {
-        success = migrateDirectory(oldDBPath, tempNewPath);
-        if(success)
-        {
-            if(!QDir().rename(tempNewPath, fullyPath))
-            {
-                QDir(tempNewPath).removeRecursively();
-                success = false;
-            }
-        }
-        else
-            QDir(tempNewPath).removeRecursively();
-
-        if(success)
-            QDir(oldDBPath).removeRecursively();
-    }
-    else
-        success = true;
+    bool success = migrateDirectory(oldDBPath, fullyPath);
 
     if(success)
+        success = verifyAndCleanOldData(oldDBPath, fullyPath);
+
+    if(!success)
+    {
+        QDir(fullyPath).removeRecursively();
+        if(!backupPath.isEmpty() && QDir(backupPath).exists())
+            QDir().rename(backupPath, fullyPath);
+    }
+    else
     {
         GlobalVariable::setPosOfChatRecord(newDBPath);
         DatabaseManager::getDatabaseManager().setNewDatabasePath(GlobalVariable::getPosOfChatRecord());
 
         GlobalVariable::setMigrationState(false);
+
+        if(!backupPath.isEmpty() && QDir(backupPath).exists())
+            QDir(backupPath).removeRecursively();
     }
 
     DatabaseManager::getDatabaseManager().startHandleTask();
@@ -456,18 +481,22 @@ bool GlobalInitController::migrateDirectory(const QString &oldDir, const QString
     if(!QDir().mkpath(newDir))
         return false;
 
-    QDirIterator it(oldDir, QDir::AllEntries | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+    QDirIterator it(oldDir, QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden, QDirIterator::Subdirectories);
     while(it.hasNext())
     {
         it.next();
         QString relativePath = oldD.relativeFilePath(it.filePath());
         QString endPath = newDir + "/" + relativePath;
+
         if(it.fileInfo().isDir())
             QDir().mkpath(endPath);
         else
         {
-            if(!QFile::copy(it.filePath(), endPath))
-                return false;
+            if(!QFile::exists(endPath))
+            {
+                if(!QFile::copy(it.filePath(), endPath))
+                    return false;
+            }
         }
     }
 
@@ -481,35 +510,66 @@ void GlobalInitController::checkUnFinishMigrate()
 
     QString oldPath = GlobalVariable::getMigratingOldPath();
     QString newPath = GlobalVariable::getMigratingNewPath();
-    QString tempPath = newPath + ".tmp";
+
+    bool isNewPathValid = false;
 
     if(!newPath.isEmpty() && QDir(newPath).exists())
     {
-        QString baseDir = newPath;
-        const QString suffix = "/record";
-        if(baseDir.endsWith(suffix))
-        {
-            baseDir.chop(suffix.length());
-        }
+        QDir dir(newPath);
+        if(dir.entryList(QDir::AllEntries | QDir::NoDotAndDotDot).size() > 0)
+            isNewPathValid = true;
+    }
 
-        GlobalVariable::setPosOfChatRecord(baseDir);
+    if(isNewPathValid)
+    {
+        GlobalVariable::setPosOfChatRecord(QFileInfo(newPath).absolutePath());
         emit chatRecordPathChanged();
 
         DatabaseManager::getDatabaseManager().setNewDatabasePath(newPath);
-        QDir(tempPath).removeRecursively();
-        if(!oldPath.isEmpty() && QDir(oldPath).exists())
-            QDir(oldPath).removeRecursively();
     }
-    else if(!oldPath.isEmpty() && QDir(oldPath).exists())
-        QDir(tempPath).removeRecursively();
     else
     {
-        qWarning() << "聊天记录迁移恢复失败，严重错误";
-        QString defaultDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
-        GlobalVariable::setPosOfChatRecord(defaultDir);
-        DatabaseManager::getDatabaseManager().setNewDatabasePath(GlobalVariable::getPosOfChatRecord());
-        emit chatRecordPathChanged();
+        if(!oldPath.isEmpty() && QDir(oldPath).exists())
+        {
+            GlobalVariable::setPosOfChatRecord(QFileInfo(oldPath).absolutePath());
+            DatabaseManager::getDatabaseManager().setNewDatabasePath(oldPath);
+            emit chatRecordPathChanged();
+        }
+        else
+        {
+            qWarning() << "聊天记录迁移恢复失败，严重错误";
+            QString defaultDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+            GlobalVariable::setPosOfChatRecord(defaultDir);
+            DatabaseManager::getDatabaseManager().setNewDatabasePath(GlobalVariable::getPosOfChatRecord());
+            emit chatRecordPathChanged();
+        }
     }
 
     GlobalVariable::setMigrationState(false);
+}
+
+bool GlobalInitController::verifyAndCleanOldData(const QString &oldDir, const QString &newDir)
+{
+    QDir oldD(oldDir);
+    if(!oldD.exists())
+        return true;
+
+    QDirIterator it(oldDir, QStringList() << "*.db", QDir::Files, QDirIterator::Subdirectories);
+    while(it.hasNext())
+    {
+        it.next();
+        QString relativePath = oldD.relativeFilePath(it.filePath());
+        QString newFilePath = newDir + "/" + relativePath;
+
+        QFileInfo oldInfo(it.filePath());
+        QFileInfo newInfo(newFilePath);
+
+        if(!newInfo.exists() || oldInfo.size() != newInfo.size())
+        {
+            qWarning() << "迁移失败 文件大小不一致";
+            return false;
+        }
+    }
+
+    return oldD.removeRecursively();
 }

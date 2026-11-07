@@ -72,6 +72,7 @@ private:
     explicit GlobalInitController(QObject *parent = nullptr);
     bool migrateDirectory(const QString& oldDir, const QString& newDir);
     void checkUnFinishMigrate();
+    bool verifyAndCleanOldData(const QString &oldDir, const QString &newDir);
 
     Step nowStep = Step::Free;
 

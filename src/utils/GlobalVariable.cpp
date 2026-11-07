@@ -84,8 +84,12 @@ void GlobalVariable::setPosOfChatRecord(const QString &dir)
 {
     QWriteLocker locker(&rwLock);
     QSettings settings(QSettings::NativeFormat, QSettings::UserScope, "ChatFreelyOrg", "ChatClient");
-    settings.setValue("pos_chatRecord", dir + "/record");
-    pos_chatRecord = dir + "/record";
+
+    QString finalPath = QDir(dir).filePath("record");
+    QDir().mkpath(finalPath);
+
+    settings.setValue("pos_chatRecord", finalPath);
+    pos_chatRecord = finalPath;
     settings.sync();
 }
 
