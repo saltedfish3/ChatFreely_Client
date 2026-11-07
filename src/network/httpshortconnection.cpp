@@ -600,9 +600,9 @@ void HttpShortConnection::getBootstrapConfig()
     QNetworkRequest request(QUrl("https://chatfreely.test/config"));
     QNetworkReply* reply = this->httpmanager->get(request);
 
-    connect(reply, &QNetworkReply::sslErrors, this, [reply](const QList<QSslError> &errors){
-        reply->ignoreSslErrors();
-    });
+    // connect(reply, &QNetworkReply::sslErrors, this, [reply](const QList<QSslError> &errors){
+    //     reply->ignoreSslErrors();
+    // });
 
     connect(reply, &QNetworkReply::finished, this, [reply](){
         reply->deleteLater();
@@ -650,12 +650,12 @@ HttpShortConnection::HttpShortConnection(QObject *parent)
 {
     httpmanager = new QNetworkAccessManager(this);
 
-    connect(httpmanager, &QNetworkAccessManager::sslErrors, this, [this](QNetworkReply* reply, const QList<QSslError>& errors){
-        for (const QSslError &error : errors) {
-            qWarning() << "SSL Error Ignored:" << error.errorString();
-        }
-        reply->ignoreSslErrors();
-    });
+    // connect(httpmanager, &QNetworkAccessManager::sslErrors, this, [this](QNetworkReply* reply, const QList<QSslError>& errors){
+    //     for (const QSslError &error : errors) {
+    //         qWarning() << "SSL Error Ignored:" << error.errorString();
+    //     }
+    //     reply->ignoreSslErrors();
+    // });
 
     connect(&TcpLongConnection::getTcpClient(), &TcpLongConnection::exitAccount, this, [this](){
         cleanALL();

@@ -3598,15 +3598,22 @@ uint64_t TcpLongConnection::getRequestsId()
 TcpLongConnection::TcpLongConnection(QObject *parent)
     : QObject{parent}
 {
-    this->socket = new QTcpSocket(this);
+    this->socket = new QSslSocket(this);
     this->clock_retry = new QTimer(this);
     this->clock_heartbeat = new QTimer(this);
     this->clock_retry->setInterval(5000);
 
     this->client_session_id = QUuid::createUuid().toString(QUuid::WithoutBraces);
 
+    // connect(this->socket, &QSslSocket::sslErrors, this, [this](const QList<QSslError> &errors){
+    //     for (const QSslError &error : errors) {
+    //         qWarning() << "TCP SSL Error Ignored:" << error.errorString();
+    //     }
+    //     this->socket->ignoreSslErrors();
+    // });
+
     //连接成功处理
-    connect(this->socket, &QTcpSocket::connected, this, [this](){
+    connect(this->socket, &QSslSocket::encrypted, this, [this](){
         this->clock_retry->stop();
         sendHello();
         if(this->hasConnected)
@@ -3615,20 +3622,20 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
             this->hasConnected = true;
     });
 
-    connect(this->socket, &QTcpSocket::disconnected, this, [this](){
+    connect(this->socket, &QSslSocket::disconnected, this, [this](){
         this->clock_heartbeat->stop();
         if(!this->clock_retry->isActive())
             this->clock_retry->start();
     });
 
     //连接失败或发生错误处理
-    connect(this->socket, &QTcpSocket::errorOccurred, this, [this](QAbstractSocket::SocketError error){
+    connect(this->socket, &QSslSocket::errorOccurred, this, [this](QAbstractSocket::SocketError error){
         this->clock_heartbeat->stop();
         if(!this->clock_retry->isActive())
             this->clock_retry->start();
     });
 
-    connect(this->socket, &QTcpSocket::readyRead, this, [this](){
+    connect(this->socket, &QSslSocket::readyRead, this, [this](){
         while(this->socket->canReadLine())
         {
             QByteArray data = this->socket->readLine().trimmed();
@@ -3866,9 +3873,10 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
 
 void TcpLongConnection::startConnect()
 {
-    if(this->socket->state() != QAbstractSocket::ConnectedState)
+    if(this->socket->state() != QAbstractSocket::ConnectedState &&
+        this->socket->state() != QAbstractSocket::ConnectingState)
     {
         this->socket->abort();
-        this->socket->connectToHost(SADDR,SPORT);
+        this->socket->connectToHost(GlobalVariable::getServerHost(), GlobalVariable::getTcpPort());
     }
 }

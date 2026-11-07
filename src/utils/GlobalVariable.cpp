@@ -5,7 +5,7 @@ QString GlobalVariable::pos_chatRecord;
 QString GlobalVariable::pos_imageCache;
 bool GlobalVariable::isHaveGPU = false;
 QString GlobalVariable::serverHost = "chatfreely.test";
-int GlobalVariable::tcpPort = 9002;
+int GlobalVariable::tcpPort = 9443;
 bool GlobalVariable::useHttps = true;
 QReadWriteLock GlobalVariable::rwLock;
 

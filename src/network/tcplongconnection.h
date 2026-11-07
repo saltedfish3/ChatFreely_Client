@@ -2,7 +2,7 @@
 #define TCPLONGCONNECTION_H
 
 #include <QObject>
-#include <QtNetwork/QTcpSocket>
+#include <QtNetwork/QSslSocket>
 #include <QCoreApplication>
 #include <QTimer>
 #include <QJsonDocument>
@@ -16,9 +16,6 @@
 #include "../utils/GlobalVariable.h"
 #include "../chat/message.h"
 #include "../utils/imagecachemanager.h"
-
-#define SADDR "192.168.153.128"
-#define SPORT 9002
 
 class UserInfo;
 class HttpShortConnection;
@@ -186,7 +183,7 @@ private:
 
     uint64_t getRequestsId();
 
-    QTcpSocket* socket;
+    QSslSocket* socket;
     QTimer* clock_retry;
     QTimer* clock_heartbeat;
 
