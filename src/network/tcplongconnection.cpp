@@ -3877,6 +3877,6 @@ void TcpLongConnection::startConnect()
         this->socket->state() != QAbstractSocket::ConnectingState)
     {
         this->socket->abort();
-        this->socket->connectToHost(GlobalVariable::getServerHost(), GlobalVariable::getTcpPort());
+        this->socket->connectToHostEncrypted(GlobalVariable::getServerHost(), GlobalVariable::getTcpPort());
     }
 }

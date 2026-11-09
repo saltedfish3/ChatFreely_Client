@@ -372,6 +372,7 @@ void HttpShortConnection::getImage(const QString &url, size_t retryTime, std::fu
 
     QNetworkRequest request(url);
     request.setRawHeader("Authorization", "Bearer " + UserInfo::getUserInfo().getAccessToken().toUtf8());
+    request.setRawHeader("Referer", GlobalVariable::getHttpBaseUrl().toUtf8());
     QNetworkReply* reply = this->httpmanager->get(request);
 
     connect(reply, &QNetworkReply::finished, this, [reply, this, url, retryTime, failed_notice, onSuccess](){
@@ -620,6 +621,7 @@ void HttpShortConnection::getBootstrapConfig()
         int newPort = obj.value("tcpPort").toString().toInt();
         bool newHttps = obj.value("useHttps").toBool();
 
+        qDebug()<<newHost << newPort;
         if(!newHost.isEmpty() && newPort > 0)
             GlobalVariable::updateServerConfig(newHost, newPort, newHttps);
     });

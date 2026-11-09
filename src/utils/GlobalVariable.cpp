@@ -228,6 +228,7 @@ void GlobalVariable::setHasGPU(bool gpu)
 QString GlobalVariable::getServerHost()
 {
     QReadLocker locker(&rwLock);
+    qDebug()<<serverHost;
     return serverHost;
 }
 
