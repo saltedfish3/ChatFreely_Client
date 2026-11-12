@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(ChatClient VERSION 0.1 LANGUAGES CXX)
+project(ChatClient VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
@@ -75,8 +75,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         src/widgets/groupdelegate.h src/widgets/groupdelegate.cpp
         src/widgets/groupinfowidget.h src/widgets/groupinfowidget.cpp
         src/widgets/groupmemberdelegate.h src/widgets/groupmemberdelegate.cpp
-        README.md
-        screenshots/main.png
+        src/app.rc
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET ChatClient APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
@@ -116,13 +115,6 @@ endif()
 
 if(MSVC)
     target_link_options(ChatClient PRIVATE /INCREMENTAL:NO)
-endif()
-
-if(WIN32)
-    set(APP_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/resources/images/favicon.ico")
-    set(RC_FILE_PATH "${CMAKE_CURRENT_BINARY_DIR}/app_icon.rc")
-    file(WRITE "${RC_FILE_PATH}" "IDI_ICON1 ICON DISCARDABLE \"${APP_ICON_PATH}\"\n")
-    target_sources(ChatClient PRIVATE "${RC_FILE_PATH}")
 endif()
 
 target_link_libraries(ChatClient PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Sql Qt${QT_VERSION_MAJOR}::Multimedia Qt${QT_VERSION_MAJOR}::OpenGLWidgets Qt${QT_VERSION_MAJOR}::MultimediaWidgets)

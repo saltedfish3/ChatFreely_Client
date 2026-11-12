@@ -1,7 +1,7 @@
 #ifndef GLOBALVARIABLE_H
 #define GLOBALVARIABLE_H
 
-#define AppVersion "1.0"
+#define AppVersion "1.0.0"
 #define AppChineseName "畅聊"
 #define AppEnglishName "ChatFreely"
 

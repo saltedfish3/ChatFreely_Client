@@ -34,6 +34,7 @@ int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
     a.setWindowIcon(QIcon(":/icon/images/favicon.ico"));
+    a.setApplicationVersion(AppVersion);
     QCoreApplication::setOrganizationName("ProChat");
     QCoreApplication::setApplicationName("ChatFreely");
     GlobalVariable::initGlobalSettings();
