@@ -75,6 +75,8 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         src/widgets/groupdelegate.h src/widgets/groupdelegate.cpp
         src/widgets/groupinfowidget.h src/widgets/groupinfowidget.cpp
         src/widgets/groupmemberdelegate.h src/widgets/groupmemberdelegate.cpp
+        README.md
+        screenshots/main.png
     )
 # Define target properties for Android with Qt 6 as:
 #    set_property(TARGET ChatClient APPEND PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
@@ -116,7 +118,30 @@ if(MSVC)
     target_link_options(ChatClient PRIVATE /INCREMENTAL:NO)
 endif()
 
+if(WIN32)
+    set(APP_ICON_PATH "${CMAKE_CURRENT_SOURCE_DIR}/src/resources/images/favicon.ico")
+    set(RC_FILE_PATH "${CMAKE_CURRENT_BINARY_DIR}/app_icon.rc")
+    file(WRITE "${RC_FILE_PATH}" "IDI_ICON1 ICON DISCARDABLE \"${APP_ICON_PATH}\"\n")
+    target_sources(ChatClient PRIVATE "${RC_FILE_PATH}")
+endif()
+
 target_link_libraries(ChatClient PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::Sql Qt${QT_VERSION_MAJOR}::Multimedia Qt${QT_VERSION_MAJOR}::OpenGLWidgets Qt${QT_VERSION_MAJOR}::MultimediaWidgets)
+
+# 动态下发url, 留空则不走
+set(CHATFREELY_BOOTSTRAP_URL "")
+# 兜底主机ip/域名
+set(CHATFREELY_DEFAULT_HOST "")
+# 服务器Tcp连接端口
+set(CHATFREELY_DEFAULT_TCP_PORT "0")
+# 服务器http连接端口
+set(CHATFREELY_DEFAULT_HTTP_PORT "0")
+
+target_compile_definitions(ChatClient PRIVATE
+    CHATFREELY_BOOTSTRAP_URL="${CHATFREELY_BOOTSTRAP_URL}"
+    CHATFREELY_DEFAULT_HOST="${CHATFREELY_DEFAULT_HOST}"
+    CHATFREELY_DEFAULT_TCP_PORT=${CHATFREELY_DEFAULT_TCP_PORT}
+    CHATFREELY_DEFAULT_HTTP_PORT=${CHATFREELY_DEFAULT_HTTP_PORT}
+)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an

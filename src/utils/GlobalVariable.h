@@ -29,6 +29,8 @@ public:
     GlobalVariable(const GlobalVariable&) = delete;
     GlobalVariable& operator=(const GlobalVariable&) = delete;
 
+    static QSettings getSettings();
+
     static void initGlobalSettings();
     static QString getPosOfDownloadFile();
     static void setPosOfDownloadFile(const QString& dir);
@@ -57,7 +59,7 @@ public:
     static int getTcpPort();
     static int getHttpPort();
     static QString getHttpBaseUrl();
-
+    static bool getUseHttps();
     static void updateServerConfig(const QString& host, int tcpPort, bool useHttps, int httpPort = 0);
 
 private:

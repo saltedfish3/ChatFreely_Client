@@ -598,37 +598,63 @@ void HttpShortConnection::checkUrlExists(const QString &url, std::function<void 
 
 void HttpShortConnection::getBootstrapConfig()
 {
-    QNetworkRequest request(QUrl("https://1306559217-6i79fk83jt.ap-guangzhou.tencentscf.com/config"));
+    const QString url = QString::fromUtf8(CHATFREELY_BOOTSTRAP_URL);
+    if(url.isEmpty())
+    {
+        qWarning() << "BOOTSTRAP_URL 为空";
+        emit bootstrapFinished();
+        return;
+    }
+
+    QNetworkRequest request{QUrl(url)};
+    request.setTransferTimeout(1500);
+
     QNetworkReply* reply = this->httpmanager->get(request);
 
     // connect(reply, &QNetworkReply::sslErrors, this, [reply](const QList<QSslError> &errors){
     //     reply->ignoreSslErrors();
     // });
 
-    connect(reply, &QNetworkReply::finished, this, [reply](){
+    connect(reply, &QNetworkReply::finished, this, [reply, this](){
         reply->deleteLater();
 
         if(reply->error() != QNetworkReply::NoError)
         {
             qWarning() << "获取动态配置失败，使用本地缓存";
+            emit bootstrapFinished();
             return;
         }
 
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
         QJsonObject obj = doc.object();
 
-        QString newHost = obj.value("serverHost").toString();
-        int newPort = obj.value("tcpPort").toString().toInt();
-        int newHttpPort = 0;
+        QString newHost = GlobalVariable::getServerHost();
+        int newTcpPort = GlobalVariable::getTcpPort();
+        int newHttpPort = GlobalVariable::getHttpPort();
+        bool newUseHttps = GlobalVariable::getUseHttps();
+
+        if(obj.contains("serverHost"))
+        {
+            const QString value = obj.value("serverHost").toString().trimmed();
+            if(!value.isEmpty())
+                newHost = value;
+        }
+
+        if(obj.contains("tcpPort"))
+        {
+            const int value = obj.value("tcpPort").toVariant().toInt();
+            if(value > 0)
+                newTcpPort = value;
+        }
 
         if(obj.contains("httpPort"))
-            newHttpPort = obj.value("httpPort").toString().toInt();
+            newHttpPort = obj.value("httpPort").toVariant().toInt();
 
-        bool newHttps = obj.value("useHttps").toBool();
+        if(obj.contains("useHttps"))
+            newUseHttps = obj.value("useHttps").toVariant().toBool();
 
-        qDebug()<<newHost << newPort << newHttpPort;
-        if(!newHost.isEmpty() && newPort > 0)
-            GlobalVariable::updateServerConfig(newHost, newPort, newHttps, newHttpPort);
+        GlobalVariable::updateServerConfig(newHost, newTcpPort, newUseHttps, newHttpPort);
+        emit bootstrapFinished();
     });
 }
 

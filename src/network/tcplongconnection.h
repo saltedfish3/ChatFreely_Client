@@ -28,6 +28,8 @@ public:
     TcpLongConnection(const TcpLongConnection&) = delete;
     TcpLongConnection& operator=(const TcpLongConnection&) = delete;
 
+    void startConnect();
+
     //账号
     void sendLogin(QString email, QString password);
     void sendRegister(QString email, QString password, QString username);
@@ -128,7 +130,6 @@ signals:
 private:
     explicit TcpLongConnection(QObject *parent = nullptr);
 
-    void startConnect();
     void sendHello();
     void handleHeartBeatResp(QJsonObject obj);
 

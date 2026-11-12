@@ -94,6 +94,7 @@ signals:
 
     void uploadProgressChanged(const QString& filePath, qint64 sendSize, qint64 totalSize, int percent);
 
+    void bootstrapFinished();
 private:
     struct DownloadTask
     {

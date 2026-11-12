@@ -2,6 +2,7 @@
 #include <QOpenGLContext>
 #include <QOffscreenSurface>
 #include <QSurfaceFormat>
+#include <QObject>
 
 #include "widgets/bodywidget.h"
 #include <QApplication>
@@ -40,7 +41,13 @@ int main(int argc, char *argv[])
     qDebug()<< "是否使用GPU: " << GlobalVariable::hasGPU();
 
     TcpLongConnection::getTcpClient();
+
+    QObject::connect(&HttpShortConnection::getHttpClient(), &HttpShortConnection::bootstrapFinished, &TcpLongConnection::getTcpClient(), [](){
+        TcpLongConnection::getTcpClient().startConnect();
+    });
+
     HttpShortConnection::getHttpClient().getBootstrapConfig();
+
     DatabaseManager::getDatabaseManager();
     FriendManage::getFriendManage();
     UserInfo::getUserInfo();

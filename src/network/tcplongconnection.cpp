@@ -3868,11 +3868,15 @@ TcpLongConnection::TcpLongConnection(QObject *parent)
             }
         }
     });
-    startConnect();
 }
 
 void TcpLongConnection::startConnect()
 {
+    if(GlobalVariable::getServerHost().isEmpty() || GlobalVariable::getTcpPort() <= 0)
+    {
+        qWarning() << "未配置服务器地址，请前往CMakeLists中配置";
+        return;
+    }
     if(this->socket->state() != QAbstractSocket::ConnectedState &&
         this->socket->state() != QAbstractSocket::ConnectingState)
     {

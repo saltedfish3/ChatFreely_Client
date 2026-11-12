@@ -40,4 +40,5 @@
         <file>images/favicon.ico</file>
         <file>images/blackIcon.png</file>
     </qresource>
+    <qresource prefix="/"/>
 </RCC>
