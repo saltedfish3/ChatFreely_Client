@@ -4,8 +4,9 @@ QString GlobalVariable::pos_downloadFile;
 QString GlobalVariable::pos_chatRecord;
 QString GlobalVariable::pos_imageCache;
 bool GlobalVariable::isHaveGPU = false;
-QString GlobalVariable::serverHost = "chatfreely.test";
+QString GlobalVariable::serverHost = "gz.chatfreely.cloud";
 int GlobalVariable::tcpPort = 9443;
+int GlobalVariable::httpPort = 8443;
 bool GlobalVariable::useHttps = true;
 QReadWriteLock GlobalVariable::rwLock;
 
@@ -42,11 +43,15 @@ void GlobalVariable::initGlobalSettings()
     if(!settings.contains("tcpPort"))
         settings.setValue("tcpPort", tcpPort);
 
+    if(!settings.contains("httpPort"))
+        settings.setValue("httpPort", httpPort);
+
     if(!settings.contains("useHttps"))
         settings.setValue("useHttps", useHttps);
 
     serverHost = settings.value("serverHost").toString();
     tcpPort = settings.value("tcpPort").toInt();
+    httpPort = settings.value("httpPort").toInt();
     useHttps = settings.value("useHttps").toBool();
 }
 
@@ -228,7 +233,6 @@ void GlobalVariable::setHasGPU(bool gpu)
 QString GlobalVariable::getServerHost()
 {
     QReadLocker locker(&rwLock);
-    qDebug()<<serverHost;
     return serverHost;
 }
 
@@ -238,20 +242,28 @@ int GlobalVariable::getTcpPort()
     return tcpPort;
 }
 
+int GlobalVariable::getHttpPort()
+{
+    QReadLocker locker(&rwLock);
+    return httpPort;
+}
+
 QString GlobalVariable::getHttpBaseUrl()
 {
     QReadLocker locker(&rwLock);
     QString pre = useHttps ? "https://" : "http://";
-    return pre + serverHost;
+    qDebug()<<pre + serverHost + (httpPort == 80 || httpPort == 443 || httpPort <= 0 ? "" : ":" + QString::number(httpPort));
+    return pre + serverHost + (httpPort == 80 || httpPort == 443 || httpPort <= 0 ? "" : ":" + QString::number(httpPort));
 }
 
-void GlobalVariable::updateServerConfig(const QString &host, int tcpPort, bool useHttps)
+void GlobalVariable::updateServerConfig(const QString &host, int tcpPort, bool useHttps, int httpPort)
 {
     if(host.isEmpty() || tcpPort <= 0)
         return;
 
     GlobalVariable::serverHost = host;
     GlobalVariable::tcpPort = tcpPort;
+    GlobalVariable::httpPort = httpPort;
     GlobalVariable::useHttps = useHttps;
 
     QSettings settings(QSettings::NativeFormat, QSettings::UserScope, "ChatFreelyOrg", "ChatClient");

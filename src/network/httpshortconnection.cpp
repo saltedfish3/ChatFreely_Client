@@ -598,7 +598,7 @@ void HttpShortConnection::checkUrlExists(const QString &url, std::function<void 
 
 void HttpShortConnection::getBootstrapConfig()
 {
-    QNetworkRequest request(QUrl("https://chatfreely.test/config"));
+    QNetworkRequest request(QUrl("https://1306559217-6i79fk83jt.ap-guangzhou.tencentscf.com/config"));
     QNetworkReply* reply = this->httpmanager->get(request);
 
     // connect(reply, &QNetworkReply::sslErrors, this, [reply](const QList<QSslError> &errors){
@@ -619,11 +619,16 @@ void HttpShortConnection::getBootstrapConfig()
 
         QString newHost = obj.value("serverHost").toString();
         int newPort = obj.value("tcpPort").toString().toInt();
+        int newHttpPort = 0;
+
+        if(obj.contains("httpPort"))
+            newHttpPort = obj.value("httpPort").toString().toInt();
+
         bool newHttps = obj.value("useHttps").toBool();
 
-        qDebug()<<newHost << newPort;
+        qDebug()<<newHost << newPort << newHttpPort;
         if(!newHost.isEmpty() && newPort > 0)
-            GlobalVariable::updateServerConfig(newHost, newPort, newHttps);
+            GlobalVariable::updateServerConfig(newHost, newPort, newHttps, newHttpPort);
     });
 }
 

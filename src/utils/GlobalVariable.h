@@ -55,9 +55,10 @@ public:
 
     static QString getServerHost();
     static int getTcpPort();
+    static int getHttpPort();
     static QString getHttpBaseUrl();
 
-    static void updateServerConfig(const QString& host, int tcpPort, bool useHttps);
+    static void updateServerConfig(const QString& host, int tcpPort, bool useHttps, int httpPort = 0);
 
 private:
     GlobalVariable() = delete;
@@ -69,6 +70,7 @@ private:
 
     static QString serverHost;
     static int tcpPort;
+    static int httpPort;
     static bool useHttps;
 
     static QReadWriteLock rwLock;
