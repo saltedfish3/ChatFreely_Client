@@ -169,3 +169,6 @@ CMakeLists.txt.user*
 /build*/
 
 build/
+
+# 发布产物
+dist/
