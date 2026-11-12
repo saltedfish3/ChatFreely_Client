@@ -66,6 +66,12 @@ Thumbs.db
 
 *.rc
 
+# 保留手写的资源脚本（图标 + 版本信息）
+!src/app.rc
+
+# 资源编辑器的缓存文件
+*.aps
+
 /.qmake.cache
 
 /.qmake.stash
